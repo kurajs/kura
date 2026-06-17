@@ -26,9 +26,9 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
@@ -47,7 +47,8 @@ jobs:
 
       - name: Publish changed packages
         run: |
-          set -euo pipefail
+          set -uo pipefail
+          failed=""
           for dir in packages/*; do
             [ -f "$dir/package.json" ] || continue
             name=$(node -p "require('./$dir/package.json').name")
@@ -58,6 +59,13 @@ jobs:
               echo "skip $name@$version (already published)"
             else
               echo "publish $name@$version"
-              ( cd "$dir" && npm publish --access public --provenance )
+              # Don't let one package's failure skip the rest — collect and fail at the end.
+              if ( cd "$dir" && npm publish --access public --provenance ); then
+                echo "ok $name@$version"
+              else
+                echo "FAILED $name@$version"
+                failed="$failed $name@$version"
+              fi
             fi
           done
+          if [ -n "$failed" ]; then echo "::error::publish failed for:$failed"; exit 1; fi
