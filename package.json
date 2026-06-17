@@ -1,0 +1,11 @@
+{
+  "name": "kura-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Kura — agent-native documentation infrastructure, built on June.",
+  "workspaces": [
+    "packages/*",
+    "examples/*"
+  ],
+  "license": "MIT"
+}
