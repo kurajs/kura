@@ -12,7 +12,7 @@
   "dependencies": {
     "@junejs/core": "^0.0.25",
     "@kurajs/core": "^0.0.1",
-    "@kurajs/docs": "^0.0.1",
+    "@kurajs/docs": "^0.0.2",
     "@kurajs/transformers": "^0.0.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
@@ -20,7 +20,7 @@
   "devDependencies": {
     "@junejs/cli": "^0.0.25",
     "@junejs/server": "^0.0.25",
-    "@kurajs/cli": "^0.0.1",
+    "@kurajs/cli": "^0.0.2",
     "@huggingface/transformers": "3.8.1",
     "@types/react": "^19.2.0",
     "typescript": "^5.9.0"
