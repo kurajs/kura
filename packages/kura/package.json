@@ -1,0 +1,37 @@
+{
+  "name": "@kurajs/core",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Kura — the knowledgebase for humans and agents. Portable pure-JS vector retrieval engine (f32 brute-force + binary prefilter + rerank).",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --experimental-strip-types --test test/*.test.ts"
+  },
+  "keywords": [
+    "kura",
+    "june",
+    "vector",
+    "rag",
+    "knowledgebase",
+    "embeddings",
+    "search"
+  ],
+  "homepage": "https://kura.build",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  },
+  "author": "Lawrence Lin",
+  "publishConfig": {
+    "access": "public"
+  }
+}
