@@ -1,0 +1,24 @@
+{
+  "name": "@kurajs/example-search",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "june dev",
+    "build": "june build"
+  },
+  "dependencies": {
+    "@junejs/core": "^0.0.25",
+    "@kurajs/core": "*",
+    "@kurajs/transformers": "*",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@junejs/cli": "^0.0.25",
+    "@junejs/server": "^0.0.25",
+    "@huggingface/transformers": "3.8.1",
+    "@types/react": "^19.2.0",
+    "typescript": "^5.9.0"
+  }
+}
