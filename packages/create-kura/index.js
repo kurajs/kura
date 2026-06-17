@@ -49,4 +49,7 @@ ${BOLD}${CYAN}Kura${RESET} ${DIM}— the knowledgebase for humans and agents${RE
     ${CYAN}npm run dev${RESET}    ${DIM}# http://localhost:3000${RESET}
 
   Add Markdown to ${BOLD}content/docs/${RESET}; humans read it, agents call ${BOLD}/mcp${RESET}.
+
+  ${DIM}If ${RESET}npm install${DIM} fails building ${RESET}sharp${DIM} (an image-only, unused dep of${RESET}
+  ${DIM}the embedder), re-run with ${RESET}npm install --ignore-scripts${DIM}.${RESET}
 `);
