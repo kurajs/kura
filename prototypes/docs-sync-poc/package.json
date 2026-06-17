@@ -1,0 +1,9 @@
+{
+  "name": "docs-sync-poc",
+  "private": true,
+  "type": "module",
+  "description": "PoC: agent updates docs from a code change, scoped by `sources:` frontmatter (Claude Agent SDK).",
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "latest"
+  }
+}
