@@ -37,26 +37,66 @@ export async function buildIndex(opts: { entries: readonly DocLike[]; embedder: 
 }
 
 export interface SearchHandle {
-  getKb(): Promise<Kb<SearchData>>;
+  getKb(): Promise<Kb<SearchData> | null>;
   search(query: string, opts?: { topK?: number; locale?: string }): Promise<SearchHit[]>;
 }
 
+// Lexical fallback used when no embedder is configured (e.g. a Cloudflare Workers deploy
+// without Workers AI). Pure JS, zero-dependency: rank docs by query-term hits in title /
+// section / body. Not semantic, but real search with no model and no native deps.
+function lexicalSearch(entries: readonly DocLike[], query: string, topK: number): SearchHit[] {
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!terms.length) return [];
+  const hits: SearchHit[] = [];
+  for (const e of entries) {
+    const title = String(e.data.title ?? e.slug);
+    const section = String(e.data.section ?? "");
+    const body = stripMdx(e.body ?? "");
+    const lcTitle = title.toLowerCase(), lcSection = section.toLowerCase(), lcBody = body.toLowerCase();
+    let score = 0;
+    let firstAt = -1;
+    for (const t of terms) {
+      if (lcTitle.includes(t)) score += 5;
+      if (lcSection.includes(t)) score += 2;
+      const occ = lcBody.split(t).length - 1;
+      score += Math.min(occ, 5);
+      const at = lcBody.indexOf(t);
+      if (at >= 0 && (firstAt < 0 || at < firstAt)) firstAt = at;
+    }
+    if (score <= 0) continue;
+    const start = firstAt > 60 ? firstAt - 40 : 0;
+    const text = body.slice(start, start + 160).trim();
+    hits.push({ slug: e.slug, title, section, text, score, ...(e.locale ? { locale: e.locale } : {}) });
+  }
+  return hits.sort((a, b) => b.score - a.score).slice(0, topK);
+}
+
 /**
- * Runtime search. Loads a precomputed index (fast; no corpus embedding on the request
- * thread) or builds from entries as a fallback. Warms the model shortly after boot so the
- * first query doesn't pay the one-time model load.
+ * Runtime search. With an embedder, runs semantic search over a precomputed index (fast; no
+ * corpus embedding on the request thread), warming the model shortly after boot. WITHOUT an
+ * embedder, search degrades to a zero-dependency lexical scan over the entries — so a site
+ * still deploys (and searches) on Cloudflare Workers with no Workers AI. The embedder is the
+ * optional upgrade from lexical to semantic.
  */
 export function createSearch(opts: {
   entries: readonly DocLike[];
-  embedder: Embedder;
+  embedder?: Embedder;
   indexBytes?: Uint8Array;
   warm?: boolean;
 }): SearchHandle {
+  // No embedder → lexical mode (no Kb, no index needed).
+  if (!opts.embedder) {
+    return {
+      getKb: async () => null,
+      search: async (query, o) => lexicalSearch(opts.entries, query, o?.topK ?? 8),
+    };
+  }
+  const embedder = opts.embedder;
   let building: Promise<Kb<SearchData>> | null = null;
   const getKb = () =>
     (building ??= opts.indexBytes
-      ? Promise.resolve(Kb.load<SearchData>(opts.indexBytes, { embedder: opts.embedder }))
-      : indexKb(opts.entries, opts.embedder));
+      ? Promise.resolve(Kb.load<SearchData>(opts.indexBytes, { embedder }))
+      : indexKb(opts.entries, embedder));
 
   if (opts.warm !== false) {
     setTimeout(() => { getKb().then((kb) => kb.searchText("warm", { topK: 1 })).catch(() => {}); }, 50);

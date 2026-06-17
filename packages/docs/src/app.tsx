@@ -39,7 +39,8 @@ export function createDocs<T extends DocLike>(opts: {
   mdxHtml?: Record<string, Record<string, string>>;
 }) {
   const { DOCS, doc, docs } = opts.content;
-  if (!opts.config.embedder) throw new Error("createDocs: config.embedder is required (e.g. transformers())");
+  // embedder is OPTIONAL: with one, search is semantic (over the frozen index); without one,
+  // createSearch degrades to a lexical scan — so a site deploys + searches on Workers with no AI.
   const i18n = opts.i18n;
   const defaultLocale = i18n?.defaultLocale;
 
