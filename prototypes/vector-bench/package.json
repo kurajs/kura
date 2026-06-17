@@ -1,0 +1,18 @@
+{
+  "name": "vector-bench",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Kura R&D: libsql native vectors vs sqlite-vec vs JS brute-force benchmark (1024-dim, bge-m3 parity).",
+  "scripts": {
+    "bench": "node bench.mjs"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^3.8.1",
+    "@libsql/client": "^0.17.4",
+    "better-sqlite3": "^12.11.1",
+    "hnswlib-node": "^3.0.0",
+    "sqlite-vec": "^0.1.9",
+    "usearch": "^2.25.3"
+  }
+}
