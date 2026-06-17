@@ -1,0 +1,30 @@
+{
+  "name": "create-kura",
+  "version": "0.0.2",
+  "description": "Kura — the knowledgebase for humans and agents. Scaffold a Kura docs site, built on June.",
+  "type": "module",
+  "bin": {
+    "create-kura": "index.js"
+  },
+  "files": [
+    "index.js",
+    "template"
+  ],
+  "keywords": [
+    "kura",
+    "june",
+    "docs",
+    "documentation",
+    "mcp",
+    "agent-native"
+  ],
+  "homepage": "https://kura.build",
+  "license": "MIT",
+  "author": "Lawrence Lin",
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
