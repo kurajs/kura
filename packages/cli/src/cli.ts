@@ -9,6 +9,7 @@ import { buildIndex } from "@kurajs/docs/search";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import { spawn } from "node:child_process";
 import { pathToFileURL } from "node:url";
 
 function arg(name: string, def?: string): string | undefined {
@@ -125,14 +126,104 @@ async function cmdIndex(): Promise<void> {
   console.log(`kura index: rendered ${ok}/${total} docs via MDX${tag} -> app/_mdx.ts`);
 }
 
+// One Kura surface over June: dev / build / deploy each freeze content (june gen) + the search
+// index/MDX (kura index), then hand off to the `june` bin — which loads its own TS source and
+// owns the dev watch supervisor. Users only ever type `kura`.
+const flag = (name: string): boolean => process.argv.includes(`--${name}`);
+
+// Forward extra args to june, dropping the kura-only flags (--no-embed, --model <v>).
+function passthrough(): string[] {
+  const out: string[] = [];
+  const a = process.argv.slice(3);
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] === "--no-embed") continue;
+    if (a[i] === "--model") { i++; continue; }
+    out.push(a[i]!);
+  }
+  return out;
+}
+
+// Find the `june` bin shim, walking up so it works both in a standalone app (local node_modules)
+// and a workspace member (the bin is hoisted to the root node_modules/.bin).
+function findJuneBin(cwd: string): string | null {
+  const name = process.platform === "win32" ? "june.cmd" : "june";
+  let dir = cwd;
+  for (;;) {
+    const p = path.join(dir, "node_modules", ".bin", name);
+    if (fs.existsSync(p)) return p;
+    const parent = path.dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
+
+// Run the app's `june` bin (it handles TS loading + the dev watcher); resolve with its exit code.
+function runJune(cwd: string, args: string[]): Promise<number> {
+  const bin = findJuneBin(cwd);
+  if (!bin) {
+    console.error("kura: couldn't find the `june` bin — is @junejs/cli installed?");
+    return Promise.resolve(1);
+  }
+  return new Promise((resolve) => {
+    const child = spawn(bin, args, { stdio: "inherit" });
+    child.on("error", (e) => {
+      console.error(`kura: couldn't run june (${e.message}).`);
+      resolve(1);
+    });
+    child.on("exit", (code) => resolve(code ?? 0));
+  });
+}
+
+// Run `kura index` in a SHORT-LIVED child so the embedder's native runtime (onnxruntime) is
+// loaded and torn down in its own process — keeping the long-running dev/build/deploy parent
+// ML-free (and dodging ORT's noisy teardown on some platforms).
+function runKuraIndex(cwd: string): Promise<number> {
+  const args = [process.argv[1]!, "index"];
+  if (flag("no-embed")) args.push("--no-embed");
+  const model = arg("model");
+  if (model) args.push("--model", model);
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, args, { stdio: "inherit", cwd });
+    child.on("error", (e) => { console.error(`kura: index failed (${e.message}).`); resolve(1); });
+    child.on("exit", (code) => resolve(code ?? 0));
+  });
+}
+
+async function freeze(cwd: string): Promise<void> {
+  let code = await runJune(cwd, ["gen"]); // june gen → app/_content.ts
+  if (code) process.exit(code);
+  code = await runKuraIndex(cwd); // kura index → app/_index.ts + _mdx.ts (own process)
+  if (code) process.exit(code);
+}
+
 const cmd = process.argv[2];
-if (cmd === "index") {
-  await cmdIndex();
-} else {
-  console.log(
-    "Kura CLI\n" +
-      "  kura index [--model <hf-model>]   build & freeze the docs search index + MDX\n" +
-      "  kura index --no-embed             MDX only, no search index (runtime search is lexical)",
-  );
-  process.exit(cmd ? 1 : 0);
+const cwd = process.cwd();
+switch (cmd) {
+  case "index":
+    await cmdIndex();
+    break;
+  case "dev":
+    await freeze(cwd);
+    process.exit(await runJune(cwd, ["dev", ...passthrough()]));
+    break;
+  case "build":
+    await freeze(cwd);
+    process.exit(await runJune(cwd, ["build", ...passthrough()]));
+    break;
+  case "deploy": {
+    await freeze(cwd);
+    const dargs = ["deploy"];
+    for (const f of ["dry-run", "prod", "skip-migrate", "allow-destructive"]) if (flag(f)) dargs.push(`--${f}`);
+    process.exit(await runJune(cwd, dargs));
+    break;
+  }
+  default:
+    console.log(
+      "Kura CLI\n" +
+        "  kura dev [--no-embed]       freeze content + index, then run the dev server\n" +
+        "  kura build [--no-embed]     freeze + build the Worker bundle\n" +
+        "  kura deploy [--no-embed]    freeze + deploy to Cloudflare ([--dry-run] [--prod])\n" +
+        "  kura index [--no-embed] [--model <hf-model>]   (re)build the search index + MDX only",
+    );
+    process.exit(cmd ? 1 : 0);
 }
