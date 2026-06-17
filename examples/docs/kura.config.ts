@@ -2,21 +2,19 @@
 import { createDocs } from "@kurajs/docs";
 import { transformers } from "@kurajs/transformers";
 import { DOCS, doc, docs } from "./app/_content";
+import { INDEX_B64 } from "./app/_index";
+import { MDX } from "./app/_mdx";
 import { i18n } from "./june.config";
-import fs from "node:fs";
-import path from "node:path";
 
-const indexPath = path.join(process.cwd(), "app", "_index.bin");
-const indexBytes = fs.existsSync(indexPath) ? new Uint8Array(fs.readFileSync(indexPath)) : undefined;
-
-const mdxPath = path.join(process.cwd(), "app", "_mdx.json");
-const mdxHtml = fs.existsSync(mdxPath) ? JSON.parse(fs.readFileSync(mdxPath, "utf8")) : undefined;
+// Frozen by `kura index` and imported (not read from disk) so the worker bundle stays
+// filesystem-free on Cloudflare Workers. atob is available on Workers, Bun, and Node 18+.
+const indexBytes = Uint8Array.from(atob(INDEX_B64), (c) => c.charCodeAt(0));
 
 export const kura = createDocs({
   content: { DOCS, doc, docs },
   i18n,
   indexBytes,
-  mdxHtml,
+  mdxHtml: MDX,
   config: {
     // Section frontmatter values are stable English KEYS; sectionLabels localizes the display.
     sections: ["Get started", "Concepts", "Advanced"],

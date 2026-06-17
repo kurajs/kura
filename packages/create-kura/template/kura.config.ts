@@ -2,15 +2,17 @@
 import { createDocs } from "@kurajs/docs";
 import { transformers } from "@kurajs/transformers";
 import { DOCS, doc } from "./app/_content";
-import fs from "node:fs";
-import path from "node:path";
+import { INDEX_B64 } from "./app/_index";
+import { MDX } from "./app/_mdx";
 
-const indexPath = path.join(process.cwd(), "app", "_index.bin");
-const indexBytes = fs.existsSync(indexPath) ? new Uint8Array(fs.readFileSync(indexPath)) : undefined;
+// Frozen by `kura index` and imported (not read from disk) so the worker bundle stays
+// filesystem-free on Cloudflare Workers. atob is available on Workers, Bun, and Node 18+.
+const indexBytes = Uint8Array.from(atob(INDEX_B64), (c) => c.charCodeAt(0));
 
 export const kura = createDocs({
   content: { DOCS, doc },
   indexBytes,
+  mdxHtml: MDX,
   config: {
     sections: ["Getting started", "Guides"],
     site: { name: "PROJECT_NAME", brand: "PROJECT_NAME" },

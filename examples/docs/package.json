@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "june dev",
     "gen": "june gen && kura index",
-    "build": "june build && kura index"
+    "build": "june gen && kura index && june build",
+    "predev": "june gen && kura index"
   },
   "dependencies": {
     "@junejs/core": "^0.0.25",

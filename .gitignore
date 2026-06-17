@@ -1,5 +1,6 @@
 node_modules/
 dist/
+.june/
 *.log
 .DS_Store
 .env
@@ -7,6 +8,8 @@ dist/
 
 # generated app artifacts (rebuilt by `june gen` / `kura index`)
 **/app/_content.ts
+**/app/_index.ts
+**/app/_mdx.ts
 **/app/_index.bin
 **/app/_mdx.json
 
