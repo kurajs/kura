@@ -1,0 +1,42 @@
+{
+  "name": "@kurajs/cli",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Kura CLI — build the docs search index (kura index).",
+  "bin": {
+    "kura": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@kurajs/core": "^0.0.1",
+    "@kurajs/docs": "^0.0.1",
+    "@kurajs/transformers": "^0.0.1"
+  },
+  "peerDependencies": {
+    "@huggingface/transformers": ">=3"
+  },
+  "devDependencies": {
+    "@huggingface/transformers": "3.8.1",
+    "typescript": "^5.7.0"
+  },
+  "author": "Lawrence Lin",
+  "publishConfig": {
+    "access": "public"
+  },
+  "homepage": "https://kura.build",
+  "keywords": [
+    "kura",
+    "june",
+    "cli",
+    "docs",
+    "search",
+    "index",
+    "mcp"
+  ]
+}
