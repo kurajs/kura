@@ -1,21 +1,21 @@
-// The one Kura file: declare the docs site and bind it to your content + index.
+// The one Kura file: declare the docs site and bind it to your content.
 import { createDocs } from "@kurajs/docs";
-import { transformers } from "@kurajs/transformers";
 import { DOCS, doc } from "./app/_content";
-import { INDEX_B64 } from "./app/_index";
 import { MDX } from "./app/_mdx";
-
-// Frozen by `kura index` and imported (not read from disk) so the worker bundle stays
-// filesystem-free on Cloudflare Workers. atob is available on Workers, Bun, and Node 18+.
-const indexBytes = Uint8Array.from(atob(INDEX_B64), (c) => c.charCodeAt(0));
 
 export const kura = createDocs({
   content: { DOCS, doc },
-  indexBytes,
   mdxHtml: MDX,
   config: {
     sections: ["Getting started", "Guides"],
     site: { name: "PROJECT_NAME", brand: "PROJECT_NAME" },
-    embedder: transformers(), // local bge-m3 (swap for workersAI() on Cloudflare)
+    // No embedder → zero-dependency lexical search, so this site installs clean and deploys to
+    // Cloudflare Workers out of the box. To upgrade to SEMANTIC search:
+    //   1. npm i @kurajs/transformers @huggingface/transformers
+    //   2. import { transformers } from "@kurajs/transformers";
+    //      import { INDEX_B64 } from "./app/_index";
+    //      add  embedder: transformers()  here, and pass
+    //      indexBytes: Uint8Array.from(atob(INDEX_B64), (c) => c.charCodeAt(0))
+    //   3. drop --no-embed from the scripts in package.json
   },
 });

@@ -45,11 +45,9 @@ ${BOLD}${CYAN}Kura${RESET} ${DIM}— the knowledgebase for humans and agents${RE
   Next:
     ${CYAN}cd ${targetArg}${RESET}
     ${CYAN}npm install${RESET}
-    ${CYAN}npm run gen${RESET}    ${DIM}# freeze content + build the search index${RESET}
-    ${CYAN}npm run dev${RESET}    ${DIM}# http://localhost:3000${RESET}
+    ${CYAN}npm run dev${RESET}       ${DIM}# http://localhost:3000${RESET}
+    ${CYAN}npm run deploy${RESET}    ${DIM}# ship to Cloudflare Workers${RESET}
 
   Add Markdown to ${BOLD}content/docs/${RESET}; humans read it, agents call ${BOLD}/mcp${RESET}.
-
-  ${DIM}If ${RESET}npm install${DIM} fails building ${RESET}sharp${DIM} (an image-only, unused dep of${RESET}
-  ${DIM}the embedder), re-run with ${RESET}npm install --ignore-scripts${DIM}.${RESET}
+  ${DIM}Search is lexical out of the box; see ${RESET}kura.config.ts${DIM} to enable semantic search.${RESET}
 `);
