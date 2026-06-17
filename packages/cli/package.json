@@ -1,6 +1,6 @@
 {
   "name": "@kurajs/cli",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "type": "module",
   "description": "Kura CLI — build the docs search index (kura index).",
   "bin": {
@@ -15,7 +15,7 @@
   "license": "MIT",
   "dependencies": {
     "@kurajs/core": "^0.0.1",
-    "@kurajs/docs": "^0.0.2",
+    "@kurajs/docs": "^0.0.3",
     "@kurajs/transformers": "^0.0.1"
   },
   "peerDependencies": {
