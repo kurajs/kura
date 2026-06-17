@@ -38,6 +38,8 @@ export function DocsShell({ site, sidebar, active, toc, labels = DEFAULT_LABELS,
   const brand = site?.brand ?? site?.name ?? "Kura";
   return (
     <>
+      {/* Resolve + apply the theme on <html> BEFORE the styles below paint — no flash. */}
+      <script dangerouslySetInnerHTML={{ __html: THEME_INIT_JS }} />
       <style dangerouslySetInnerHTML={{ __html: themeCss }} />
       <header className="topbar">
         <a className="brand" href={href("/")}>{brand} <span className="sub">Docs</span></a>
@@ -52,6 +54,7 @@ export function DocsShell({ site, sidebar, active, toc, labels = DEFAULT_LABELS,
               ))}
             </span>
           )}
+          <button type="button" className="theme-toggle" data-theme-toggle aria-label="Toggle theme" />
           <a href="/llms.txt">llms.txt</a>
           <a href="/mcp">MCP</a>
         </nav>
@@ -79,7 +82,7 @@ export function DocsShell({ site, sidebar, active, toc, labels = DEFAULT_LABELS,
           )}
         </aside>
       </div>
-      <script dangerouslySetInnerHTML={{ __html: FOCUS_JS }} />
+      <script dangerouslySetInnerHTML={{ __html: FOCUS_JS + THEME_TOGGLE_JS }} />
     </>
   );
 }
@@ -124,6 +127,11 @@ export function SearchResults({ query, hits, labels = DEFAULT_LABELS, href = (p)
   );
 }
 
+// Runs FIRST (before the stylesheet) to set <html data-theme> with no flash. Pref is one of
+// system | light | dark; "system" follows prefers-color-scheme.
+const THEME_INIT_JS = `(function(){try{var p=localStorage.getItem('kura-theme')||'system';var d=document.documentElement;d.setAttribute('data-theme-pref',p);d.setAttribute('data-theme',(p==='dark'||(p==='system'&&matchMedia('(prefers-color-scheme:dark)').matches))?'dark':'light');}catch(e){}})();`;
+// The topbar toggle cycles system → light → dark, persists the pref, and tracks the OS while on system.
+const THEME_TOGGLE_JS = `(function(){var b=document.querySelector('[data-theme-toggle]');if(!b)return;var d=document.documentElement,order=['system','light','dark'],icon={system:'🖥',light:'☀',dark:'☾'};function pref(){return d.getAttribute('data-theme-pref')||'system';}function res(p){return p==='dark'||(p==='system'&&matchMedia('(prefers-color-scheme:dark)').matches)?'dark':'light';}function set(p){d.setAttribute('data-theme-pref',p);d.setAttribute('data-theme',res(p));try{localStorage.setItem('kura-theme',p);}catch(e){}b.textContent=icon[p];b.setAttribute('title','Theme: '+p);}set(pref());b.addEventListener('click',function(){set(order[(order.indexOf(pref())+1)%order.length]);});try{matchMedia('(prefers-color-scheme:dark)').addEventListener('change',function(){if(pref()==='system')d.setAttribute('data-theme',res('system'));});}catch(e){}})();`;
 const FOCUS_JS = `document.addEventListener('keydown',function(e){if(e.key==='/' && !/INPUT|TEXTAREA/.test((document.activeElement||{}).tagName||'')){e.preventDefault();var s=document.querySelector('.search-box');if(s)s.focus();}});`;
 const COPY_JS = `document.querySelectorAll('[data-copy-md]').forEach(function(b){b.addEventListener('click',async function(){try{var r=await fetch(b.getAttribute('data-copy-md'));var t=await r.text();await navigator.clipboard.writeText(t);var o=b.textContent;b.textContent='Copied';setTimeout(function(){b.textContent=o;},1500);}catch(e){alert('Copy failed: '+e);}});});`;
 const CODE_JS = `document.querySelectorAll('.prose pre').forEach(function(pre){if(pre.querySelector('.copy-code'))return;var b=document.createElement('button');b.className='copy-code';b.textContent='Copy';b.addEventListener('click',async function(){var c=pre.querySelector('code');try{await navigator.clipboard.writeText(c?c.innerText:pre.innerText);var o=b.textContent;b.textContent='Copied';setTimeout(function(){b.textContent=o;},1200);}catch(e){}});pre.appendChild(b);});`;
