@@ -3,6 +3,7 @@
 import { Kb } from "@kurajs/core";
 import type { Embedder } from "@kurajs/core";
 import type { DocLike } from "./nav.ts";
+import { stripMdx } from "./util.ts";
 
 export type SearchData = { slug: string; title: string; section: string; text: string; locale?: string };
 export type SearchHit = { slug: string; title: string; section: string; text: string; score: number; locale?: string };
@@ -23,7 +24,9 @@ async function indexKb(entries: readonly DocLike[], embedder: Embedder): Promise
     // can be resolved to the right language; the id is locale-scoped to avoid collisions
     // between a doc and its variants (same slug across locales).
     const base = { slug: d.slug, title: String(d.data.title ?? d.slug), section: String(d.data.section ?? ""), ...(d.locale ? { locale: d.locale } : {}) };
-    for (const c of chunk(d.body)) await kb.addText([{ id: `${d.locale ?? "_"}:${d.slug}#${n++}`, text: c, data: { ...base, text: c } }]);
+    // Strip MDX/JSX tags before chunking so neither the embeddings nor the result snippets
+    // carry raw `<Tab …>`-style markup.
+    for (const c of chunk(stripMdx(d.body))) await kb.addText([{ id: `${d.locale ?? "_"}:${d.slug}#${n++}`, text: c, data: { ...base, text: c } }]);
   }
   return kb;
 }
