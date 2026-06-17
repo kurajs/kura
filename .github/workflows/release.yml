@@ -1,0 +1,63 @@
+name: release
+
+# Publish the @kurajs/* packages (and create-kura) to npm via OIDC Trusted Publishing —
+# no long-lived npm token. Versions come from each package.json; a package whose version
+# is already on npm is skipped, so the monorepo's independently-versioned packages can
+# release together. Trigger by pushing a tag (e.g. `v0.0.2`) or running it manually.
+#
+# One-time npm setup (per package, on npmjs.com → package → Settings → Trusted Publisher):
+#   Publisher: GitHub Actions · Org/User: kurajs · Repository: kura · Workflow: release.yml
+# Do this for @kurajs/core, @kurajs/transformers, @kurajs/docs, @kurajs/cli, create-kura.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write # required for OIDC trusted publishing + provenance
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      # Trusted publishing needs a recent npm (>= 11.5).
+      - run: npm install -g npm@latest
+
+      # --ignore-scripts skips sharp's native build (image-only, unused here).
+      - run: npm ci --ignore-scripts
+
+      # Build in dependency order (core → transformers → docs → cli).
+      - run: npm run build -w @kurajs/core
+      - run: npm run build -w @kurajs/transformers
+      - run: npm run build -w @kurajs/docs
+      - run: npm run build -w @kurajs/cli
+
+      - name: Publish changed packages
+        run: |
+          set -euo pipefail
+          for dir in packages/*; do
+            [ -f "$dir/package.json" ] || continue
+            name=$(node -p "require('./$dir/package.json').name")
+            private=$(node -p "require('./$dir/package.json').private === true")
+            [ "$private" = "true" ] && { echo "skip $name (private)"; continue; }
+            version=$(node -p "require('./$dir/package.json').version")
+            if npm view "$name@$version" version >/dev/null 2>&1; then
+              echo "skip $name@$version (already published)"
+            else
+              echo "publish $name@$version"
+              ( cd "$dir" && npm publish --access public --provenance )
+            fi
+          done
