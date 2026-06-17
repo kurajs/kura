@@ -6,7 +6,6 @@
 //     and never reads the filesystem (Workers-safe; mirrors June's app/_content.ts freeze).
 //     A content hash short-circuits re-embedding when nothing changed (cheap to run pre-dev).
 import { buildIndex } from "@kurajs/docs/search";
-import { transformers } from "@kurajs/transformers";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -79,6 +78,12 @@ async function cmdIndex(): Promise<void> {
     const localeTag = locales.size ? ` (+${variants.length} variants across ${locales.size} locales)` : "";
     console.log(`kura index: embedding ${DOCS.length} docs${localeTag} (model ${model})…`);
     const t0 = Date.now();
+    // Lazy import: only the embed path needs the ML stack, so --no-embed sites never load it
+    // (and never install @kurajs/transformers — it's an optional peer).
+    const { transformers } = await import("@kurajs/transformers").catch(() => {
+      console.error("kura index: embedding needs @kurajs/transformers — install it, or use --no-embed.");
+      return process.exit(1);
+    });
     const bytes = await buildIndex({ entries: allEntries, embedder: transformers({ model }) });
     const b64 = Buffer.from(bytes).toString("base64");
     fs.writeFileSync(
