@@ -1,4 +1,6 @@
 import { defineJune } from "@junejs/core/config";
+import { kuraLlms } from "@kurajs/docs/agent";
+import { DOCS } from "./app/_content";
 
 // Locale routing: en is the default (unprefixed, canonical at "/"); ja-JP lives under
 // /ja. Shared with kura.config.ts so the docs framework knows the default locale.
@@ -17,5 +19,7 @@ export default defineJune({
     description: "The knowledgebase for humans and agents.",
   },
   i18n,
-  agent: { enabled: true }, // /mcp, /llms.txt, per-page .md/.json projections
+  // /mcp, /llms.txt, per-page .md/.json projections. llms.txt points agents at Kura's
+  // canonical names and lists every doc page (June only knows the catch-all route).
+  agent: { enabled: true, llms: kuraLlms({ DOCS }) },
 });
