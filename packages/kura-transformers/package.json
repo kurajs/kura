@@ -1,0 +1,40 @@
+{
+  "name": "@kurajs/transformers",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Local Transformers.js embedder for Kura (bge-m3). Runs ML models in JS with no Python.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "keywords": [
+    "kura",
+    "embeddings",
+    "bge-m3",
+    "transformers.js",
+    "onnx"
+  ],
+  "homepage": "https://kura.build",
+  "license": "MIT",
+  "peerDependencies": {
+    "@kurajs/core": "^0.0.1",
+    "@huggingface/transformers": ">=3"
+  },
+  "devDependencies": {
+    "@kurajs/core": "*",
+    "@huggingface/transformers": "3.8.1",
+    "typescript": "^5.7.0"
+  },
+  "author": "Lawrence Lin",
+  "publishConfig": {
+    "access": "public"
+  }
+}
