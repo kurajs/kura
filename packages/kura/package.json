@@ -33,5 +33,10 @@
   "author": "Lawrence Lin",
   "publishConfig": {
     "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kurajs/kura.git",
+    "directory": "packages/kura"
   }
 }

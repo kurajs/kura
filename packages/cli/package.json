@@ -38,5 +38,10 @@
     "search",
     "index",
     "mcp"
-  ]
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kurajs/kura.git",
+    "directory": "packages/cli"
+  }
 }
