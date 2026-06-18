@@ -4,6 +4,7 @@ import { transformers } from "@kurajs/transformers";
 import { DOCS, doc, docs } from "./app/_content";
 import { INDEX_B64 } from "./app/_index";
 import { MDX } from "./app/_mdx";
+import { META, META_LOCALES } from "./app/_meta";
 import { i18n } from "./june.config";
 
 // Frozen by `kura index` and imported (not read from disk) so the worker bundle stays
@@ -15,12 +16,11 @@ export const kura = createDocs({
   i18n,
   indexBytes,
   mdxHtml: MDX,
+  // Folder-driven nav: top-level folders are the sections, ordered by content/docs/meta.json.
+  // META_LOCALES localizes folder group titles per locale (e.g. "Features" → "機能").
+  meta: META,
+  metaLocales: META_LOCALES,
   config: {
-    // Section frontmatter values are stable English KEYS; sectionLabels localizes the display.
-    sections: ["Get started", "Concepts", "Advanced"],
-    sectionLabels: {
-      "ja-JP": { "Get started": "入門", Concepts: "コンセプト", Advanced: "発展" },
-    },
     localeNames: { en: "English", "ja-JP": "日本語" },
     site: { name: "Kura Docs", brand: "Kura" },
     embedder: transformers(), // local bge-m3 (swap for workersAI() on Cloudflare)

@@ -22,4 +22,7 @@ export default defineJune({
   // /mcp, /llms.txt, per-page .md/.json projections. llms.txt points agents at Kura's
   // canonical names and lists every doc page (June only knows the catch-all route).
   agent: { enabled: true, llms: kuraLlms({ DOCS }) },
+  // EXPERIMENT: soft-swap navigation for large docs — June fetches the next page's HTML and
+  // morphs it in (no full reload), so the sidebar/scroll stay put and clicking around feels instant.
+  clientRouter: true,
 });
