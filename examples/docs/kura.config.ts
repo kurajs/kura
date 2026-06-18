@@ -22,6 +22,9 @@ export const kura = createDocs({
   metaLocales: META_LOCALES,
   config: {
     localeNames: { en: "English", "ja-JP": "日本語" },
+    // Tab structure is declared once in content/docs/meta.json; only the titles localize here,
+    // keyed by the English title (same shape as sectionLabels).
+    tabLabels: { "ja-JP": { Guides: "ガイド", Reference: "リファレンス" } },
     site: { name: "Kura Docs", brand: "Kura" },
     embedder: transformers(), // local bge-m3 (swap for workersAI() on Cloudflare)
     labels: {
