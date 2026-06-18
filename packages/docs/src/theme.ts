@@ -49,11 +49,13 @@ a { color: inherit; text-decoration: none; }
 .sidebar .folder { margin: .1rem 0; }
 .sidebar .folder > .folder-title { display: flex; align-items: center; gap: .35rem; padding: .35rem .55rem; border-radius: 7px; color: var(--fg-soft); font-size: .92rem; cursor: pointer; list-style: none; }
 .sidebar .folder > .folder-title::-webkit-details-marker { display: none; }
-.sidebar .folder > .folder-title::before { content: "›"; display: inline-block; transition: transform .15s; color: var(--muted); }
-.sidebar .folder[open] > .folder-title::before { transform: rotate(90deg); }
+/* Chevron sits AFTER the (flex:1) label → pushed to the right edge, so every item's left text
+   aligns; the leaf items and the folder labels share the same left padding. */
+.sidebar .folder > .folder-title::after { content: "›"; display: inline-block; flex: none; transition: transform .15s; color: var(--muted); }
+.sidebar .folder[open] > .folder-title::after { transform: rotate(90deg); }
 .sidebar .folder > .folder-title:hover { background: var(--hover); }
 .sidebar .folder > .folder-title > .folder-link,
-.sidebar .folder > .folder-title > span { flex: 1; color: inherit; }
+.sidebar .folder > .folder-title > span { flex: 1; min-width: 0; color: inherit; }
 .sidebar .folder > .folder-title > .folder-link.active { color: var(--accent); font-weight: 600; }
 .sidebar .folder-items { margin-left: .5rem; padding-left: .6rem; border-left: 1px solid var(--border); }
 .content { padding: 2rem 2.5rem 5rem; min-width: 0; }
