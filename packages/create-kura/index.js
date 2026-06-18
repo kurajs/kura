@@ -23,12 +23,14 @@ if (fs.existsSync(target) && fs.readdirSync(target).length > 0) {
   process.exit(1);
 }
 
+// npm strips leading-dot files from published tarballs, so they ship dot-less and are restored here.
+const DOTFILES = { gitignore: ".gitignore", nvmrc: ".nvmrc" };
+
 function copyDir(src, dst) {
   fs.mkdirSync(dst, { recursive: true });
   for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
     const from = path.join(src, entry.name);
-    // npm strips .gitignore from published tarballs, so it ships as "gitignore".
-    const outName = entry.name === "gitignore" ? ".gitignore" : entry.name;
+    const outName = DOTFILES[entry.name] ?? entry.name;
     const to = path.join(dst, outName);
     if (entry.isDirectory()) copyDir(from, to);
     else fs.writeFileSync(to, fs.readFileSync(from, "utf8").replaceAll("PROJECT_NAME", name));
