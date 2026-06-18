@@ -9,15 +9,15 @@
     "deploy": "kura deploy --no-embed"
   },
   "dependencies": {
-    "@junejs/core": "^0.0.25",
+    "@junejs/core": "^0.0.27",
     "@kurajs/core": "^0.0.1",
-    "@kurajs/docs": "^0.0.3",
+    "@kurajs/docs": "^0.0.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
-    "@junejs/cli": "^0.0.25",
-    "@junejs/server": "^0.0.25",
+    "@junejs/cli": "^0.0.27",
+    "@junejs/server": "^0.0.27",
     "@kurajs/cli": "^0.0.5",
     "@types/react": "^19.2.0",
     "typescript": "^5.9.0"

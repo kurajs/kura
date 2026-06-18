@@ -53,7 +53,7 @@
     "remark-gfm": "^4.0.0"
   },
   "peerDependencies": {
-    "@junejs/core": "^0.0.25",
+    "@junejs/core": "^0.0.27",
     "react": "^19",
     "react-dom": "^19"
   },
@@ -69,7 +69,7 @@
     }
   },
   "devDependencies": {
-    "@junejs/core": "^0.0.25",
+    "@junejs/core": "^0.0.27",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "react": "^19.2.0",
