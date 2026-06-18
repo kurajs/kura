@@ -13,7 +13,7 @@ import { createSearch, type SearchHit } from "./search.ts";
 import { docsActions } from "./actions.ts";
 import { DocsPage, DocsShell, SearchResults, type SiteInfo, type SidebarGroup, type SidebarNode, type DocView, type Href, type LocaleLink, type TabLink } from "./ui.tsx";
 import type { KuraConfig } from "./config.ts";
-import { resolveLabels, type Labels } from "./labels.ts";
+import { resolveLabels, pickLabel, type Labels } from "./labels.ts";
 import { localeHref, type I18nConfig } from "@junejs/core/i18n";
 import { stripMdx } from "./util.ts";
 
@@ -93,14 +93,17 @@ export function createDocs<T extends DocLike>(opts: {
   // Tabs (Mintlify-style): an optional grouping of top-level section folders, declared in the ROOT
   // meta.json (`tabs: [{title, pages}]`). Off by absence → today's single sidebar. URLs are unchanged
   // — a tab is pure navigation, resolved from the slug's top-level folder, never a path prefix.
-  const tabDefsFor = (locale?: string): TabConfig[] | undefined => {
+  // STRUCTURE is single-source (the default meta, locale-independent — arrays don't merge per-locale
+  // cleanly); only the TITLE localizes, via config.tabLabels keyed by the English title.
+  const tabDefs = (): TabConfig[] | undefined => {
     if (hasSections) return undefined;
-    const t = metaFor(locale)?.[""]?.tabs;
+    const t = opts.meta?.[""]?.tabs;
     return t && t.length ? t : undefined;
   };
+  const tabLabel = (locale: string | undefined, title: string): string => pickLabel(opts.config.tabLabels, locale, title);
   // The top-level folders shown for the tab that owns `slug` (undefined = no tabs → all folders).
-  const tabFoldersFor = (locale: string | undefined, slug?: string): string[] | undefined => {
-    const defs = tabDefsFor(locale);
+  const tabFoldersFor = (slug?: string): string[] | undefined => {
+    const defs = tabDefs();
     return defs ? defs[activeTabIndex(defs, slug ?? "")]!.pages : undefined;
   };
 
@@ -177,19 +180,19 @@ export function createDocs<T extends DocLike>(opts: {
   };
   // prev/next stay WITHIN the active tab (you don't page from one tab into another).
   const prevNextOf = (slug: string, locale?: string): { prev: T | null; next: T | null } => {
-    const all = orderedFor(locale, tabFoldersFor(locale, slug));
+    const all = orderedFor(locale, tabFoldersFor(slug));
     const i = all.findIndex((e) => e.slug === slug);
     return { prev: i > 0 ? all[i - 1]! : null, next: i >= 0 && i < all.length - 1 ? all[i + 1]! : null };
   };
   // The tab bar for a page: each tab links to its first page; the tab owning `slug` is active.
   const tabBarFor = (locale: string | undefined, slug: string): TabLink[] | undefined => {
-    const defs = tabDefsFor(locale);
+    const defs = tabDefs();
     if (!defs) return undefined;
     const ai = activeTabIndex(defs, slug);
     const h = hrefFor(locale);
     return defs.map((t, i) => {
       const landing = orderedFor(locale, t.pages)[0];
-      return { title: t.title, href: h(docPath(basePath, landing ? landing.slug : t.pages[0]!)), active: i === ai };
+      return { title: tabLabel(locale, t.title), href: h(docPath(basePath, landing ? landing.slug : t.pages[0]!)), active: i === ai };
     });
   };
   const labelsFor = (locale?: string): Labels => resolveLabels(locale, opts.config.labels);
@@ -217,14 +220,14 @@ export function createDocs<T extends DocLike>(opts: {
 
   // The site's first page: the first page of the first tab when tabs are on, else the global first.
   const first = (locale?: string): T | undefined => {
-    const defs = tabDefsFor(locale);
+    const defs = tabDefs();
     return orderedFor(locale, defs ? defs[0]!.pages : undefined)[0];
   };
   const resolve = (slug: string | undefined, locale?: string): T | undefined =>
     slug ? doc(slug, locale) ?? undefined : first(locale);
   const pageOf = (e: T, locale?: string): DocPage => ({
     doc: viewOf(e, locale),
-    sidebar: sidebarFor(locale, tabFoldersFor(locale, e.slug)),
+    sidebar: sidebarFor(locale, tabFoldersFor(e.slug)),
     tabs: tabBarFor(locale, e.slug),
     labels: labelsFor(locale),
     locale,
@@ -277,7 +280,7 @@ export function createDocs<T extends DocLike>(opts: {
       return (
         <DocsShell
           site={site}
-          sidebar={sidebarFor(d.locale, tabFoldersFor(d.locale, ""))}
+          sidebar={sidebarFor(d.locale, tabFoldersFor(""))}
           tabs={tabBarFor(d.locale, "")}
           labels={labelsFor(d.locale)}
           href={hrefFor(d.locale)}

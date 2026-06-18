@@ -28,6 +28,13 @@ export interface KuraConfig {
   /** Display names for the language switcher, keyed by locale tag (e.g. `{ en: "English",
    *  "zh-TW": "繁體中文" }`). Falls back to the raw tag when a name is missing. */
   localeNames?: Record<string, string>;
+  /**
+   * Per-locale tab titles. Tab STRUCTURE (which tabs, which folders) is declared once in the root
+   * meta.json; this localizes only the displayed title, keyed by the tab's English title (the stable
+   * key). Same shape as sectionLabels: locale → englishTitle → display
+   * (e.g. `{ "ja-JP": { Guides: "ガイド" } }`).
+   */
+  tabLabels?: Record<string, Record<string, string>>;
   // theme, agent toggles, etc. land here later.
 }
 

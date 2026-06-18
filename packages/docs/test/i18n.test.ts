@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mergeMeta } from "../src/meta.ts";
+import { pickLabel } from "../src/labels.ts";
 import { treeOf, flattenTree, type NavNode, type DocLike } from "../src/nav.ts";
 import { DOCS, META, META_JA, docsFor } from "./fixtures.ts";
 
@@ -10,6 +11,16 @@ const group = (nodes: NavNode<DocLike>[], key: string) => {
   return g as Extract<NavNode<DocLike>, { kind: "group" }>;
 };
 const titleOf = (nodes: NavNode<DocLike>[], key: string) => group(nodes, key).title;
+
+test("pickLabel: localizes by English key; falls back to the key (tab/section titles)", () => {
+  const tabLabels = { "ja-JP": { Guides: "ガイド", Reference: "リファレンス" } };
+  assert.equal(pickLabel(tabLabels, "ja-JP", "Guides"), "ガイド");
+  assert.equal(pickLabel(tabLabels, "ja-JP", "Reference"), "リファレンス");
+  assert.equal(pickLabel(tabLabels, "ja-JP", "Untranslated"), "Untranslated"); // no entry → key
+  assert.equal(pickLabel(tabLabels, "en", "Guides"), "Guides"); // no en map → key (en is the source)
+  assert.equal(pickLabel(tabLabels, undefined, "Guides"), "Guides"); // no locale → key
+  assert.equal(pickLabel(undefined, "ja-JP", "Guides"), "Guides"); // no map → key
+});
 
 test("mergeMeta: a locale override is shallow-merged per folder; base fields survive", () => {
   const merged = mergeMeta(META, META_JA);

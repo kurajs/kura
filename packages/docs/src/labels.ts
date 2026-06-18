@@ -31,3 +31,14 @@ export const DEFAULT_LABELS: Labels = {
 export function resolveLabels(locale: string | undefined, overrides?: Record<string, Partial<Labels>>): Labels {
   return { ...DEFAULT_LABELS, ...(locale ? overrides?.[locale] : undefined) };
 }
+
+/** Resolve one localized label from a `locale → key → label` map, falling back to the key itself.
+ *  The key is a STABLE English string (e.g. a tab/section title) that doubles as the default label —
+ *  same convention as sectionLabels and tabLabels. */
+export function pickLabel(
+  map: Record<string, Record<string, string>> | undefined,
+  locale: string | undefined,
+  key: string,
+): string {
+  return (locale ? map?.[locale]?.[key] : undefined) ?? key;
+}
