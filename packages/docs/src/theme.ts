@@ -43,11 +43,13 @@ a { color: inherit; text-decoration: none; }
 .sidebar { position: sticky; top: 56px; height: calc(100vh - 56px); overflow-y: auto; padding: 1.5rem 1rem; border-right: 1px solid var(--border); }
 .sidebar .group { margin-bottom: 1.25rem; }
 .sidebar .group-title { font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin: 0 0 .5rem .5rem; }
-.sidebar a.item { display: block; padding: .35rem .55rem; border-radius: 7px; color: var(--fg-soft); font-size: .92rem; }
+/* Items are a real list. Flex column with a 1px gap → exactly 1px between every row. */
+.sidebar .items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
+/* One row = 24px line + 6px top/bottom padding = 36px tall; leaves and folder labels share it. */
+.sidebar a.item, .sidebar .folder > .folder-title { display: flex; align-items: center; gap: .35rem; line-height: 24px; padding: 6px .55rem; border-radius: 7px; color: var(--fg-soft); font-size: .92rem; }
 .sidebar a.item:hover { background: var(--hover); }
 .sidebar a.item.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
-.sidebar .folder { margin: .1rem 0; }
-.sidebar .folder > .folder-title { display: flex; align-items: center; gap: .35rem; padding: .35rem .55rem; border-radius: 7px; color: var(--fg-soft); font-size: .92rem; cursor: pointer; list-style: none; }
+.sidebar .folder > .folder-title { cursor: pointer; list-style: none; }
 .sidebar .folder > .folder-title::-webkit-details-marker { display: none; }
 /* Chevron sits AFTER the (flex:1) label → pushed to the right edge, so every item's left text
    aligns; the leaf items and the folder labels share the same left padding. */
@@ -57,7 +59,8 @@ a { color: inherit; text-decoration: none; }
 .sidebar .folder > .folder-title > .folder-link,
 .sidebar .folder > .folder-title > span { flex: 1; min-width: 0; color: inherit; }
 .sidebar .folder > .folder-title > .folder-link.active { color: var(--accent); font-weight: 600; }
-.sidebar .folder-items { margin-left: .5rem; padding-left: .6rem; border-left: 1px solid var(--border); }
+/* Nested list: indent + guide line, offset 1px below the parent summary. */
+.sidebar .folder .items { margin: 1px 0 0 .5rem; padding-left: .6rem; border-left: 1px solid var(--border); }
 .content { padding: 2rem 2.5rem 5rem; min-width: 0; }
 .breadcrumb { color: var(--muted); font-size: .82rem; margin-bottom: 1rem; }
 .not-translated { margin: 0 0 1.2rem; padding: .6rem .85rem; font-size: .85rem; border: 1px solid var(--warn-border); border-left: 3px solid #d97706; border-radius: 0 8px 8px 0; background: var(--warn-bg); color: var(--warn-fg); }

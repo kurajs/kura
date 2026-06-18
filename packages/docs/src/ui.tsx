@@ -16,32 +16,35 @@ function hasActive(items: SidebarNode[], active?: string): boolean {
   return items.some((n) => ("items" in n ? n.slug === active || hasActive(n.items, active) : n.slug === active));
 }
 
-/** Recursive sidebar rendering: doc → link; folder → <details>. A folder with an index renders its
- *  title as a link (clicking navigates to the folder's page); the chevron still toggles. */
+/** Recursive sidebar rendering as a real list (semantics + a11y): each item is an <li>; a doc → link,
+ *  a folder → <details> whose children are a nested <ul>. A folder with an index renders its title as
+ *  a link (clicking navigates to the folder's page); the chevron still toggles. */
 function SidebarItems({ items, active, href }: { items: SidebarNode[]; active?: string; href: Href }) {
   return (
-    <>
+    <ul className="items">
       {items.map((n) =>
         "items" in n ? (
-          <details key={n.title} className="folder" open={n.slug === active || hasActive(n.items, active)}>
-            <summary className="folder-title">
-              {n.slug ? (
-                <a className={"folder-link" + (n.slug === active ? " active" : "")} href={href(`/docs/${n.slug}`)}>{n.title}</a>
-              ) : (
-                <span>{n.title}</span>
-              )}
-            </summary>
-            <div className="folder-items">
+          <li key={n.title} className="folder-li">
+            <details className="folder" open={n.slug === active || hasActive(n.items, active)}>
+              <summary className="folder-title">
+                {n.slug ? (
+                  <a className={"folder-link" + (n.slug === active ? " active" : "")} href={href(`/docs/${n.slug}`)}>{n.title}</a>
+                ) : (
+                  <span>{n.title}</span>
+                )}
+              </summary>
               <SidebarItems items={n.items} active={active} href={href} />
-            </div>
-          </details>
+            </details>
+          </li>
         ) : (
-          <a key={n.slug} className={"item" + (n.slug === active ? " active" : "")} href={href(`/docs/${n.slug}`)}>
-            {n.title}
-          </a>
+          <li key={n.slug}>
+            <a className={"item" + (n.slug === active ? " active" : "")} href={href(`/docs/${n.slug}`)}>
+              {n.title}
+            </a>
+          </li>
         ),
       )}
-    </>
+    </ul>
   );
 }
 /** Localizes an internal route path to the active locale (identity when i18n is off). */
