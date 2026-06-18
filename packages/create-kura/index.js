@@ -48,8 +48,9 @@ ${BOLD}${CYAN}Kura${RESET} ${DIM}— the knowledgebase for humans and agents${RE
     ${CYAN}cd ${targetArg}${RESET}
     ${CYAN}npm install${RESET}
     ${CYAN}npm run dev${RESET}       ${DIM}# http://localhost:3000${RESET}
-    ${CYAN}npm run deploy${RESET}    ${DIM}# ship to Cloudflare Workers${RESET}
+    ${CYAN}npm run deploy${RESET}    ${DIM}# ship it (Cloudflare Workers by default)${RESET}
 
   Add Markdown to ${BOLD}content/docs/${RESET}; humans read it, agents call ${BOLD}/mcp${RESET}.
   ${DIM}Search is lexical out of the box; see ${RESET}kura.config.ts${DIM} to enable semantic search.${RESET}
+  ${DIM}Deploy elsewhere or via CI? → ${RESET}https://kura.build/docs/deploy${RESET}
 `);
