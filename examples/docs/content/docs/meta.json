@@ -1,1 +1,6 @@
-{ "pages": ["getting-started", "features", "concepts", "advanced"] }
+{
+  "tabs": [
+    { "title": "Guides", "pages": ["getting-started", "features"] },
+    { "title": "Reference", "pages": ["concepts", "advanced"] }
+  ]
+}
