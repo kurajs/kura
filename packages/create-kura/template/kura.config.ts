@@ -9,6 +9,10 @@ export const kura = createDocs({
   config: {
     sections: ["Getting started", "Guides"],
     site: { name: "PROJECT_NAME", brand: "PROJECT_NAME" },
+    // URL prefix for doc pages. Default is "/docs" (this app's routes live in app/docs/[[...slug]]).
+    // To mount docs at the site root instead, set basePath: "" AND move that route folder to
+    // app/[[...slug]] — the route location must match the prefix.
+    // basePath: "/docs",
     // No embedder → zero-dependency lexical search, so this site installs clean and deploys to
     // Cloudflare Workers out of the box. To upgrade to SEMANTIC search:
     //   1. npm i @kurajs/transformers @huggingface/transformers
