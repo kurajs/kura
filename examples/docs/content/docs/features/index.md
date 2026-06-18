@@ -1,9 +1,9 @@
 ---
-title: Features
+title: Overview
 description: Search, projections, and the agent surface — the building blocks of a Kura site.
 ---
 
-# Features
+# Overview
 
 Kura ships the pieces a knowledgebase needs, and nothing it doesn't.
 
