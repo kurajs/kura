@@ -51,6 +51,8 @@ function SidebarItems({ items, active, href }: { items: SidebarNode[]; active?: 
 export type Href = (path: string) => string;
 /** One entry in the language switcher: this page's URL in another locale. */
 export type LocaleLink = { locale: string; name: string; href: string; active: boolean };
+/** One tab in the top tab bar: a group of sections; `href` points at the tab's first page. */
+export type TabLink = { title: string; href: string; active: boolean };
 export type DocView = {
   slug: string;
   title: string;
@@ -65,9 +67,10 @@ export type DocView = {
 export type SearchHit = { slug: string; title: string; section: string; text: string; score: number };
 
 /** The 3-column chrome: top bar · sidebar · content · ToC. Injects the theme. */
-export function DocsShell({ site, sidebar, active, toc, labels = DEFAULT_LABELS, href = (p) => p, localeSwitch, children }: {
+export function DocsShell({ site, sidebar, tabs, active, toc, labels = DEFAULT_LABELS, href = (p) => p, localeSwitch, children }: {
   site?: SiteInfo;
   sidebar: SidebarGroup[];
+  tabs?: TabLink[];
   active?: string;
   toc?: Toc;
   labels?: Labels;
@@ -99,6 +102,15 @@ export function DocsShell({ site, sidebar, active, toc, labels = DEFAULT_LABELS,
           <a href="/mcp">MCP</a>
         </nav>
       </header>
+      {tabs && tabs.length > 0 && (
+        <nav className="tabbar">
+          <div className="tabbar-inner">
+            {tabs.map((t) => (
+              <a key={t.title} className={"tab" + (t.active ? " active" : "")} href={t.href}>{t.title}</a>
+            ))}
+          </div>
+        </nav>
+      )}
       <div className="shell">
         <aside className="sidebar">
           {sidebar.map((s, i) => (
@@ -126,11 +138,11 @@ export function DocsShell({ site, sidebar, active, toc, labels = DEFAULT_LABELS,
 }
 
 /** A full doc page: breadcrumb · page actions (copy md / open in LLM) · prose · pager. */
-export function DocsPage({ site, sidebar, doc, labels = DEFAULT_LABELS, href = (p) => p, localeSwitch }: { site?: SiteInfo; sidebar: SidebarGroup[]; doc: DocView; labels?: Labels; href?: Href; localeSwitch?: LocaleLink[] }) {
+export function DocsPage({ site, sidebar, tabs, doc, labels = DEFAULT_LABELS, href = (p) => p, localeSwitch }: { site?: SiteInfo; sidebar: SidebarGroup[]; tabs?: TabLink[]; doc: DocView; labels?: Labels; href?: Href; localeSwitch?: LocaleLink[] }) {
   const md = href(`/docs/${doc.slug}.md`);
   const prompt = encodeURIComponent(`Please read this doc and answer my questions: ${doc.title}`);
   return (
-    <DocsShell site={site} sidebar={sidebar} active={doc.slug} toc={doc.toc} labels={labels} href={href} localeSwitch={localeSwitch}>
+    <DocsShell site={site} sidebar={sidebar} tabs={tabs} active={doc.slug} toc={doc.toc} labels={labels} href={href} localeSwitch={localeSwitch}>
       <div className="breadcrumb">{doc.section ? `${doc.section} / ` : ""}{doc.title}</div>
       {doc.notTranslated && <div className="not-translated">{labels.notTranslated}</div>}
       <div className="page-actions">

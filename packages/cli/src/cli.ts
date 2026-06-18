@@ -49,6 +49,12 @@ function walkMetaTree(rootDir: string, skipTopLocales: boolean, wherePrefix = ""
         else if (/\.mdx?$/.test(c.name)) children.add(c.name.replace(/\.mdx?$/, ""));
       }
       errors.push(...validatePages(parsed.meta, children, where));
+      // Root-only: every tab's pages must reference a real top-level folder.
+      if (rel === "" && parsed.meta.tabs) {
+        for (const t of parsed.meta.tabs)
+          for (const p of t.pages)
+            if (!children.has(p)) errors.push(`${where}: tab "${t.title}" lists "${p}", which is not a top-level folder (have: ${[...children].sort().join(", ") || "none"})`);
+      }
       meta[rel] = parsed.meta;
     }
     for (const e of ents) {

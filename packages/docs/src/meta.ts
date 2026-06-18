@@ -3,6 +3,18 @@
 // type, or a `pages` entry that points at no real file fails the build with a precise message —
 // the safety of a typed config without forcing anyone to write TypeScript.
 
+/** A navigation tab (Mintlify-style): a group of top-level section folders. Declared only in the
+ *  ROOT meta.json (`content/docs/meta.json`). A tab is pure navigation — it groups folders into a
+ *  switchable sidebar but never becomes a URL segment. */
+export interface TabConfig {
+  /** Tab label shown in the tab bar. */
+  title: string;
+  /** Top-level folder names this tab contains, in order. */
+  pages: string[];
+  /** Icon name (validated against the icon set later). */
+  icon?: string;
+}
+
 export interface MetaConfig {
   /** Folder display name in the sidebar (else the folder name is humanized). */
   title?: string;
@@ -12,6 +24,8 @@ export interface MetaConfig {
   icon?: string;
   /** Whether the folder starts expanded (default: open when it contains the active page). */
   defaultOpen?: boolean;
+  /** Root meta only: navigation tabs grouping top-level folders. Absent = a single sidebar. */
+  tabs?: TabConfig[];
 }
 
 /** folder path (relative to the docs root; "" = root) → its meta. */
@@ -27,7 +41,24 @@ export function mergeMeta(base: MetaMap | undefined, override: MetaMap): MetaMap
   return out;
 }
 
-const ALLOWED = ["title", "pages", "icon", "defaultOpen"] as const;
+const ALLOWED = ["title", "pages", "icon", "defaultOpen", "tabs"] as const;
+
+/** Validate a `tabs` value: an array of { title: string, pages: string[], icon?: string }. */
+function isTabs(v: unknown): v is TabConfig[] {
+  return (
+    Array.isArray(v) &&
+    v.every(
+      (t) =>
+        t != null &&
+        typeof t === "object" &&
+        !Array.isArray(t) &&
+        typeof (t as TabConfig).title === "string" &&
+        Array.isArray((t as TabConfig).pages) &&
+        (t as TabConfig).pages.every((p) => typeof p === "string") &&
+        ((t as TabConfig).icon === undefined || typeof (t as TabConfig).icon === "string"),
+    )
+  );
+}
 
 /** Validate one raw meta object. Returns the typed meta plus a list of human-readable errors
  *  (empty = valid). `where` is a label for messages (e.g. "features/payments/meta.json"). */
@@ -56,6 +87,10 @@ export function parseMeta(raw: unknown, where: string): { meta: MetaConfig; erro
   if ("defaultOpen" in o) {
     if (typeof o.defaultOpen === "boolean") meta.defaultOpen = o.defaultOpen;
     else errors.push(`${where}: "defaultOpen" must be a boolean`);
+  }
+  if ("tabs" in o) {
+    if (isTabs(o.tabs)) meta.tabs = o.tabs;
+    else errors.push(`${where}: "tabs" must be an array of { title: string, pages: string[], icon?: string }`);
   }
   return { meta, errors };
 }

@@ -42,6 +42,12 @@ a { color: inherit; text-decoration: none; }
 .locale-switch .locale { padding: .2rem .55rem; border-radius: 6px; color: var(--muted); font-size: .82rem; }
 .locale-switch .locale:hover { color: var(--fg); }
 .locale-switch .locale.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+/* Tab bar (Mintlify-style): a full-width row under the topbar; tabs switch the whole sidebar. */
+.tabbar { border-bottom: 1px solid var(--border); background: var(--bg); }
+.tabbar-inner { display: flex; gap: 1.4rem; max-width: 1280px; margin: 0 auto; padding: 0 1.25rem; overflow-x: auto; }
+.tabbar .tab { padding: .7rem .1rem; font-size: .9rem; color: var(--muted); border-bottom: 2px solid transparent; white-space: nowrap; }
+.tabbar .tab:hover { color: var(--fg); }
+.tabbar .tab.active { color: var(--fg); border-bottom-color: var(--accent); }
 .shell { display: grid; grid-template-columns: var(--sidebar-w) minmax(0,1fr) var(--toc-w); align-items: start; max-width: 1280px; margin: 0 auto; }
 @media (max-width: 1024px) { .shell { grid-template-columns: var(--sidebar-w) minmax(0,1fr); } .toc { display: none; } }
 @media (max-width: 720px) { .shell { grid-template-columns: 1fr; } .sidebar { display: none; } }

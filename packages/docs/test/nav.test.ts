@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { treeOf, flattenTree, createNav, slugify, type NavNode, type DocLike } from "../src/nav.ts";
+import { treeOf, flattenTree, createNav, slugify, topFolderOf, activeTabIndex, type NavNode, type DocLike } from "../src/nav.ts";
 import { doc, DOCS, META } from "./fixtures.ts";
 
 // Tiny readers over the discriminated NavNode union.
@@ -105,4 +105,22 @@ test("createNav: section frontmatter groups; sections honor the configured order
 test("slugify: lowercases, dashes spaces, drops punctuation", () => {
   assert.equal(slugify("Hello, World!"), "hello-world");
   assert.equal(slugify("Getting Started"), "getting-started");
+});
+
+test("topFolderOf: the first slug segment (or '' for a bare slug)", () => {
+  assert.equal(topFolderOf("features/search/semantic"), "features");
+  assert.equal(topFolderOf("features"), "features");
+  assert.equal(topFolderOf(""), "");
+});
+
+test("activeTabIndex: the tab owning the slug's top folder; first tab as fallback", () => {
+  const tabs = [
+    { pages: ["getting-started", "features"] },
+    { pages: ["concepts", "advanced"] },
+  ];
+  assert.equal(activeTabIndex(tabs, "features/search/semantic"), 0);
+  assert.equal(activeTabIndex(tabs, "concepts/agents"), 1);
+  assert.equal(activeTabIndex(tabs, "advanced"), 1);
+  assert.equal(activeTabIndex(tabs, "unknown/page"), 0); // fallback → first tab
+  assert.equal(activeTabIndex(tabs, ""), 0);
 });

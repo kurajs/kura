@@ -39,3 +39,19 @@ test("validatePages: all-known pages (and no pages) produce no errors", () => {
   assert.deepEqual(validatePages({ pages: ["index", "a", "b"] }, known, "x"), []);
   assert.deepEqual(validatePages({ title: "X" }, known, "x"), []);
 });
+
+test("parseMeta: valid tabs parse; the shape is preserved", () => {
+  const { meta, errors } = parseMeta(
+    { tabs: [{ title: "Guides", pages: ["getting-started", "features"] }, { title: "Reference", pages: ["api"], icon: "book" }] },
+    "meta.json",
+  );
+  assert.deepEqual(errors, []);
+  assert.equal(meta.tabs?.length, 2);
+  assert.deepEqual(meta.tabs?.[0], { title: "Guides", pages: ["getting-started", "features"] });
+});
+
+test("parseMeta: malformed tabs are rejected", () => {
+  assert.match(parseMeta({ tabs: "nope" }, "x").errors[0]!, /"tabs" must be an array/);
+  assert.match(parseMeta({ tabs: [{ pages: ["a"] }] }, "x").errors[0]!, /"tabs" must be an array/); // missing title
+  assert.match(parseMeta({ tabs: [{ title: "T", pages: "a" }] }, "x").errors[0]!, /"tabs" must be an array/); // pages not array
+});

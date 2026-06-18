@@ -7,11 +7,11 @@
 // every per-locale helper collapses to the single default collection (zero overhead).
 // With `i18n`, June resolves ctx.locale before routing; the loaders thread it into the
 // content finders (variant → default fallback), the nav, the labels, and the MDX bucket.
-import { createNav, treeOf, flattenTree, processHtml, type DocLike, type Nav, type NavNode } from "./nav.ts";
-import { mergeMeta, type MetaMap } from "./meta.ts";
+import { createNav, treeOf, flattenTree, processHtml, topFolderOf, activeTabIndex, type DocLike, type Nav, type NavNode } from "./nav.ts";
+import { mergeMeta, type MetaMap, type TabConfig } from "./meta.ts";
 import { createSearch, type SearchHit } from "./search.ts";
 import { docsActions } from "./actions.ts";
-import { DocsPage, DocsShell, SearchResults, type SiteInfo, type SidebarGroup, type SidebarNode, type DocView, type Href, type LocaleLink } from "./ui.tsx";
+import { DocsPage, DocsShell, SearchResults, type SiteInfo, type SidebarGroup, type SidebarNode, type DocView, type Href, type LocaleLink, type TabLink } from "./ui.tsx";
 import type { KuraConfig } from "./config.ts";
 import { resolveLabels, type Labels } from "./labels.ts";
 import { localeHref, type I18nConfig } from "@junejs/core/i18n";
@@ -27,7 +27,7 @@ type Lister<T> = (locale?: string) => readonly T[];
 
 /** The loader payload: the page plus its locale-resolved chrome, so the View and the
  *  .md/.json projections stay pure functions of their own data. */
-export type DocPage = { doc: DocView; sidebar: SidebarGroup[]; labels: Labels; locale?: string };
+export type DocPage = { doc: DocView; sidebar: SidebarGroup[]; tabs?: TabLink[]; labels: Labels; locale?: string };
 
 export function createDocs<T extends DocLike>(opts: {
   content: { DOCS: readonly T[]; doc: Finder<T>; docs?: Lister<T> };
@@ -87,6 +87,20 @@ export function createDocs<T extends DocLike>(opts: {
     return m;
   };
 
+  // Tabs (Mintlify-style): an optional grouping of top-level section folders, declared in the ROOT
+  // meta.json (`tabs: [{title, pages}]`). Off by absence → today's single sidebar. URLs are unchanged
+  // — a tab is pure navigation, resolved from the slug's top-level folder, never a path prefix.
+  const tabDefsFor = (locale?: string): TabConfig[] | undefined => {
+    if (hasSections) return undefined;
+    const t = metaFor(locale)?.[""]?.tabs;
+    return t && t.length ? t : undefined;
+  };
+  // The top-level folders shown for the tab that owns `slug` (undefined = no tabs → all folders).
+  const tabFoldersFor = (locale: string | undefined, slug?: string): string[] | undefined => {
+    const defs = tabDefsFor(locale);
+    return defs ? defs[activeTabIndex(defs, slug ?? "")]!.pages : undefined;
+  };
+
   // Per-locale entries + nav, memoized — built once per locale, reused across requests.
   const entriesFor = (locale?: string): readonly T[] => (docs ? docs(locale) : DOCS);
   const navCache = new Map<string, Nav<T>>();
@@ -111,7 +125,15 @@ export function createDocs<T extends DocLike>(opts: {
   // Without → folder-driven (Fumadocs/GitBook style): top-level FOLDERS are the sections, ordered by
   // the root meta.json; a folder's index shows as its first item.
   const hasSections = DOCS.some((d) => d.data.section);
-  const sidebarFor = (locale?: string): SidebarGroup[] => {
+  // A top-level folder group → a sidebar section: its index page (if any) leads, then its children.
+  const groupToSection = (n: Extract<NavNode<T>, { kind: "group" }>): SidebarGroup => {
+    const items: SidebarNode[] = [];
+    if (n.index) items.push({ slug: n.index.slug, title: String(n.index.data.title ?? n.title) });
+    items.push(...n.children.map(toNode));
+    return { title: n.title, items };
+  };
+  // `tabFolders` restricts the sidebar to one tab's top-level folders (in order); undefined = all.
+  const sidebarFor = (locale?: string, tabFolders?: string[]): SidebarGroup[] => {
     const meta = metaFor(locale);
     if (hasSections) {
       return navFor(locale).groups().map((g) => ({
@@ -119,39 +141,53 @@ export function createDocs<T extends DocLike>(opts: {
         items: treeOf(g.items, meta).map(toNode),
       }));
     }
-    const groups: SidebarGroup[] = [];
+    const byKey = new Map<string, Extract<NavNode<T>, { kind: "group" }>>();
     const loose: SidebarNode[] = [];
     for (const n of treeOf(entriesFor(locale), meta)) {
-      if (n.kind === "group") {
-        const items: SidebarNode[] = [];
-        if (n.index) items.push({ slug: n.index.slug, title: String(n.index.data.title ?? n.title) });
-        items.push(...n.children.map(toNode));
-        groups.push({ title: n.title, items });
-      } else {
-        loose.push(toNode(n));
-      }
+      if (n.kind === "group") byKey.set(n.key, n);
+      else loose.push(toNode(n));
     }
+    if (tabFolders) return tabFolders.map((k) => byKey.get(k)).filter((n): n is Extract<NavNode<T>, { kind: "group" }> => !!n).map(groupToSection);
+    const groups = [...byKey.values()].map(groupToSection);
     return loose.length ? [{ title: "", items: loose }, ...groups] : groups;
   };
 
   // prev/next follow the SAME order as the sidebar (the flattened nav tree), not the legacy
   // section/frontmatter order — so they match what the reader sees. Memoized per locale.
   const orderCache = new Map<string, readonly T[]>();
-  const orderedFor = (locale?: string): readonly T[] => {
-    const key = locale ?? "";
+  const orderedFor = (locale?: string, tabFolders?: string[]): readonly T[] => {
+    const key = `${locale ?? ""}::${tabFolders ? tabFolders.join(",") : "*"}`;
     let o = orderCache.get(key);
     if (!o) {
-      o = hasSections
-        ? navFor(locale).groups().flatMap((g) => flattenTree(treeOf(g.items, metaFor(locale))))
-        : flattenTree(treeOf(entriesFor(locale), metaFor(locale)));
+      if (hasSections) {
+        o = navFor(locale).groups().flatMap((g) => flattenTree(treeOf(g.items, metaFor(locale))));
+      } else {
+        const nodes = treeOf(entriesFor(locale), metaFor(locale));
+        const scoped = tabFolders
+          ? tabFolders.map((k) => nodes.find((n) => n.kind === "group" && n.key === k)).filter((n): n is NavNode<T> => !!n)
+          : nodes;
+        o = flattenTree(scoped);
+      }
       orderCache.set(key, o);
     }
     return o;
   };
+  // prev/next stay WITHIN the active tab (you don't page from one tab into another).
   const prevNextOf = (slug: string, locale?: string): { prev: T | null; next: T | null } => {
-    const all = orderedFor(locale);
+    const all = orderedFor(locale, tabFoldersFor(locale, slug));
     const i = all.findIndex((e) => e.slug === slug);
     return { prev: i > 0 ? all[i - 1]! : null, next: i >= 0 && i < all.length - 1 ? all[i + 1]! : null };
+  };
+  // The tab bar for a page: each tab links to its first page; the tab owning `slug` is active.
+  const tabBarFor = (locale: string | undefined, slug: string): TabLink[] | undefined => {
+    const defs = tabDefsFor(locale);
+    if (!defs) return undefined;
+    const ai = activeTabIndex(defs, slug);
+    const h = hrefFor(locale);
+    return defs.map((t, i) => {
+      const landing = orderedFor(locale, t.pages)[0];
+      return { title: t.title, href: h(`/docs/${landing ? landing.slug : t.pages[0]}`), active: i === ai };
+    });
   };
   const labelsFor = (locale?: string): Labels => resolveLabels(locale, opts.config.labels);
 
@@ -176,12 +212,17 @@ export function createDocs<T extends DocLike>(opts: {
     };
   };
 
-  const first = (locale?: string): T | undefined => navFor(locale).ordered()[0];
+  // The site's first page: the first page of the first tab when tabs are on, else the global first.
+  const first = (locale?: string): T | undefined => {
+    const defs = tabDefsFor(locale);
+    return orderedFor(locale, defs ? defs[0]!.pages : undefined)[0];
+  };
   const resolve = (slug: string | undefined, locale?: string): T | undefined =>
     slug ? doc(slug, locale) ?? undefined : first(locale);
   const pageOf = (e: T, locale?: string): DocPage => ({
     doc: viewOf(e, locale),
-    sidebar: sidebarFor(locale),
+    sidebar: sidebarFor(locale, tabFoldersFor(locale, e.slug)),
+    tabs: tabBarFor(locale, e.slug),
     labels: labelsFor(locale),
     locale,
   });
@@ -190,6 +231,7 @@ export function createDocs<T extends DocLike>(opts: {
     <DocsPage
       site={site}
       sidebar={d.sidebar}
+      tabs={d.tabs}
       doc={d.doc}
       labels={d.labels}
       href={hrefFor(d.locale)}
@@ -231,7 +273,8 @@ export function createDocs<T extends DocLike>(opts: {
       return (
         <DocsShell
           site={site}
-          sidebar={sidebarFor(d.locale)}
+          sidebar={sidebarFor(d.locale, tabFoldersFor(d.locale, ""))}
+          tabs={tabBarFor(d.locale, "")}
           labels={labelsFor(d.locale)}
           href={hrefFor(d.locale)}
           localeSwitch={switchFor(d.locale, `/search${qs}`)}

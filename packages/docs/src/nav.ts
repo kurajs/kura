@@ -128,6 +128,17 @@ export function flattenTree<T extends DocLike>(nodes: readonly NavNode<T>[]): T[
   return out;
 }
 
+/** The top-level folder of a slug (`features/search/x` → `features`); "" for a bare slug. */
+export const topFolderOf = (slug: string): string => slug.split("/")[0] ?? "";
+
+/** Index of the tab whose `pages` include the slug's top-level folder; 0 (the first tab) when none
+ *  match — so an unknown/empty slug lands on the first tab rather than nowhere. */
+export function activeTabIndex(tabs: readonly { pages: string[] }[], slug: string): number {
+  const top = topFolderOf(slug);
+  const i = tabs.findIndex((t) => t.pages.includes(top));
+  return i >= 0 ? i : 0;
+}
+
 export function slugify(text: string): string {
   return text.trim().toLowerCase().replace(/[`*_~]/g, "").replace(/\s+/g, "-").replace(/[^\p{L}\p{N}-]/gu, "");
 }
