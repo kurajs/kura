@@ -1,0 +1,40 @@
+name: curator
+# Mori (Kura Curator) keeps kura.build's docs true to this code. Cross-repo: the code lives here
+# (kurajs/kura), the docs site is kurajs/kura.build. On a push to main that touches a package a doc
+# tracks via `sources:`, Mori opens a docs-only PR in kura.build (mode: new-pr, the default).
+# Auth: the "Kura Curator" GitHub App (installed on kura.build) mints a scoped, writeable token.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/**"
+  workflow_dispatch:
+jobs:
+  curate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mint Kura Curator app token (scoped to kura.build)
+        uses: actions/create-github-app-token@v2
+        id: app
+        with:
+          app-id: ${{ vars.KURA_CURATOR_APP_ID }}
+          private-key: ${{ secrets.KURA_CURATOR_APP_PRIVATE_KEY }}
+          owner: kurajs
+          repositories: kura.build
+      - name: Resolve bot user id
+        id: bot
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          SLUG: ${{ steps.app.outputs.app-slug }}
+        run: echo "uid=$(gh api "/users/${SLUG}[bot]" --jq .id)" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0          # full history, to diff the pushed range of this (code) repo
+      - uses: kurajs/curator@v1
+        with:
+          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          docs-repo: kurajs/kura.build   # docs live in a separate repo
+          docs-dir: content/docs
+          github-token: ${{ steps.app.outputs.token }}
+          committer-name: ${{ steps.app.outputs.app-slug }}[bot]
+          committer-email: ${{ steps.bot.outputs.uid }}+${{ steps.app.outputs.app-slug }}[bot]@users.noreply.github.com
