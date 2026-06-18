@@ -1,6 +1,6 @@
 {
   "name": "@kurajs/docs",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "type": "module",
   "description": "Kura — the docs framework on June. Sidebar, ToC, search, copy-markdown, and the agent surface (MCP) for a knowledgebase that serves humans and agents.",
   "exports": {
@@ -53,7 +53,7 @@
     "remark-gfm": "^4.0.0"
   },
   "peerDependencies": {
-    "@junejs/core": "^0.0.27",
+    "@junejs/core": ">=0.0.25 <0.1.0",
     "react": "^19",
     "react-dom": "^19"
   },
