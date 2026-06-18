@@ -47,11 +47,14 @@ a { color: inherit; text-decoration: none; }
 @media (max-width: 720px) { .shell { grid-template-columns: 1fr; } .sidebar { display: none; } }
 .sidebar { position: sticky; top: 56px; height: calc(100vh - 56px); overflow-y: auto; padding: 1.5rem 1rem; border-right: 1px solid var(--border); }
 .sidebar .group { margin-bottom: 1.25rem; }
-.sidebar .group-title { font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin: 0 0 .5rem .5rem; }
+/* Section title as a prominent anchor (Mintlify-style): same size as items, but bolder and at full
+   foreground emphasis, Title Case (authored casing) — so the heading reads louder than the items
+   beneath it, which recede to --fg-soft. */
+.sidebar .group-title { font-size: .875rem; font-weight: 600; color: var(--fg); margin: 0 0 .35rem .55rem; }
 /* Items are a real list. Flex column with a 1px gap → exactly 1px between every row. */
 .sidebar .items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
 /* One row = 24px line + 6px top/bottom padding = 36px tall; leaves and folder labels share it. */
-.sidebar a.item, .sidebar .folder > .folder-title { display: flex; align-items: center; gap: .35rem; line-height: 24px; padding: 6px .55rem; border-radius: 7px; color: var(--fg-soft); font-size: .92rem; }
+.sidebar a.item, .sidebar .folder > .folder-title { display: flex; align-items: center; gap: .35rem; line-height: 24px; padding: 6px .55rem; border-radius: 7px; color: var(--fg-soft); font-size: .875rem; }
 .sidebar a.item:hover { background: var(--hover); }
 /* Active = a soft accent tint + accent text, NOT bold (avoids the row reflowing wider). */
 .sidebar a.item.active { background: var(--accent-soft); color: var(--accent); }
