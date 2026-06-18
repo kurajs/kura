@@ -12,7 +12,7 @@ export const themeCss = `
   --surface: #ffffff; --surface-2: #fafafa; --hover: #f4f4f5; --topbar-bg: rgba(255,255,255,.85);
   --callout-tip-bg: #f0fdf4; --callout-warn-bg: #fffbeb; --callout-danger-bg: #fef2f2;
   --warn-bg: #fffbeb; --warn-border: #fde68a; --warn-fg: #92400e;
-  --sidebar-w: 248px; --toc-w: 220px;
+  --sidebar-w: 248px; --toc-w: 220px; --topbar-h: 56px; --tabbar-h: 44px;
   font-family: system-ui, -apple-system, "Noto Sans TC", "PingFang TC", sans-serif;
   /* Headings use a serif display face for an editorial feel. en-US-first: a Latin system serif,
      ending in the generic \`serif\` keyword so CJK runs fall back to the OS serif (Mincho/Songti)
@@ -42,12 +42,17 @@ a { color: inherit; text-decoration: none; }
 .locale-switch .locale { padding: .2rem .55rem; border-radius: 6px; color: var(--muted); font-size: .82rem; }
 .locale-switch .locale:hover { color: var(--fg); }
 .locale-switch .locale.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
-/* Tab bar (Mintlify-style): a full-width row under the topbar; tabs switch the whole sidebar. */
-.tabbar { border-bottom: 1px solid var(--border); background: var(--bg); }
-.tabbar-inner { display: flex; gap: 1.4rem; max-width: 1280px; margin: 0 auto; padding: 0 1.25rem; overflow-x: auto; }
-.tabbar .tab { padding: .7rem .1rem; font-size: .9rem; color: var(--muted); border-bottom: 2px solid transparent; white-space: nowrap; }
+/* Tab bar (Mintlify-style): a full-width row under the topbar; tabs switch the whole sidebar.
+   Sticky just under the topbar; on narrow screens it scrolls horizontally so many tabs still fit. */
+.tabbar { position: sticky; top: var(--topbar-h); z-index: 15; height: var(--tabbar-h); background: var(--bg); border-bottom: 1px solid var(--border); }
+.tabbar-inner { display: flex; align-items: stretch; gap: 1.4rem; height: 100%; max-width: 1280px; margin: 0 auto; padding: 0 1.25rem; overflow-x: auto; scrollbar-width: none; }
+.tabbar-inner::-webkit-scrollbar { display: none; }
+.tabbar .tab { display: flex; align-items: center; font-size: .9rem; color: var(--muted); border-bottom: 2px solid transparent; white-space: nowrap; }
 .tabbar .tab:hover { color: var(--fg); }
 .tabbar .tab.active { color: var(--fg); border-bottom-color: var(--accent); }
+/* With a tab bar present, the sidebar/ToC stick BELOW it (topbar + tabbar) so nothing overlaps. */
+.tabbar ~ .shell .sidebar { top: calc(var(--topbar-h) + var(--tabbar-h)); height: calc(100vh - var(--topbar-h) - var(--tabbar-h)); }
+.tabbar ~ .shell .toc { top: calc(var(--topbar-h) + var(--tabbar-h)); max-height: calc(100vh - var(--topbar-h) - var(--tabbar-h)); }
 .shell { display: grid; grid-template-columns: var(--sidebar-w) minmax(0,1fr) var(--toc-w); align-items: start; max-width: 1280px; margin: 0 auto; }
 @media (max-width: 1024px) { .shell { grid-template-columns: var(--sidebar-w) minmax(0,1fr); } .toc { display: none; } }
 @media (max-width: 720px) { .shell { grid-template-columns: 1fr; } .sidebar { display: none; } }
