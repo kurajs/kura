@@ -80,6 +80,7 @@ export function DocsShell({ site, sidebar, tabs, active, toc, basePath = "/docs"
   children: ReactNode;
 }) {
   const brand = site?.brand ?? site?.name ?? "Kura";
+  const currentLang = localeSwitch?.find((l) => l.active) ?? localeSwitch?.[0];
   return (
     <>
       {/* Resolve + apply the theme on <html> BEFORE the styles below paint — no flash. */}
@@ -91,16 +92,16 @@ export function DocsShell({ site, sidebar, tabs, active, toc, basePath = "/docs"
           <input className="search-box" name="q" placeholder={labels.searchPlaceholder} aria-label={labels.search} />
         </form>
         <nav className="links">
-          {localeSwitch && localeSwitch.length > 1 && (
-            <span className="locale-switch">
-              {localeSwitch.map((l) => (
-                <a key={l.locale} className={"locale" + (l.active ? " active" : "")} href={l.href} hrefLang={l.locale}>{l.name}</a>
-              ))}
-            </span>
+          {localeSwitch && localeSwitch.length > 1 && currentLang && (
+            <details className="lang">
+              <summary className="lang-current">{currentLang.name}</summary>
+              <div className="lang-menu">
+                {localeSwitch.map((l) => (
+                  <a key={l.locale} className={"lang-item" + (l.active ? " active" : "")} href={l.href} hrefLang={l.locale}>{l.name}</a>
+                ))}
+              </div>
+            </details>
           )}
-          <button type="button" className="theme-toggle" data-theme-toggle aria-label="Toggle theme" />
-          <a href="/llms.txt">llms.txt</a>
-          <a href="/mcp">MCP</a>
         </nav>
       </header>
       {tabs && tabs.length > 0 && (
@@ -133,7 +134,18 @@ export function DocsShell({ site, sidebar, tabs, active, toc, basePath = "/docs"
           )}
         </aside>
       </div>
-      <script dangerouslySetInnerHTML={{ __html: FOCUS_JS + THEME_TOGGLE_JS }} />
+      <footer className="site-footer">
+        <div className="site-footer-inner">
+          <nav className="footer-links">
+            {/* Agent surface + theme toggle — secondary controls, out of the topbar. */}
+            <a href="/llms.txt">llms.txt</a>
+            <a href="/mcp">MCP</a>
+            <button type="button" className="theme-toggle" data-theme-toggle aria-label="Toggle theme" />
+          </nav>
+          <a className="powered-by" href="https://kura.build/" target="_blank" rel="noreferrer">Powered by Kura</a>
+        </div>
+      </footer>
+      <script dangerouslySetInnerHTML={{ __html: FOCUS_JS + THEME_TOGGLE_JS + LANG_JS }} />
     </>
   );
 }
@@ -184,6 +196,8 @@ const THEME_INIT_JS = `(function(){try{var p=localStorage.getItem('kura-theme')|
 // The topbar toggle cycles system → light → dark, persists the pref, and tracks the OS while on system.
 const THEME_TOGGLE_JS = `(function(){var b=document.querySelector('[data-theme-toggle]');if(!b)return;var d=document.documentElement,order=['system','light','dark'],icon={system:'🖥',light:'☀',dark:'☾'};function pref(){return d.getAttribute('data-theme-pref')||'system';}function res(p){return p==='dark'||(p==='system'&&matchMedia('(prefers-color-scheme:dark)').matches)?'dark':'light';}function set(p){d.setAttribute('data-theme-pref',p);d.setAttribute('data-theme',res(p));try{localStorage.setItem('kura-theme',p);}catch(e){}b.textContent=icon[p];b.setAttribute('title','Theme: '+p);}set(pref());b.addEventListener('click',function(){set(order[(order.indexOf(pref())+1)%order.length]);});try{matchMedia('(prefers-color-scheme:dark)').addEventListener('change',function(){if(pref()==='system')d.setAttribute('data-theme',res('system'));});}catch(e){}})();`;
 const FOCUS_JS = `document.addEventListener('keydown',function(e){if(e.key==='/' && !/INPUT|TEXTAREA/.test((document.activeElement||{}).tagName||'')){e.preventDefault();var s=document.querySelector('.search-box');if(s)s.focus();}});`;
+// Language dropdown: close on outside-click / Escape (the <details> opens natively).
+const LANG_JS = `document.addEventListener('click',function(e){document.querySelectorAll('details.lang[open]').forEach(function(d){if(!d.contains(e.target))d.removeAttribute('open');});});document.addEventListener('keydown',function(e){if(e.key==='Escape')document.querySelectorAll('details.lang[open]').forEach(function(d){d.removeAttribute('open');});});`;
 const COPY_JS = `document.querySelectorAll('[data-copy-md]').forEach(function(b){b.addEventListener('click',async function(){try{var r=await fetch(b.getAttribute('data-copy-md'));var t=await r.text();await navigator.clipboard.writeText(t);var o=b.textContent;b.textContent='Copied';setTimeout(function(){b.textContent=o;},1500);}catch(e){alert('Copy failed: '+e);}});});`;
 const CODE_JS = `document.querySelectorAll('.prose pre').forEach(function(pre){if(pre.querySelector('.copy-code'))return;var b=document.createElement('button');b.className='copy-code';b.textContent='Copy';b.addEventListener('click',async function(){var c=pre.querySelector('code');try{await navigator.clipboard.writeText(c?c.innerText:pre.innerText);var o=b.textContent;b.textContent='Copied';setTimeout(function(){b.textContent=o;},1200);}catch(e){}});pre.appendChild(b);});`;
 const TABS_JS = `document.querySelectorAll('.tabs').forEach(function(t){t.querySelectorAll('.tab-btn').forEach(function(b){b.addEventListener('click',function(){var i=b.getAttribute('data-tab');t.querySelectorAll('.tab-btn').forEach(function(x){x.classList.toggle('active',x.getAttribute('data-tab')===i);});t.querySelectorAll('.tab-panel').forEach(function(p){p.hidden=p.getAttribute('data-tab')!==i;});});});});`;

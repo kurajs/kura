@@ -38,10 +38,18 @@ a { color: inherit; text-decoration: none; }
 .topbar .links { display: flex; align-items: center; gap: 1rem; color: var(--muted); font-size: .9rem; }
 .theme-toggle { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; font-size: .95rem; line-height: 1; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--fg); cursor: pointer; }
 .theme-toggle:hover { background: var(--hover); }
-.locale-switch { display: inline-flex; align-items: center; gap: .1rem; padding: .1rem; border: 1px solid var(--border); border-radius: 8px; }
-.locale-switch .locale { padding: .2rem .55rem; border-radius: 6px; color: var(--muted); font-size: .82rem; }
-.locale-switch .locale:hover { color: var(--fg); }
-.locale-switch .locale.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+/* Language switcher: a compact dropdown (current language + chevron), opens a menu — scales to many
+   locales without crowding the topbar (vs the old inline segmented control). */
+.lang { position: relative; }
+.lang > summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: .3rem; padding: .3rem .6rem; border: 1px solid var(--border); border-radius: 8px; color: var(--fg-soft); font-size: .85rem; }
+.lang > summary::-webkit-details-marker { display: none; }
+.lang > summary::after { content: "⌄"; color: var(--muted); line-height: 1; transition: transform .15s; }
+.lang[open] > summary::after { transform: rotate(180deg); }
+.lang > summary:hover { color: var(--fg); }
+.lang-menu { position: absolute; right: 0; top: calc(100% + .4rem); min-width: 9rem; display: flex; flex-direction: column; gap: 1px; padding: .3rem; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.14); z-index: 30; }
+.lang-item { padding: .4rem .55rem; border-radius: 6px; color: var(--fg-soft); font-size: .85rem; white-space: nowrap; }
+.lang-item:hover { background: var(--hover); color: var(--fg); }
+.lang-item.active { color: var(--accent); font-weight: 600; }
 /* Tab bar (Mintlify-style): a full-width row under the topbar; tabs switch the whole sidebar.
    Sticky just under the topbar; on narrow screens it scrolls horizontally so many tabs still fit. */
 .tabbar { position: sticky; top: var(--topbar-h); z-index: 15; height: var(--tabbar-h); background: var(--bg); border-bottom: 1px solid var(--border); }
@@ -120,6 +128,14 @@ a { color: inherit; text-decoration: none; }
 .toc a { display: block; padding: .2rem 0; color: var(--muted); font-size: .85rem; }
 .toc a:hover { color: var(--accent); }
 .toc a.lvl-3 { padding-left: .8rem; font-size: .82rem; }
+/* Footer: secondary links (agent surface + theme toggle) and attribution, full-width below the shell. */
+.site-footer { border-top: 1px solid var(--border); margin-top: 2rem; }
+.site-footer-inner { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; max-width: 1280px; margin: 0 auto; padding: 1.25rem 1.5rem; }
+.footer-links { display: flex; align-items: center; gap: 1.1rem; font-size: .85rem; }
+.footer-links a { color: var(--muted); }
+.footer-links a:hover { color: var(--fg); }
+.powered-by { color: var(--muted); font-size: .85rem; }
+.powered-by:hover { color: var(--accent); }
 .results { max-width: 760px; margin: 2rem auto; padding: 0 1.5rem; }
 .result { border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.1rem; margin-bottom: .9rem; display: block; }
 .result:hover { border-color: var(--accent); }
