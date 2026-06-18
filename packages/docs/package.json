@@ -27,13 +27,18 @@
     "./agent": {
       "types": "./dist/agent.d.ts",
       "import": "./dist/agent.js"
+    },
+    "./meta": {
+      "types": "./dist/meta.d.ts",
+      "import": "./dist/meta.js"
     }
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json",
+    "test": "node --experimental-strip-types --test test/*.test.ts"
   },
   "keywords": [
     "kura",

@@ -10,6 +10,7 @@ dist/
 **/app/_content.ts
 **/app/_index.ts
 **/app/_mdx.ts
+**/app/_meta.ts
 **/app/_index.bin
 **/app/_mdx.json
 
@@ -23,3 +24,6 @@ dist/
 prototypes/**/drcd/
 prototypes/**/wasm-probe/
 prototypes/**/*.bin
+
+# local-only dev helpers (machine-specific paths/links; never committed)
+*.local.*

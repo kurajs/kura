@@ -6,7 +6,44 @@ import { themeCss } from "./theme.ts";
 import { DEFAULT_LABELS, type Labels } from "./labels.ts";
 
 export type SiteInfo = { name?: string; brand?: string };
-export type SidebarGroup = { title: string; items: { slug: string; title: string }[] };
+/** A sidebar entry: a doc link, or a collapsible folder group (`items`). A group may also carry a
+ *  `slug` — its index page (folder-as-page): the header links there AND toggles the children. */
+export type SidebarNode = { slug: string; title: string } | { title: string; items: SidebarNode[]; slug?: string };
+export type SidebarGroup = { title: string; items: SidebarNode[] };
+
+/** Does a subtree contain (or itself link to) the active page? (Folders auto-open when they do.) */
+function hasActive(items: SidebarNode[], active?: string): boolean {
+  return items.some((n) => ("items" in n ? n.slug === active || hasActive(n.items, active) : n.slug === active));
+}
+
+/** Recursive sidebar rendering: doc → link; folder → <details>. A folder with an index renders its
+ *  title as a link (clicking navigates to the folder's page); the chevron still toggles. */
+function SidebarItems({ items, active, href }: { items: SidebarNode[]; active?: string; href: Href }) {
+  return (
+    <>
+      {items.map((n) =>
+        "items" in n ? (
+          <details key={n.title} className="folder" open={n.slug === active || hasActive(n.items, active)}>
+            <summary className="folder-title">
+              {n.slug ? (
+                <a className={"folder-link" + (n.slug === active ? " active" : "")} href={href(`/docs/${n.slug}`)}>{n.title}</a>
+              ) : (
+                <span>{n.title}</span>
+              )}
+            </summary>
+            <div className="folder-items">
+              <SidebarItems items={n.items} active={active} href={href} />
+            </div>
+          </details>
+        ) : (
+          <a key={n.slug} className={"item" + (n.slug === active ? " active" : "")} href={href(`/docs/${n.slug}`)}>
+            {n.title}
+          </a>
+        ),
+      )}
+    </>
+  );
+}
 /** Localizes an internal route path to the active locale (identity when i18n is off). */
 export type Href = (path: string) => string;
 /** One entry in the language switcher: this page's URL in another locale. */
@@ -61,12 +98,10 @@ export function DocsShell({ site, sidebar, active, toc, labels = DEFAULT_LABELS,
       </header>
       <div className="shell">
         <aside className="sidebar">
-          {sidebar.map((s) => (
-            <div className="group" key={s.title}>
-              <p className="group-title">{s.title}</p>
-              {s.items.map((it) => (
-                <a key={it.slug} className={"item" + (it.slug === active ? " active" : "")} href={href(`/docs/${it.slug}`)}>{it.title}</a>
-              ))}
+          {sidebar.map((s, i) => (
+            <div className="group" key={s.title || `g${i}`}>
+              {s.title && <p className="group-title">{s.title}</p>}
+              <SidebarItems items={s.items} active={active} href={href} />
             </div>
           ))}
         </aside>

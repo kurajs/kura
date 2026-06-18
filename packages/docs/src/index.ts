@@ -1,5 +1,7 @@
-export { createNav, processHtml, slugify } from "./nav.ts";
-export type { DocLike, Toc, Nav } from "./nav.ts";
+export { createNav, treeOf, processHtml, slugify } from "./nav.ts";
+export type { DocLike, Toc, Nav, NavNode } from "./nav.ts";
+export { parseMeta, validatePages, mergeMeta } from "./meta.ts";
+export type { MetaConfig, MetaMap } from "./meta.ts";
 export { defineKura } from "./config.ts";
 export type { KuraConfig } from "./config.ts";
 export { createSearch, buildIndex, chunk } from "./search.ts";

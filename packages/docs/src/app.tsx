@@ -7,10 +7,11 @@
 // every per-locale helper collapses to the single default collection (zero overhead).
 // With `i18n`, June resolves ctx.locale before routing; the loaders thread it into the
 // content finders (variant → default fallback), the nav, the labels, and the MDX bucket.
-import { createNav, processHtml, type DocLike, type Nav } from "./nav.ts";
+import { createNav, treeOf, flattenTree, processHtml, type DocLike, type Nav, type NavNode } from "./nav.ts";
+import { mergeMeta, type MetaMap } from "./meta.ts";
 import { createSearch, type SearchHit } from "./search.ts";
 import { docsActions } from "./actions.ts";
-import { DocsPage, DocsShell, SearchResults, type SiteInfo, type SidebarGroup, type DocView, type Href, type LocaleLink } from "./ui.tsx";
+import { DocsPage, DocsShell, SearchResults, type SiteInfo, type SidebarGroup, type SidebarNode, type DocView, type Href, type LocaleLink } from "./ui.tsx";
 import type { KuraConfig } from "./config.ts";
 import { resolveLabels, type Labels } from "./labels.ts";
 import { localeHref, type I18nConfig } from "@junejs/core/i18n";
@@ -37,6 +38,12 @@ export function createDocs<T extends DocLike>(opts: {
   indexBytes?: Uint8Array;
   /** Precompiled MDX html bucketed by locale ("default" = flat default), built by `kura index`. */
   mdxHtml?: Record<string, Record<string, string>>;
+  /** Per-folder nav metadata (folder path → { title, pages }), frozen from meta.json by `kura index`. */
+  meta?: MetaMap;
+  /** Per-locale meta overrides (locale → folder path → { title, … }), from each locale's mirror.
+   *  Merged over `meta` per folder, so a locale localizes folder group titles (and order) without
+   *  restating the whole tree. Frozen as `META_LOCALES` by `kura index`. */
+  metaLocales?: Record<string, MetaMap>;
 }) {
   const { DOCS, doc, docs } = opts.content;
   // embedder is OPTIONAL: with one, search is semantic (over the frozen index); without one,
@@ -64,6 +71,22 @@ export function createDocs<T extends DocLike>(opts: {
   const search = createSearch({ entries: DOCS, embedder: opts.config.embedder, indexBytes: opts.indexBytes });
   const actions = docsActions({ search, entries: DOCS, doc });
 
+  // Folder nav metadata for a locale: the default `meta`, with this locale's per-folder overrides
+  // merged in (shallow, per folder key) so a locale can relabel/reorder a folder without restating
+  // the rest. No i18n (or no override for the locale) → the default map, untouched. Memoized.
+  const metaCache = new Map<string, MetaMap | undefined>();
+  const metaFor = (locale?: string): MetaMap | undefined => {
+    const over = locale ? opts.metaLocales?.[locale] : undefined;
+    if (!over) return opts.meta;
+    const key = locale!;
+    let m = metaCache.get(key);
+    if (!m) {
+      m = mergeMeta(opts.meta, over);
+      metaCache.set(key, m);
+    }
+    return m;
+  };
+
   // Per-locale entries + nav, memoized — built once per locale, reused across requests.
   const entriesFor = (locale?: string): readonly T[] => (docs ? docs(locale) : DOCS);
   const navCache = new Map<string, Nav<T>>();
@@ -79,11 +102,57 @@ export function createDocs<T extends DocLike>(opts: {
   // Section frontmatter values are stable KEYS; sectionLabels maps them to localized headings.
   const sectionLabel = (locale: string | undefined, key: string): string =>
     (locale ? opts.config.sectionLabels?.[locale]?.[key] : undefined) ?? key;
-  const sidebarFor = (locale?: string): SidebarGroup[] =>
-    navFor(locale).groups().map((g) => ({
-      title: sectionLabel(locale, g.title),
-      items: g.items.map((it) => ({ slug: it.slug, title: String(it.data.title ?? it.slug) })),
-    }));
+  // Section = top group; within it, slug folders nest (treeOf) into collapsible sub-groups.
+  const toNode = (n: NavNode<T>): SidebarNode =>
+    n.kind === "doc"
+      ? { slug: n.entry.slug, title: String(n.entry.data.title ?? n.entry.slug) }
+      : { title: n.title, items: n.children.map(toNode), ...(n.index ? { slug: n.index.slug } : {}) };
+  // Two nav models. With `section` frontmatter → sections are the top groups (folders nest within).
+  // Without → folder-driven (Fumadocs/GitBook style): top-level FOLDERS are the sections, ordered by
+  // the root meta.json; a folder's index shows as its first item.
+  const hasSections = DOCS.some((d) => d.data.section);
+  const sidebarFor = (locale?: string): SidebarGroup[] => {
+    const meta = metaFor(locale);
+    if (hasSections) {
+      return navFor(locale).groups().map((g) => ({
+        title: sectionLabel(locale, g.title),
+        items: treeOf(g.items, meta).map(toNode),
+      }));
+    }
+    const groups: SidebarGroup[] = [];
+    const loose: SidebarNode[] = [];
+    for (const n of treeOf(entriesFor(locale), meta)) {
+      if (n.kind === "group") {
+        const items: SidebarNode[] = [];
+        if (n.index) items.push({ slug: n.index.slug, title: String(n.index.data.title ?? n.title) });
+        items.push(...n.children.map(toNode));
+        groups.push({ title: n.title, items });
+      } else {
+        loose.push(toNode(n));
+      }
+    }
+    return loose.length ? [{ title: "", items: loose }, ...groups] : groups;
+  };
+
+  // prev/next follow the SAME order as the sidebar (the flattened nav tree), not the legacy
+  // section/frontmatter order — so they match what the reader sees. Memoized per locale.
+  const orderCache = new Map<string, readonly T[]>();
+  const orderedFor = (locale?: string): readonly T[] => {
+    const key = locale ?? "";
+    let o = orderCache.get(key);
+    if (!o) {
+      o = hasSections
+        ? navFor(locale).groups().flatMap((g) => flattenTree(treeOf(g.items, metaFor(locale))))
+        : flattenTree(treeOf(entriesFor(locale), metaFor(locale)));
+      orderCache.set(key, o);
+    }
+    return o;
+  };
+  const prevNextOf = (slug: string, locale?: string): { prev: T | null; next: T | null } => {
+    const all = orderedFor(locale);
+    const i = all.findIndex((e) => e.slug === slug);
+    return { prev: i > 0 ? all[i - 1]! : null, next: i >= 0 && i < all.length - 1 ? all[i + 1]! : null };
+  };
   const labelsFor = (locale?: string): Labels => resolveLabels(locale, opts.config.labels);
 
   // MDX html for an entry: its own locale bucket → the default bucket → plain markdown html.
@@ -92,7 +161,7 @@ export function createDocs<T extends DocLike>(opts: {
 
   const viewOf = (e: T, locale?: string): DocView => {
     const { html, toc } = processHtml(mdxFor(e));
-    const { prev, next } = navFor(locale).prevNext(e.slug);
+    const { prev, next } = prevNextOf(e.slug, locale);
     // A non-default locale that resolved to a non-variant entry fell back to default.
     const notTranslated = !!(locale && defaultLocale && locale !== defaultLocale && e.locale !== locale);
     return {
