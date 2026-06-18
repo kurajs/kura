@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // Kura CLI.
+// (curator cross-repo test: trigger Mori to open a docs PR in kura.build)
 //   kura index [--model Xenova/bge-m3]
 //     Build the search index + precompiled MDX for the current Kura docs app and FREEZE both
 //     as importable modules (app/_index.ts, app/_mdx.ts) — so the worker bundle imports them
