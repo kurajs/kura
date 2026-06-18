@@ -14,6 +14,11 @@ export const themeCss = `
   --warn-bg: #fffbeb; --warn-border: #fde68a; --warn-fg: #92400e;
   --sidebar-w: 248px; --toc-w: 220px;
   font-family: system-ui, -apple-system, "Noto Sans TC", "PingFang TC", sans-serif;
+  /* Headings use a serif display face for an editorial feel. en-US-first: a Latin system serif,
+     ending in the generic \`serif\` keyword so CJK runs fall back to the OS serif (Mincho/Songti)
+     automatically — no CJK web font shipped, so zero load cost. Want a web display serif (e.g.
+     Fraunces, Newsreader)? Override --font-display in your own CSS — an explicit, opt-in choice. */
+  --font-display: Georgia, Cambria, "Times New Roman", Times, serif;
 }
 [data-theme="dark"] {
   --bg: #0b0d12; --fg: #e6edf3; --fg-soft: #c9d1d9; --muted: #8b949e; --border: #21262d;
@@ -48,7 +53,8 @@ a { color: inherit; text-decoration: none; }
 /* One row = 24px line + 6px top/bottom padding = 36px tall; leaves and folder labels share it. */
 .sidebar a.item, .sidebar .folder > .folder-title { display: flex; align-items: center; gap: .35rem; line-height: 24px; padding: 6px .55rem; border-radius: 7px; color: var(--fg-soft); font-size: .92rem; }
 .sidebar a.item:hover { background: var(--hover); }
-.sidebar a.item.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+/* Active = a soft accent tint + accent text, NOT bold (avoids the row reflowing wider). */
+.sidebar a.item.active { background: var(--accent-soft); color: var(--accent); }
 .sidebar .folder > .folder-title { cursor: pointer; list-style: none; }
 .sidebar .folder > .folder-title::-webkit-details-marker { display: none; }
 /* Chevron sits AFTER the (flex:1) label → pushed to the right edge, so every item's left text
@@ -58,7 +64,9 @@ a { color: inherit; text-decoration: none; }
 .sidebar .folder > .folder-title:hover { background: var(--hover); }
 .sidebar .folder > .folder-title > .folder-link,
 .sidebar .folder > .folder-title > span { flex: 1; min-width: 0; color: inherit; }
-.sidebar .folder > .folder-title > .folder-link.active { color: var(--accent); font-weight: 600; }
+.sidebar .folder > .folder-title > .folder-link.active { color: var(--accent); }
+/* Folder-as-page active: tint the whole header row (matches a leaf's active state). */
+.sidebar .folder > .folder-title:has(.folder-link.active) { background: var(--accent-soft); }
 /* Nested list: indent + guide line, offset 1px below the parent summary. */
 .sidebar .folder .items { margin: 1px 0 0 .5rem; padding-left: .6rem; border-left: 1px solid var(--border); }
 .content { padding: 2rem 2.5rem 5rem; min-width: 0; }
@@ -68,14 +76,16 @@ a { color: inherit; text-decoration: none; }
 .btn { display: inline-flex; align-items: center; gap: .35rem; padding: .35rem .7rem; font-size: .82rem; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--fg-soft); cursor: pointer; }
 .btn:hover { background: var(--hover); }
 .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
-.prose { line-height: 1.7; font-size: 1rem; }
-.prose h1 { font-size: 1.9rem; margin: 0 0 .5rem; }
-.prose h2 { font-size: 1.35rem; margin: 2.2rem 0 .8rem; padding-top: .4rem; scroll-margin-top: 72px; }
-.prose h3 { font-size: 1.1rem; margin: 1.6rem 0 .6rem; scroll-margin-top: 72px; }
+.prose { line-height: 1.65; font-size: 1rem; }
+.prose h1, .prose h2, .prose h3 { font-family: var(--font-display); font-weight: 600; letter-spacing: -.01em; }
+.prose h1 { font-size: 2rem; font-weight: 500; margin: 0 0 .5rem; }
+.prose h2 { font-size: 1.4rem; margin: 2.2rem 0 .8rem; padding-top: .4rem; scroll-margin-top: 72px; }
+.prose h3 { font-size: 1.12rem; margin: 1.6rem 0 .6rem; scroll-margin-top: 72px; }
 .prose p { margin: .8rem 0; }
 .prose ul, .prose ol { padding-left: 1.4rem; }
 .prose li { margin: .3rem 0; }
-.prose a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.prose a { color: var(--accent); font-weight: 600; text-decoration: none; }
+.prose a:hover { text-decoration: underline; text-underline-offset: 2px; }
 .prose blockquote { margin: 1.2rem 0; padding: .7rem 1rem; border-left: 3px solid var(--accent); background: var(--accent-soft); border-radius: 0 8px 8px 0; color: var(--fg); }
 .prose code { background: var(--code-bg); padding: .12em .35em; border-radius: 5px; font-size: .88em; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
 .prose pre { position: relative; background: #0d1117; color: #e6edf3; padding: 1rem 1.1rem; border-radius: 10px; overflow-x: auto; margin: 1.2rem 0; }
