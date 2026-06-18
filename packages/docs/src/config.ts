@@ -2,6 +2,11 @@ import type { Embedder } from "@kurajs/core";
 import type { Labels } from "./labels.ts";
 
 export interface KuraConfig {
+  /** URL prefix for doc pages (default `/docs`). Set `""` to mount docs at the site root. The route
+   *  files must be placed to match: `app/docs/[[...slug]]` for `/docs`, `app/[[...slug]]` for root.
+   *  Affects generated links only (sidebar, pager, tabs, search results, `.md`); search stays at
+   *  `/search`. */
+  basePath?: string;
   /** Sidebar group order (sections). */
   sections?: string[];
   /** Site identity shown in the chrome. */

@@ -1,4 +1,4 @@
-export { createNav, treeOf, processHtml, slugify } from "./nav.ts";
+export { createNav, treeOf, processHtml, slugify, normalizeBasePath, docPath, topFolderOf, activeTabIndex } from "./nav.ts";
 export type { DocLike, Toc, Nav, NavNode } from "./nav.ts";
 export { parseMeta, validatePages, mergeMeta } from "./meta.ts";
 export type { MetaConfig, MetaMap, TabConfig } from "./meta.ts";

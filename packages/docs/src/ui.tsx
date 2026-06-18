@@ -1,7 +1,7 @@
 // Presentational docs UI (en-US). Plain-prop components — no June/app imports — so they
 // stay portable and overridable. The app maps its nav/content into these props.
 import type { ReactNode } from "react";
-import type { Toc } from "./nav.ts";
+import { docPath, type Toc } from "./nav.ts";
 import { themeCss } from "./theme.ts";
 import { DEFAULT_LABELS, type Labels } from "./labels.ts";
 
@@ -19,7 +19,7 @@ function hasActive(items: SidebarNode[], active?: string): boolean {
 /** Recursive sidebar rendering as a real list (semantics + a11y): each item is an <li>; a doc → link,
  *  a folder → <details> whose children are a nested <ul>. A folder with an index renders its title as
  *  a link (clicking navigates to the folder's page); the chevron still toggles. */
-function SidebarItems({ items, active, href }: { items: SidebarNode[]; active?: string; href: Href }) {
+function SidebarItems({ items, active, href, basePath }: { items: SidebarNode[]; active?: string; href: Href; basePath: string }) {
   return (
     <ul className="items">
       {items.map((n) =>
@@ -28,17 +28,17 @@ function SidebarItems({ items, active, href }: { items: SidebarNode[]; active?: 
             <details className="folder" open={n.slug === active || hasActive(n.items, active)}>
               <summary className="folder-title">
                 {n.slug ? (
-                  <a className={"folder-link" + (n.slug === active ? " active" : "")} href={href(`/docs/${n.slug}`)}>{n.title}</a>
+                  <a className={"folder-link" + (n.slug === active ? " active" : "")} href={href(docPath(basePath, n.slug))}>{n.title}</a>
                 ) : (
                   <span>{n.title}</span>
                 )}
               </summary>
-              <SidebarItems items={n.items} active={active} href={href} />
+              <SidebarItems items={n.items} active={active} href={href} basePath={basePath} />
             </details>
           </li>
         ) : (
           <li key={n.slug}>
-            <a className={"item" + (n.slug === active ? " active" : "")} href={href(`/docs/${n.slug}`)}>
+            <a className={"item" + (n.slug === active ? " active" : "")} href={href(docPath(basePath, n.slug))}>
               {n.title}
             </a>
           </li>
@@ -67,12 +67,13 @@ export type DocView = {
 export type SearchHit = { slug: string; title: string; section: string; text: string; score: number };
 
 /** The 3-column chrome: top bar · sidebar · content · ToC. Injects the theme. */
-export function DocsShell({ site, sidebar, tabs, active, toc, labels = DEFAULT_LABELS, href = (p) => p, localeSwitch, children }: {
+export function DocsShell({ site, sidebar, tabs, active, toc, basePath = "/docs", labels = DEFAULT_LABELS, href = (p) => p, localeSwitch, children }: {
   site?: SiteInfo;
   sidebar: SidebarGroup[];
   tabs?: TabLink[];
   active?: string;
   toc?: Toc;
+  basePath?: string;
   labels?: Labels;
   href?: Href;
   localeSwitch?: LocaleLink[];
@@ -116,7 +117,7 @@ export function DocsShell({ site, sidebar, tabs, active, toc, labels = DEFAULT_L
           {sidebar.map((s, i) => (
             <div className="group" key={s.title || `g${i}`}>
               {s.title && <p className="group-title">{s.title}</p>}
-              <SidebarItems items={s.items} active={active} href={href} />
+              <SidebarItems items={s.items} active={active} href={href} basePath={basePath} />
             </div>
           ))}
         </aside>
@@ -138,11 +139,11 @@ export function DocsShell({ site, sidebar, tabs, active, toc, labels = DEFAULT_L
 }
 
 /** A full doc page: breadcrumb · page actions (copy md / open in LLM) · prose · pager. */
-export function DocsPage({ site, sidebar, tabs, doc, labels = DEFAULT_LABELS, href = (p) => p, localeSwitch }: { site?: SiteInfo; sidebar: SidebarGroup[]; tabs?: TabLink[]; doc: DocView; labels?: Labels; href?: Href; localeSwitch?: LocaleLink[] }) {
-  const md = href(`/docs/${doc.slug}.md`);
+export function DocsPage({ site, sidebar, tabs, doc, basePath = "/docs", labels = DEFAULT_LABELS, href = (p) => p, localeSwitch }: { site?: SiteInfo; sidebar: SidebarGroup[]; tabs?: TabLink[]; doc: DocView; basePath?: string; labels?: Labels; href?: Href; localeSwitch?: LocaleLink[] }) {
+  const md = href(docPath(basePath, `${doc.slug}.md`));
   const prompt = encodeURIComponent(`Please read this doc and answer my questions: ${doc.title}`);
   return (
-    <DocsShell site={site} sidebar={sidebar} tabs={tabs} active={doc.slug} toc={doc.toc} labels={labels} href={href} localeSwitch={localeSwitch}>
+    <DocsShell site={site} sidebar={sidebar} tabs={tabs} active={doc.slug} toc={doc.toc} basePath={basePath} labels={labels} href={href} localeSwitch={localeSwitch}>
       <div className="breadcrumb">{doc.section ? `${doc.section} / ` : ""}{doc.title}</div>
       {doc.notTranslated && <div className="not-translated">{labels.notTranslated}</div>}
       <div className="page-actions">
@@ -153,8 +154,8 @@ export function DocsPage({ site, sidebar, tabs, doc, labels = DEFAULT_LABELS, hr
       </div>
       <article className="prose" dangerouslySetInnerHTML={{ __html: doc.html }} />
       <nav className="pager">
-        {doc.prev ? <a href={href(`/docs/${doc.prev.slug}`)}><div className="dir">← {labels.previous}</div><div className="ttl">{doc.prev.title}</div></a> : <span />}
-        {doc.next ? <a className="next" href={href(`/docs/${doc.next.slug}`)}><div className="dir">{labels.next} →</div><div className="ttl">{doc.next.title}</div></a> : <span />}
+        {doc.prev ? <a href={href(docPath(basePath, doc.prev.slug))}><div className="dir">← {labels.previous}</div><div className="ttl">{doc.prev.title}</div></a> : <span />}
+        {doc.next ? <a className="next" href={href(docPath(basePath, doc.next.slug))}><div className="dir">{labels.next} →</div><div className="ttl">{doc.next.title}</div></a> : <span />}
       </nav>
       <script dangerouslySetInnerHTML={{ __html: COPY_JS + CODE_JS + TABS_JS }} />
     </DocsShell>
@@ -162,13 +163,13 @@ export function DocsPage({ site, sidebar, tabs, doc, labels = DEFAULT_LABELS, hr
 }
 
 /** Search results list (used inside a DocsShell). */
-export function SearchResults({ query, hits, labels = DEFAULT_LABELS, href = (p) => p }: { query: string; hits: SearchHit[]; labels?: Labels; href?: Href }) {
+export function SearchResults({ query, hits, basePath = "/docs", labels = DEFAULT_LABELS, href = (p) => p }: { query: string; hits: SearchHit[]; basePath?: string; labels?: Labels; href?: Href }) {
   return (
     <div className="results">
       <h1 style={{ fontSize: "1.4rem" }}>{query ? `${labels.search}: “${query}”` : labels.search}</h1>
       {query && hits.length === 0 && <p style={{ color: "var(--muted)" }}>{labels.noResults}</p>}
       {hits.map((h, i) => (
-        <a key={i} className="result" href={href(`/docs/${h.slug}`)}>
+        <a key={i} className="result" href={href(docPath(basePath, h.slug))}>
           <div className="meta"><span>{h.section} · {h.title}</span><span>cos {h.score}</span></div>
           <p style={{ margin: ".3rem 0 0", color: "#444" }}>{h.text.slice(0, 140)}…</p>
         </a>

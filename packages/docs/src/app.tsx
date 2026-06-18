@@ -7,7 +7,7 @@
 // every per-locale helper collapses to the single default collection (zero overhead).
 // With `i18n`, June resolves ctx.locale before routing; the loaders thread it into the
 // content finders (variant → default fallback), the nav, the labels, and the MDX bucket.
-import { createNav, treeOf, flattenTree, processHtml, topFolderOf, activeTabIndex, type DocLike, type Nav, type NavNode } from "./nav.ts";
+import { createNav, treeOf, flattenTree, processHtml, topFolderOf, activeTabIndex, normalizeBasePath, docPath, type DocLike, type Nav, type NavNode } from "./nav.ts";
 import { mergeMeta, type MetaMap, type TabConfig } from "./meta.ts";
 import { createSearch, type SearchHit } from "./search.ts";
 import { docsActions } from "./actions.ts";
@@ -50,6 +50,9 @@ export function createDocs<T extends DocLike>(opts: {
   // createSearch degrades to a lexical scan — so a site deploys + searches on Workers with no AI.
   const i18n = opts.i18n;
   const defaultLocale = i18n?.defaultLocale;
+  // URL prefix for doc pages ("/docs" default, "" = site root). All generated doc links go through
+  // docPath(basePath, …); the app mounts its route files to match.
+  const basePath = normalizeBasePath(opts.config.basePath);
 
   // Localize an internal route path to a locale (identity when i18n is off); build the
   // language-switcher links for a given page (its URL in every locale). Both lean on June's
@@ -186,7 +189,7 @@ export function createDocs<T extends DocLike>(opts: {
     const h = hrefFor(locale);
     return defs.map((t, i) => {
       const landing = orderedFor(locale, t.pages)[0];
-      return { title: t.title, href: h(`/docs/${landing ? landing.slug : t.pages[0]}`), active: i === ai };
+      return { title: t.title, href: h(docPath(basePath, landing ? landing.slug : t.pages[0]!)), active: i === ai };
     });
   };
   const labelsFor = (locale?: string): Labels => resolveLabels(locale, opts.config.labels);
@@ -233,9 +236,10 @@ export function createDocs<T extends DocLike>(opts: {
       sidebar={d.sidebar}
       tabs={d.tabs}
       doc={d.doc}
+      basePath={basePath}
       labels={d.labels}
       href={hrefFor(d.locale)}
-      localeSwitch={switchFor(d.locale, `/docs/${d.doc.slug}`)}
+      localeSwitch={switchFor(d.locale, docPath(basePath, d.doc.slug))}
     />
   );
   const md = (d: DocPage) => stripMdx(doc(d.doc.slug, d.locale)?.original ?? "");
@@ -279,7 +283,7 @@ export function createDocs<T extends DocLike>(opts: {
           href={hrefFor(d.locale)}
           localeSwitch={switchFor(d.locale, `/search${qs}`)}
         >
-          <SearchResults query={d.q} hits={d.hits} labels={labelsFor(d.locale)} href={hrefFor(d.locale)} />
+          <SearchResults query={d.q} hits={d.hits} basePath={basePath} labels={labelsFor(d.locale)} href={hrefFor(d.locale)} />
         </DocsShell>
       );
     },

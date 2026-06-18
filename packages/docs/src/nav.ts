@@ -128,6 +128,18 @@ export function flattenTree<T extends DocLike>(nodes: readonly NavNode<T>[]): T[
   return out;
 }
 
+/** Normalize a configured base path: `undefined` → "/docs"; "" → site root; otherwise a single
+ *  leading slash and no trailing slash (`"docs/"` → "/docs", `"/"` → ""). */
+export function normalizeBasePath(raw?: string): string {
+  if (raw === undefined) return "/docs";
+  const trimmed = raw.replace(/^\/+|\/+$/g, "");
+  return trimmed === "" ? "" : "/" + trimmed;
+}
+
+/** A doc route path from a base path + slug: `docPath("/docs","a/b")` → "/docs/a/b";
+ *  `docPath("","a")` → "/a". Append the extension into the slug for `.md`/`.json` projections. */
+export const docPath = (basePath: string, slug: string): string => `${basePath}/${slug}`;
+
 /** The top-level folder of a slug (`features/search/x` → `features`); "" for a bare slug. */
 export const topFolderOf = (slug: string): string => slug.split("/")[0] ?? "";
 

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { treeOf, flattenTree, createNav, slugify, topFolderOf, activeTabIndex, type NavNode, type DocLike } from "../src/nav.ts";
+import { treeOf, flattenTree, createNav, slugify, topFolderOf, activeTabIndex, normalizeBasePath, docPath, type NavNode, type DocLike } from "../src/nav.ts";
 import { doc, DOCS, META } from "./fixtures.ts";
 
 // Tiny readers over the discriminated NavNode union.
@@ -111,6 +111,22 @@ test("topFolderOf: the first slug segment (or '' for a bare slug)", () => {
   assert.equal(topFolderOf("features/search/semantic"), "features");
   assert.equal(topFolderOf("features"), "features");
   assert.equal(topFolderOf(""), "");
+});
+
+test("normalizeBasePath: default /docs; '' = root; trims slashes", () => {
+  assert.equal(normalizeBasePath(undefined), "/docs"); // default
+  assert.equal(normalizeBasePath("/docs"), "/docs");
+  assert.equal(normalizeBasePath("docs"), "/docs"); // leading slash added
+  assert.equal(normalizeBasePath("/docs/"), "/docs"); // trailing trimmed
+  assert.equal(normalizeBasePath("guide/handbook"), "/guide/handbook");
+  assert.equal(normalizeBasePath(""), ""); // explicit root
+  assert.equal(normalizeBasePath("/"), ""); // root
+});
+
+test("docPath: joins base + slug; '' base yields a root-relative path", () => {
+  assert.equal(docPath("/docs", "features/search"), "/docs/features/search");
+  assert.equal(docPath("", "features/search"), "/features/search");
+  assert.equal(docPath("/docs", "intro.md"), "/docs/intro.md"); // projection ext baked into slug
 });
 
 test("activeTabIndex: the tab owning the slug's top folder; first tab as fallback", () => {
