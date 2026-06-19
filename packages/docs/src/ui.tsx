@@ -81,6 +81,7 @@ export function DocsShell({ site, sidebar, tabs, active, toc, basePath = "/docs"
 }) {
   const brand = site?.brand ?? site?.name ?? "Kura";
   const currentLang = localeSwitch?.find((l) => l.active) ?? localeSwitch?.[0];
+  const activeTab = tabs?.find((t) => t.active);
   return (
     <>
       {/* Resolve + apply the theme on <html> BEFORE the styles below paint — no flash. */}
@@ -113,8 +114,23 @@ export function DocsShell({ site, sidebar, tabs, active, toc, basePath = "/docs"
           </div>
         </nav>
       )}
+      {/* Mobile-only: a labeled bar (shows where you are) that opens the nav drawer. */}
+      <button className="nav-bar" data-drawer-open aria-controls="docs-nav" aria-expanded="false">
+        <span className="nav-bar-icon" aria-hidden="true">☰</span>
+        <span className="nav-bar-label">{labels.navigation}</span>
+        {activeTab && <span className="nav-bar-context">{activeTab.title}</span>}
+      </button>
+      <div className="drawer-backdrop" data-drawer-close aria-hidden="true" />
       <div className="shell">
-        <aside className="sidebar">
+        <aside className="sidebar" id="docs-nav">
+          {/* Mobile-only: tab switcher folded into the drawer (the desktop tab bar is hidden ≤720). */}
+          {tabs && tabs.length > 0 && (
+            <div className="drawer-tabs">
+              {tabs.map((t) => (
+                <a key={t.title} className={"drawer-tab" + (t.active ? " active" : "")} href={t.href}>{t.title}</a>
+              ))}
+            </div>
+          )}
           {sidebar.map((s, i) => (
             <div className="group" key={s.title || `g${i}`}>
               {s.title && <p className="group-title">{s.title}</p>}
@@ -122,7 +138,20 @@ export function DocsShell({ site, sidebar, tabs, active, toc, basePath = "/docs"
             </div>
           ))}
         </aside>
-        <main className="content">{children}</main>
+        <main className="content">
+          {/* Mobile/tablet-only: the side ToC is hidden ≤1024, so offer a collapsible "On this page". */}
+          {toc && toc.length > 0 && (
+            <details className="toc-mobile">
+              <summary>{labels.onThisPage}</summary>
+              <div className="toc-mobile-list">
+                {toc.map((h) => (
+                  <a key={h.id} className={`lvl-${h.level}`} href={`#${encodeURIComponent(h.id)}`}>{h.text}</a>
+                ))}
+              </div>
+            </details>
+          )}
+          {children}
+        </main>
         <aside className="toc">
           {toc && toc.length > 0 && (
             <>
@@ -145,7 +174,7 @@ export function DocsShell({ site, sidebar, tabs, active, toc, basePath = "/docs"
           <a className="powered-by" href="https://kura.build/" target="_blank" rel="noreferrer">Powered by Kura</a>
         </div>
       </footer>
-      <script dangerouslySetInnerHTML={{ __html: FOCUS_JS + THEME_TOGGLE_JS + LANG_JS }} />
+      <script dangerouslySetInnerHTML={{ __html: FOCUS_JS + THEME_TOGGLE_JS + LANG_JS + DRAWER_JS }} />
     </>
   );
 }
@@ -198,6 +227,9 @@ const THEME_TOGGLE_JS = `(function(){var b=document.querySelector('[data-theme-t
 const FOCUS_JS = `document.addEventListener('keydown',function(e){if(e.key==='/' && !/INPUT|TEXTAREA/.test((document.activeElement||{}).tagName||'')){e.preventDefault();var s=document.querySelector('.search-box');if(s)s.focus();}});`;
 // Language dropdown: close on outside-click / Escape (the <details> opens natively).
 const LANG_JS = `document.addEventListener('click',function(e){document.querySelectorAll('details.lang[open]').forEach(function(d){if(!d.contains(e.target))d.removeAttribute('open');});});document.addEventListener('keydown',function(e){if(e.key==='Escape')document.querySelectorAll('details.lang[open]').forEach(function(d){d.removeAttribute('open');});});`;
+// Mobile nav drawer: the "Navigation" bar opens it; backdrop / a nav-link tap (incl. clientRouter
+// soft-nav) / Escape close it; <html.drawer-open> drives the slide-in + body scroll-lock.
+const DRAWER_JS = `(function(){var root=document.documentElement;function set(o){root.classList.toggle('drawer-open',o);var b=document.querySelector('[data-drawer-open]');if(b)b.setAttribute('aria-expanded',o?'true':'false');}document.addEventListener('click',function(e){if(e.target.closest('[data-drawer-open]')){e.preventDefault();set(!root.classList.contains('drawer-open'));return;}if(e.target.closest('[data-drawer-close]')){set(false);return;}if(e.target.closest('#docs-nav a'))set(false);});document.addEventListener('keydown',function(e){if(e.key==='Escape')set(false);});})();`;
 const COPY_JS = `document.querySelectorAll('[data-copy-md]').forEach(function(b){b.addEventListener('click',async function(){try{var r=await fetch(b.getAttribute('data-copy-md'));var t=await r.text();await navigator.clipboard.writeText(t);var o=b.textContent;b.textContent='Copied';setTimeout(function(){b.textContent=o;},1500);}catch(e){alert('Copy failed: '+e);}});});`;
 const CODE_JS = `document.querySelectorAll('.prose pre').forEach(function(pre){if(pre.querySelector('.copy-code'))return;var b=document.createElement('button');b.className='copy-code';b.textContent='Copy';b.addEventListener('click',async function(){var c=pre.querySelector('code');try{await navigator.clipboard.writeText(c?c.innerText:pre.innerText);var o=b.textContent;b.textContent='Copied';setTimeout(function(){b.textContent=o;},1200);}catch(e){}});pre.appendChild(b);});`;
 const TABS_JS = `document.querySelectorAll('.tabs').forEach(function(t){t.querySelectorAll('.tab-btn').forEach(function(b){b.addEventListener('click',function(){var i=b.getAttribute('data-tab');t.querySelectorAll('.tab-btn').forEach(function(x){x.classList.toggle('active',x.getAttribute('data-tab')===i);});t.querySelectorAll('.tab-panel').forEach(function(p){p.hidden=p.getAttribute('data-tab')!==i;});});});});`;

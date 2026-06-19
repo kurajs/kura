@@ -2,6 +2,7 @@
 // @junejs/i18n). en-US is the source/default; apps override per locale via config.labels.
 export type Labels = {
   onThisPage: string;
+  navigation: string;
   searchPlaceholder: string;
   copyMarkdown: string;
   viewMarkdown: string;
@@ -16,6 +17,7 @@ export type Labels = {
 
 export const DEFAULT_LABELS: Labels = {
   onThisPage: "On this page",
+  navigation: "Navigation",
   searchPlaceholder: "Search docs…  (press /)",
   copyMarkdown: "Copy Markdown",
   viewMarkdown: "View as Markdown",

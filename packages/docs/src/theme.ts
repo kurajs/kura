@@ -58,9 +58,13 @@ a { color: inherit; text-decoration: none; }
 .tabbar .tab { display: flex; align-items: center; font-size: .9rem; color: var(--muted); border-bottom: 2px solid transparent; white-space: nowrap; }
 .tabbar .tab:hover { color: var(--fg); }
 .tabbar .tab.active { color: var(--fg); border-bottom-color: var(--accent); }
-/* With a tab bar present, the sidebar/ToC stick BELOW it (topbar + tabbar) so nothing overlaps. */
-.tabbar ~ .shell .sidebar { top: calc(var(--topbar-h) + var(--tabbar-h)); height: calc(100vh - var(--topbar-h) - var(--tabbar-h)); }
-.tabbar ~ .shell .toc { top: calc(var(--topbar-h) + var(--tabbar-h)); max-height: calc(100vh - var(--topbar-h) - var(--tabbar-h)); }
+/* With a tab bar present, the sidebar/ToC stick BELOW it (topbar + tabbar) so nothing overlaps.
+   Desktop/tablet only — on mobile the sidebar becomes a drawer (see the responsive block), and this
+   higher-specificity rule must not fight the mobile drawer's top/height. */
+@media (min-width: 721px) {
+  .tabbar ~ .shell .sidebar { top: calc(var(--topbar-h) + var(--tabbar-h)); height: calc(100vh - var(--topbar-h) - var(--tabbar-h)); }
+  .tabbar ~ .shell .toc { top: calc(var(--topbar-h) + var(--tabbar-h)); max-height: calc(100vh - var(--topbar-h) - var(--tabbar-h)); }
+}
 .shell { display: grid; grid-template-columns: var(--sidebar-w) minmax(0,1fr) var(--toc-w); align-items: start; max-width: 1280px; margin: 0 auto; }
 .sidebar { position: sticky; top: 56px; height: calc(100vh - 56px); overflow-y: auto; padding: 1.5rem 1rem; border-right: 1px solid var(--border); }
 .sidebar .group { margin-bottom: 1.25rem; }
@@ -161,11 +165,37 @@ a.card:hover { border-color: var(--accent); }
 .tab-panel > :first-child { margin-top: 0; }
 .tab-panel > :last-child { margin-bottom: 0; }
 
+/* Mobile nav-drawer chrome — defined here, hidden on desktop; the responsive blocks below switch it on.
+   The "Navigation" bar (labeled, shows the active tab) opens an off-canvas drawer = the reused .sidebar
+   with the tabs folded in at the top. A collapsible "On this page" replaces the side ToC. */
+.nav-bar { display: none; align-items: center; gap: .6rem; width: 100%; padding: .7rem 1rem; background: var(--bg); border-bottom: 1px solid var(--border); color: var(--fg-soft); font-size: .9rem; text-align: left; cursor: pointer; }
+.nav-bar .nav-bar-icon { font-size: 1.05rem; line-height: 1; }
+.nav-bar .nav-bar-label { font-weight: 600; color: var(--fg); }
+.nav-bar .nav-bar-context { color: var(--muted); }
+.nav-bar .nav-bar-context::before { content: "·"; margin-right: .5rem; }
+.drawer-backdrop { display: none; }
+.drawer-tabs { display: none; flex-wrap: wrap; gap: .4rem; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
+.drawer-tab { padding: .3rem .7rem; border: 1px solid var(--border); border-radius: 999px; font-size: .85rem; color: var(--fg-soft); }
+.drawer-tab.active { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+.toc-mobile { display: none; margin: 0 0 1.25rem; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.toc-mobile > summary { list-style: none; cursor: pointer; padding: .6rem .85rem; font-size: .85rem; font-weight: 600; color: var(--fg-soft); }
+.toc-mobile > summary::-webkit-details-marker { display: none; }
+.toc-mobile > summary::after { content: "⌄"; float: right; color: var(--muted); transition: transform .15s; }
+.toc-mobile[open] > summary::after { transform: rotate(180deg); }
+.toc-mobile-list { display: flex; flex-direction: column; padding: .2rem .85rem .7rem; border-top: 1px solid var(--border); }
+.toc-mobile-list a { padding: .3rem 0; color: var(--muted); font-size: .85rem; }
+.toc-mobile-list a:hover { color: var(--accent); }
+.toc-mobile-list a.lvl-3 { padding-left: .9rem; }
+
 /* Responsive — kept LAST so these win over the base rules above (same specificity → source order). */
-@media (max-width: 1024px) { .shell { grid-template-columns: var(--sidebar-w) minmax(0,1fr); } .toc { display: none; } }
+@media (max-width: 1024px) {
+  .shell { grid-template-columns: var(--sidebar-w) minmax(0,1fr); }
+  .toc { display: none; }
+  /* The side ToC is gone here → offer the collapsible "On this page" instead. */
+  .toc-mobile { display: block; }
+}
 @media (max-width: 720px) {
   .shell { grid-template-columns: 1fr; }
-  .sidebar { display: none; }
   /* Reclaim horizontal space on phones: small content gutters (was 2.5rem desktop). */
   .content { padding: 1.25rem 1rem 3rem; }
   /* Tighter topbar; the search field flexes to fill the row instead of a fixed 280px that
@@ -173,7 +203,16 @@ a.card:hover { border-color: var(--accent); }
   .topbar { padding: 0 1rem; gap: .6rem; }
   .topbar form { margin-left: .5rem; flex: 1 1 auto; min-width: 0; }
   .search-box { width: 100%; max-width: none; }
-  .tabbar-inner { padding: 0 1rem; }
   .site-footer-inner { padding: 1.1rem 1rem; }
+  /* The desktop tab bar is replaced by the labeled "Navigation" bar; tabs fold into the drawer. */
+  .tabbar { display: none; }
+  .nav-bar { display: flex; }
+  /* The sidebar becomes an off-canvas drawer (overrides its sticky desktop layout). */
+  .sidebar { position: fixed; top: 0; left: 0; bottom: 0; height: auto; width: min(86vw, 320px); padding: 1.25rem 1rem; transform: translateX(-100%); transition: transform .25s ease; z-index: 50; background: var(--bg); border-right: 1px solid var(--border); }
+  .drawer-tabs { display: flex; }
+  .drawer-backdrop { display: block; position: fixed; inset: 0; background: rgba(0,0,0,.45); opacity: 0; pointer-events: none; transition: opacity .2s ease; z-index: 45; }
+  html.drawer-open { overflow: hidden; }
+  html.drawer-open .sidebar { transform: translateX(0); box-shadow: 0 0 40px rgba(0,0,0,.2); }
+  html.drawer-open .drawer-backdrop { opacity: 1; pointer-events: auto; }
 }
 `;
