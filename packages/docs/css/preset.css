@@ -1,0 +1,173 @@
+/* @kurajs/docs/css — Kura docs theme preset.
+   Import AFTER Tailwind in your app's global.css:
+     @import "tailwindcss";
+     @import "@kurajs/docs/css";
+   It (1) scans Kura's compiled components so the app's Tailwind generates the utilities they use,
+   (2) maps Kura's design tokens into Tailwind (color/font utilities that follow the dark-mode var
+   swap), (3) binds `dark:` to <html data-theme="dark">, (4) adds the typography plugin for rendered
+   Markdown (.prose) wired to Kura's tokens, and (5) carries the small `@layer components` block for
+   the bits that don't reduce to utilities (pseudo-element chevrons, JS-state widgets, the mobile
+   drawer). Kura is a library, so the consumer's Tailwind (June ships it) does the compiling. */
+
+/* Generate utilities for the classes used inside @kurajs/docs's compiled components (ui.js + mdx.js). */
+@source "../dist";
+
+/* Rendered Markdown (.prose) — the content HTML has no classes we control, so the plugin styles it.
+   Wired to Kura's tokens below so it follows the dark var swap (no prose-invert needed). */
+@plugin "@tailwindcss/typography";
+
+/* Kura toggles theme with <html data-theme="dark"> (3-state system/light/dark via a tiny script);
+   bind Tailwind's `dark:` variant to that attribute. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* Design tokens — swappable CSS vars (one source; @theme inline below exposes them as utilities). */
+:root {
+  --bg: #ffffff; --fg: #1a1a1a; --fg-soft: #444444; --muted: #6b7280; --border: #e7e7ea;
+  --accent: #4f46e5; --accent-soft: #eef2ff; --surface: #ffffff; --surface-2: #fafafa;
+  --hover: #f4f4f5; --code-bg: #f6f8fa; --topbar-bg: rgba(255,255,255,.85);
+  --callout-tip-bg: #f0fdf4; --callout-warn-bg: #fffbeb; --callout-danger-bg: #fef2f2;
+  --warn-bg: #fffbeb; --warn-border: #fde68a; --warn-fg: #92400e;
+  /* Headings use a serif display face for an editorial feel. en-US-first: a Latin system serif,
+     ending in the generic `serif` keyword so CJK runs fall back to the OS serif (Mincho/Songti)
+     automatically — no CJK web font shipped, so zero load cost. Override --font-display to use a web
+     display serif (e.g. Fraunces, Newsreader) — an explicit, opt-in choice. */
+  --font-display: Georgia, Cambria, "Times New Roman", Times, serif;
+}
+[data-theme="dark"] {
+  --bg: #0b0d12; --fg: #e6edf3; --fg-soft: #c9d1d9; --muted: #8b949e; --border: #21262d;
+  --accent: #818cf8; --accent-soft: #1e1b4b; --surface: #161b22; --surface-2: #11151b;
+  --hover: #1c2128; --code-bg: #161b22; --topbar-bg: rgba(13,17,23,.85);
+  --callout-tip-bg: #0f2a1a; --callout-warn-bg: #2a230f; --callout-danger-bg: #2a1518;
+  --warn-bg: #2a230f; --warn-border: #5a4a1e; --warn-fg: #fcd34d;
+}
+
+/* Expose tokens as Tailwind theme values. `inline` → utilities resolve the var() directly, so the
+   color utilities (bg-bg, text-fg, text-accent, border-border, …) follow the dark var swap with no
+   per-utility dark: needed. */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-fg: var(--fg);
+  --color-fg-soft: var(--fg-soft);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-hover: var(--hover);
+  --color-code-bg: var(--code-bg);
+  --color-topbar-bg: var(--topbar-bg);
+  --color-warn-bg: var(--warn-bg);
+  --color-warn-border: var(--warn-border);
+  --color-warn-fg: var(--warn-fg);
+  --font-display: var(--font-display);
+}
+
+@layer base {
+  /* The page surface (Preflight zeroes body; set Kura's bg/fg). Links inherit color by default. */
+  body { background: var(--bg); color: var(--fg); }
+  a { color: inherit; text-decoration: none; }
+}
+
+/* Component CSS — only the bits that don't reduce cleanly to utilities: pseudo-elements, CSS counters,
+   JS-toggled state, parent-state (the mobile drawer), and the few prose tweaks the plugin doesn't do.
+   Everything else (layout/spacing/color/state) lives as utilities in the markup.
+
+   NOT in @layer components: Tailwind's `@layer utilities` is emitted AFTER `@layer components`, so a
+   component rule there would LOSE to any competing utility. The drawer's `position`/`transform` and
+   the JS-toggled `.tab-btn.active` must beat utilities on the same element, so this block is unlayered
+   (unlayered CSS outranks every @layer). The rest doesn't compete with utilities at all. */
+
+/* --- typography (.prose) wired to Kura tokens --- */
+/* Each maps to a var() that swaps on dark, so rendered Markdown follows the theme. MUST be unlayered:
+   the typography plugin defines its OWN `.prose { --tw-prose-*: <gray defaults> }` in a layer, and a
+   layered override of ours would lose to it (so prose body/code came out gray, unreadable on dark).
+   Unlayered wins over every layer → these take. The pre block stays GitHub-dark in both themes. */
+.prose {
+  --tw-prose-body: var(--fg-soft);
+  --tw-prose-headings: var(--fg);
+  --tw-prose-links: var(--accent);
+  --tw-prose-bold: var(--fg);
+  --tw-prose-counters: var(--muted);
+  --tw-prose-bullets: var(--border);
+  --tw-prose-hr: var(--border);
+  --tw-prose-quotes: var(--fg);
+  --tw-prose-quote-borders: var(--accent);
+  --tw-prose-captions: var(--muted);
+  --tw-prose-code: var(--fg);
+  --tw-prose-pre-code: #e6edf3;
+  --tw-prose-pre-bg: #0d1117;
+  --tw-prose-th-borders: var(--border);
+  --tw-prose-td-borders: var(--border);
+  font-size: 1rem;
+  line-height: 1.65;
+  max-width: none;
+}
+
+/* --- prose tweaks the typography plugin doesn't cover --- */
+/* Serif display headings; tighter h1; anchor offset so #hash / ToC jumps clear the sticky topbar. */
+.prose :is(h1, h2, h3) { font-family: var(--font-display); letter-spacing: -.01em; }
+.prose h1 { font-weight: 500; }
+.prose :is(h2, h3) { scroll-margin-top: calc(56px + .75rem); }
+/* With a sticky tab bar (desktop/tablet), anchored headings must clear topbar + tabbar. */
+@media (min-width: 768px) {
+  .has-tabs :is(.prose h2, .prose h3) { scroll-margin-top: calc(56px + 44px + .75rem); }
+}
+/* Inline code as a padded chip (the plugin renders `code` with backtick ::before/::after and bold; the
+   color comes from --tw-prose-code → --fg, set above, so it follows the theme). Pre code is left to the
+   plugin (transparent on the dark pre surface) now that June defers its default `code` style. */
+.prose :where(code):not(:where(pre code)) {
+  background: var(--code-bg); padding: .12em .35em; border-radius: 5px; font-weight: 400; font-size: .88em;
+}
+.prose :where(code)::before, .prose :where(code)::after { content: none; }
+/* Curated MDX blocks contain prose; zero their outer child margins so they don't double-space. */
+.callout-body > :first-child, .tab-panel > :first-child { margin-top: 0; }
+.callout-body > :last-child, .tab-panel > :last-child { margin-bottom: 0; }
+
+/* --- pseudo-element chevrons + native marker hide (dropdowns / collapsibles) --- */
+.chevron { list-style: none; }
+.chevron::-webkit-details-marker { display: none; }
+.chevron::after { content: "⌄"; color: var(--muted); line-height: 1; transition: transform .15s; }
+[open] > .chevron::after { transform: rotate(180deg); }
+/* Sidebar folder chevron: a right-pointing caret that rotates down when open (sits after the label). */
+.folder-title { list-style: none; }
+.folder-title::-webkit-details-marker { display: none; }
+.folder-title::after { content: "›"; flex: none; color: var(--muted); transition: transform .15s; }
+.folder[open] > .folder-title::after { transform: rotate(90deg); }
+/* Horizontal-scroll tab bar: hide the scrollbar (utilities can't target ::-webkit-scrollbar). */
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+/* Mobile "Navigation" bar: a "·" separator before the active-page context. */
+.nav-bar-context::before { content: "·"; margin-right: .5rem; }
+
+/* --- copy-code button (injected by CODE_JS into each <pre>, so it has no React className) --- */
+.copy-code {
+  position: absolute; top: .5rem; right: .5rem; padding: .2rem .5rem; font-size: .72rem;
+  border: 1px solid #30363d; border-radius: 6px; background: #161b22; color: #c9d1d9;
+  cursor: pointer; opacity: 0; transition: opacity .15s;
+}
+.prose pre { position: relative; }
+.prose pre:hover .copy-code { opacity: 1; }
+
+/* --- MDX widgets rendered from Markdown (steps counters + JS-toggled tabs) --- */
+.steps { counter-reset: step; border-left: 2px solid var(--border); margin-left: .5rem; padding-left: 1.5rem; }
+.steps > * { position: relative; }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+
+/* --- mobile nav drawer state machine (parent <html.drawer-open>; utilities can't target it) --- */
+.drawer-backdrop { display: none; }
+@media (max-width: 767px) {
+  /* The sidebar becomes an off-canvas drawer (overrides its sticky desktop layout). */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; height: auto; width: min(86vw, 320px);
+    padding: 1.25rem 1rem; transform: translateX(-100%); transition: transform .25s ease;
+    z-index: 50; background: var(--bg); border-right: 1px solid var(--border);
+  }
+  .drawer-backdrop {
+    display: block; position: fixed; inset: 0; background: rgba(0,0,0,.45);
+    opacity: 0; pointer-events: none; transition: opacity .2s ease; z-index: 45;
+  }
+  html.drawer-open { overflow: hidden; }
+  html.drawer-open .sidebar { transform: translateX(0); box-shadow: 0 0 40px rgba(0,0,0,.2); }
+  html.drawer-open .drawer-backdrop { opacity: 1; pointer-events: auto; }
+}

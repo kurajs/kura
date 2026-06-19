@@ -1,8 +1,14 @@
-// Presentational docs UI (en-US). Plain-prop components — no June/app imports — so they
-// stay portable and overridable. The app maps its nav/content into these props.
+// Presentational docs UI (en-US). Plain-prop components — no June/app imports — so they stay portable
+// and overridable. The app maps its nav/content into these props.
+//
+// Styling: Tailwind utilities (June ships Tailwind built-in; the app imports "@kurajs/docs/css", which
+// scans this file's compiled output and supplies the design tokens — bg/fg/accent/… follow the dark
+// var swap automatically). The few things utilities can't express cleanly — pseudo-element chevrons,
+// the typography plugin's .prose, JS-toggled state, the mobile drawer — live in that preset's small
+// component block. Hook classes that the preset/scripts target: `folder`/`folder-title`, `chevron`,
+// `no-scrollbar`, `nav-bar-context`, `drawer-backdrop`, `copy-code`, `has-tabs`, `prose`, `tab-*`.
 import type { ReactNode } from "react";
 import { docPath, type Toc } from "./nav.ts";
-import { themeCss } from "./theme.ts";
 import { DEFAULT_LABELS, type Labels } from "./labels.ts";
 
 export type SiteInfo = { name?: string; brand?: string };
@@ -16,29 +22,34 @@ function hasActive(items: SidebarNode[], active?: string): boolean {
   return items.some((n) => ("items" in n ? n.slug === active || hasActive(n.items, active) : n.slug === active));
 }
 
+// One sidebar row (leaf link or folder summary): 36px tall (24px line + 6px×2), rounded, small text.
+// Color/state is applied per-row (active vs idle) so there's no later-wins specificity fight.
+const ROW = "flex items-center gap-1.5 leading-6 px-2 py-1.5 rounded-md text-sm";
+
 /** Recursive sidebar rendering as a real list (semantics + a11y): each item is an <li>; a doc → link,
  *  a folder → <details> whose children are a nested <ul>. A folder with an index renders its title as
- *  a link (clicking navigates to the folder's page); the chevron still toggles. */
-function SidebarItems({ items, active, href, basePath }: { items: SidebarNode[]; active?: string; href: Href; basePath: string }) {
+ *  a link (clicking navigates to the folder's page); the chevron still toggles. The `folder`/
+ *  `folder-title` classes are the component-CSS hooks (chevron ::after + marker hide live in preset). */
+function SidebarItems({ items, active, href, basePath, nested = false }: { items: SidebarNode[]; active?: string; href: Href; basePath: string; nested?: boolean }) {
   return (
-    <ul className="items">
+    <ul className={"flex flex-col gap-px" + (nested ? " mt-px ml-2 pl-2.5 border-l border-border" : "")}>
       {items.map((n) =>
         "items" in n ? (
-          <li key={n.title} className="folder-li">
+          <li key={n.title}>
             <details className="folder" open={n.slug === active || hasActive(n.items, active)}>
-              <summary className="folder-title">
+              <summary className={`${ROW} folder-title text-fg-soft cursor-pointer ${n.slug === active ? "bg-accent-soft" : "hover:bg-hover"}`}>
                 {n.slug ? (
-                  <a className={"folder-link" + (n.slug === active ? " active" : "")} href={href(docPath(basePath, n.slug))}>{n.title}</a>
+                  <a className={"flex-1 min-w-0 " + (n.slug === active ? "text-accent" : "text-inherit")} href={href(docPath(basePath, n.slug))}>{n.title}</a>
                 ) : (
-                  <span>{n.title}</span>
+                  <span className="flex-1 min-w-0">{n.title}</span>
                 )}
               </summary>
-              <SidebarItems items={n.items} active={active} href={href} basePath={basePath} />
+              <SidebarItems items={n.items} active={active} href={href} basePath={basePath} nested />
             </details>
           </li>
         ) : (
           <li key={n.slug}>
-            <a className={"item" + (n.slug === active ? " active" : "")} href={href(docPath(basePath, n.slug))}>
+            <a className={`${ROW} ${n.slug === active ? "bg-accent-soft text-accent" : "text-fg-soft hover:bg-hover"}`} href={href(docPath(basePath, n.slug))}>
               {n.title}
             </a>
           </li>
@@ -66,21 +77,22 @@ export type DocView = {
 };
 export type SearchHit = { slug: string; title: string; section: string; text: string; score: number };
 
-// Compact inline icons (lucide-style, currentColor) for the page-action menu.
-const IconCopy = () => (
-  <svg className="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg>
+// Compact inline icons (lucide-style, currentColor). `className` lets a call site tune size/color
+// (e.g. the page-action menu rows want a muted, top-aligned glyph).
+const IconCopy = ({ className = "" }: { className?: string }) => (
+  <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg>
 );
-const IconFile = () => (
-  <svg className="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M16 21H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6l4 4v12a2 2 0 0 1-2 2z" /><path d="M9 13h6M9 17h4" /></svg>
+const IconFile = ({ className = "" }: { className?: string }) => (
+  <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M16 21H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6l4 4v12a2 2 0 0 1-2 2z" /><path d="M9 13h6M9 17h4" /></svg>
 );
-const IconChat = () => (
-  <svg className="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z" /></svg>
+const IconChat = ({ className = "" }: { className?: string }) => (
+  <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z" /></svg>
 );
-const IconExternal = () => (
-  <svg className="ico-ext" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9" /></svg>
+const IconExternal = ({ className = "" }: { className?: string }) => (
+  <svg className={className} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9" /></svg>
 );
 
-/** The 3-column chrome: top bar · sidebar · content · ToC. Injects the theme. */
+/** The 3-column chrome: top bar · sidebar · content · ToC. */
 export function DocsShell({ site, sidebar, tabs, active, toc, basePath = "/docs", pageTitle, labels = DEFAULT_LABELS, href = (p) => p, localeSwitch, children }: {
   site?: SiteInfo;
   sidebar: SidebarGroup[];
@@ -99,96 +111,100 @@ export function DocsShell({ site, sidebar, tabs, active, toc, basePath = "/docs"
   const currentLang = localeSwitch?.find((l) => l.active) ?? localeSwitch?.[0];
   const activeTab = tabs?.find((t) => t.active);
   const navContext = [activeTab?.title, pageTitle].filter(Boolean).join(" / ");
+  const hasTabs = !!(tabs && tabs.length > 0);
+  // With a tab bar, the sticky sidebar/ToC start below topbar(56) + tabbar(44); otherwise below the
+  // topbar only. (≤768 the sidebar is a fixed drawer — the preset overrides these.)
+  const stickyTop = hasTabs ? "top-[100px] h-[calc(100vh-100px)]" : "top-14 h-[calc(100vh-56px)]";
+  const tocTop = hasTabs ? "top-[100px] max-h-[calc(100vh-100px)]" : "top-14 max-h-[calc(100vh-56px)]";
   return (
     <>
-      {/* Resolve + apply the theme on <html> BEFORE the styles below paint — no flash. */}
+      {/* Resolve + apply the theme on <html> BEFORE first paint — no flash. */}
       <script dangerouslySetInnerHTML={{ __html: THEME_INIT_JS }} />
-      <style dangerouslySetInnerHTML={{ __html: themeCss }} />
-      <header className="topbar">
-        <a className="brand" href={href("/")}>{brand} <span className="sub">Docs</span></a>
-        <form method="get" action={href("/search")}>
-          <input className="search-box" name="q" placeholder={labels.searchPlaceholder} aria-label={labels.search} />
+      <header className="sticky top-0 z-20 flex items-center gap-4 h-14 px-5 bg-topbar-bg backdrop-blur-sm border-b border-border max-md:px-4 max-md:gap-2.5">
+        <a className="flex items-center gap-1.5 font-bold text-[1.05rem]" href={href("/")}>{brand} <span className="font-normal text-muted text-[.85rem]">Docs</span></a>
+        <form className="ml-auto max-md:ml-2 max-md:flex-1 max-md:min-w-0" method="get" action={href("/search")}>
+          <input className="w-[280px] max-w-[40vw] px-3 py-2 text-[.9rem] border border-border rounded-lg bg-surface-2 text-fg max-md:w-full max-md:max-w-none search-box" name="q" placeholder={labels.searchPlaceholder} aria-label={labels.search} />
         </form>
-        <nav className="links">
+        <nav className="flex items-center gap-4 text-muted text-[.9rem]">
           {localeSwitch && localeSwitch.length > 1 && currentLang && (
-            <details className="lang" data-menu>
-              <summary className="lang-current">{currentLang.name}</summary>
-              <div className="lang-menu">
+            <details className="relative" data-menu>
+              <summary className="chevron cursor-pointer inline-flex items-center gap-1 px-2.5 py-1 border border-border rounded-lg text-fg-soft text-[.85rem] whitespace-nowrap hover:text-fg">{currentLang.name}</summary>
+              <div className="absolute right-0 top-[calc(100%+.4rem)] min-w-36 flex flex-col gap-px p-1.5 bg-surface border border-border rounded-xl shadow-xl z-30">
                 {localeSwitch.map((l) => (
-                  <a key={l.locale} className={"lang-item" + (l.active ? " active" : "")} href={l.href} hrefLang={l.locale}>{l.name}</a>
+                  <a key={l.locale} className={"px-2 py-1.5 rounded-md text-[.85rem] whitespace-nowrap " + (l.active ? "text-accent font-semibold" : "text-fg-soft hover:bg-hover hover:text-fg")} href={l.href} hrefLang={l.locale}>{l.name}</a>
                 ))}
               </div>
             </details>
           )}
         </nav>
       </header>
-      {tabs && tabs.length > 0 && (
-        <nav className="tabbar">
-          <div className="tabbar-inner">
-            {tabs.map((t) => (
-              <a key={t.title} className={"tab" + (t.active ? " active" : "")} href={t.href}>{t.title}</a>
+      {hasTabs && (
+        <nav className="sticky top-14 z-[15] h-11 bg-bg border-b border-border max-md:hidden">
+          <div className="flex items-stretch gap-6 h-full max-w-[1280px] mx-auto px-5 overflow-x-auto no-scrollbar">
+            {tabs!.map((t) => (
+              <a key={t.title} className={"flex items-center text-[.9rem] border-b-2 whitespace-nowrap " + (t.active ? "text-fg border-accent" : "text-muted border-transparent hover:text-fg")} href={t.href}>{t.title}</a>
             ))}
           </div>
         </nav>
       )}
       {/* Mobile-only: a labeled bar (shows where you are) that opens the nav drawer. */}
-      <button className="nav-bar" data-drawer-open aria-controls="docs-nav" aria-expanded="false">
-        <span className="nav-bar-icon" aria-hidden="true">☰</span>
-        <span className="nav-bar-label">{labels.navigation}</span>
-        {navContext && <span className="nav-bar-context">{navContext}</span>}
+      <button className="hidden max-md:flex items-center gap-2.5 w-full px-4 py-2.5 bg-bg border-0 border-b border-border text-fg-soft text-[.9rem] text-left cursor-pointer focus-visible:outline-none focus-visible:bg-hover" data-drawer-open aria-controls="docs-nav" aria-expanded="false">
+        <span className="text-[1.05rem] leading-none" aria-hidden="true">☰</span>
+        <span className="font-semibold text-fg flex-none">{labels.navigation}</span>
+        {navContext && <span className="nav-bar-context text-muted flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{navContext}</span>}
       </button>
       <div className="drawer-backdrop" data-drawer-close aria-hidden="true" />
-      <div className="shell">
-        <aside className="sidebar" id="docs-nav">
-          {/* Mobile-only: tab switcher folded into the drawer (the desktop tab bar is hidden ≤720). */}
-          {tabs && tabs.length > 0 && (
-            <div className="drawer-tabs">
-              {tabs.map((t) => (
-                <a key={t.title} className={"drawer-tab" + (t.active ? " active" : "")} href={t.href}>{t.title}</a>
+      <div className={`grid grid-cols-[248px_minmax(0,1fr)_220px] max-lg:grid-cols-[248px_minmax(0,1fr)] max-md:grid-cols-1 items-start max-w-[1280px] mx-auto${hasTabs ? " has-tabs" : ""}`}>
+        <aside className={`sidebar sticky ${stickyTop} overflow-y-auto px-4 py-6 border-r border-border`} id="docs-nav">
+          {/* Mobile-only: tab switcher folded into the drawer (the desktop tab bar is hidden ≤768). */}
+          {hasTabs && (
+            <div className="hidden max-md:flex flex-wrap gap-1.5 mb-4 pb-4 border-b border-border">
+              {tabs!.map((t) => (
+                <a key={t.title} className={"px-3 py-1 border rounded-full text-[.85rem] " + (t.active ? "bg-accent-soft text-accent border-transparent" : "text-fg-soft border-border")} href={t.href}>{t.title}</a>
               ))}
             </div>
           )}
           {sidebar.map((s, i) => (
-            <div className="group" key={s.title || `g${i}`}>
-              {s.title && <p className="group-title">{s.title}</p>}
+            <div className="mb-5" key={s.title || `g${i}`}>
+              {s.title && <p className="mb-1.5 ml-2 text-sm font-semibold text-fg">{s.title}</p>}
               <SidebarItems items={s.items} active={active} href={href} basePath={basePath} />
             </div>
           ))}
         </aside>
-        <main className="content">
+        <main className="w-auto max-w-none m-0 min-w-0 px-10 pt-8 pb-20 max-md:px-4 max-md:pt-5 max-md:pb-12">
           {/* Mobile/tablet-only: the side ToC is hidden ≤1024, so offer a collapsible "On this page". */}
           {toc && toc.length > 0 && (
-            <details className="toc-mobile">
-              <summary>{labels.onThisPage}</summary>
-              <div className="toc-mobile-list">
+            <details className="hidden max-lg:block mb-5 border border-border rounded-xl overflow-hidden">
+              <summary className="chevron flex justify-between items-center cursor-pointer px-3.5 py-2.5 text-[.85rem] font-semibold text-fg-soft">{labels.onThisPage}</summary>
+              <div className="flex flex-col px-3.5 pt-1 pb-2.5 border-t border-border">
                 {toc.map((h) => (
-                  <a key={h.id} className={`lvl-${h.level}`} href={`#${encodeURIComponent(h.id)}`}>{h.text}</a>
+                  <a key={h.id} className={"py-1.5 text-muted text-[.85rem] hover:text-accent" + (h.level === 3 ? " pl-3.5" : "")} href={`#${encodeURIComponent(h.id)}`}>{h.text}</a>
                 ))}
               </div>
             </details>
           )}
           {children}
         </main>
-        <aside className="toc">
+        <aside className={`sticky ${tocTop} overflow-y-auto px-4 py-8 max-lg:hidden`}>
           {toc && toc.length > 0 && (
             <>
-              <p className="toc-title">{labels.onThisPage}</p>
+              <p className="text-[.72rem] font-bold tracking-wider uppercase text-muted mb-2.5">{labels.onThisPage}</p>
               {toc.map((h) => (
-                <a key={h.id} className={`lvl-${h.level}`} href={`#${encodeURIComponent(h.id)}`}>{h.text}</a>
+                <a key={h.id} className={"block py-1 text-muted text-[.85rem] hover:text-accent" + (h.level === 3 ? " pl-3 text-[.82rem]" : "")} href={`#${encodeURIComponent(h.id)}`}>{h.text}</a>
               ))}
             </>
           )}
         </aside>
       </div>
-      <footer className="site-footer">
-        <div className="site-footer-inner">
-          <nav className="footer-links">
+      <footer className="border-t border-border mt-8">
+        <div className="flex items-center justify-between flex-wrap gap-4 max-w-[1280px] mx-auto px-6 py-5 max-md:px-4">
+          <nav className="flex items-center gap-[1.1rem] text-[.85rem]">
             {/* Agent surface + theme toggle — secondary controls, out of the topbar. */}
-            <a href="/llms.txt">llms.txt</a>
-            <a href="/mcp">MCP</a>
-            <button type="button" className="theme-toggle" data-theme-toggle aria-label="Toggle theme" />
+            <a className="text-muted hover:text-fg" href="/llms.txt">llms.txt</a>
+            <a className="text-muted hover:text-fg" href="/mcp">MCP</a>
+            <button type="button" className="inline-flex items-center justify-center w-[30px] h-[30px] p-0 text-[.95rem] leading-none border border-border rounded-lg bg-surface text-fg cursor-pointer hover:bg-hover" data-theme-toggle aria-label="Toggle theme" />
           </nav>
-          <a className="powered-by" href="https://kura.build/" target="_blank" rel="noreferrer">Powered by Kura</a>
+          <a className="text-muted text-[.85rem] hover:text-accent" href="https://kura.build/" target="_blank" rel="noreferrer">Powered by Kura</a>
         </div>
       </footer>
       <script dangerouslySetInnerHTML={{ __html: FOCUS_JS + THEME_TOGGLE_JS + MENU_JS + DRAWER_JS }} />
@@ -200,41 +216,42 @@ export function DocsShell({ site, sidebar, tabs, active, toc, basePath = "/docs"
 export function DocsPage({ site, sidebar, tabs, doc, basePath = "/docs", labels = DEFAULT_LABELS, href = (p) => p, localeSwitch }: { site?: SiteInfo; sidebar: SidebarGroup[]; tabs?: TabLink[]; doc: DocView; basePath?: string; labels?: Labels; href?: Href; localeSwitch?: LocaleLink[] }) {
   const md = href(docPath(basePath, `${doc.slug}.md`));
   const prompt = encodeURIComponent(`Please read this doc and answer my questions: ${doc.title}`);
+  const menuItem = "flex items-start gap-2.5 w-full px-2.5 py-2 rounded-lg bg-transparent border-0 text-fg-soft text-left cursor-pointer hover:bg-hover";
   return (
     <DocsShell site={site} sidebar={sidebar} tabs={tabs} active={doc.slug} toc={doc.toc} basePath={basePath} pageTitle={doc.title} labels={labels} href={href} localeSwitch={localeSwitch}>
-      <div className="breadcrumb">{doc.section ? `${doc.section} / ` : ""}{doc.title}</div>
-      {doc.notTranslated && <div className="not-translated">{labels.notTranslated}</div>}
-      <div className="page-actions">
+      <div className="text-muted text-[.82rem] mb-4">{doc.section ? `${doc.section} / ` : ""}{doc.title}</div>
+      {doc.notTranslated && <div className="mb-5 px-3.5 py-2.5 text-[.85rem] border border-warn-border border-l-[3px] border-l-amber-600 rounded-r-lg bg-warn-bg text-warn-fg">{labels.notTranslated}</div>}
+      <div className="flex gap-2 flex-wrap mb-6">
         {/* Split button (Mintlify-style): primary "Copy" + a chevron that opens the actions menu. */}
-        <div className="copy-page">
-          <button className="copy-page-main" data-copy-md={md}><IconCopy />{labels.copyMarkdown}</button>
-          <details className="copy-page-menu" data-menu>
-            <summary className="copy-page-toggle" aria-label="More actions" />
-            <div className="copy-page-list">
-              <button className="copy-page-item" data-copy-md={md}>
-                <IconCopy />
-                <span className="cp-text"><span className="cp-title">{labels.copyMarkdown}</span><span className="cp-hint">{labels.copyMarkdownHint}</span></span>
+        <div className="relative inline-flex items-stretch">
+          <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[.85rem] border border-border border-r-0 rounded-l-lg bg-surface text-fg-soft cursor-pointer hover:bg-hover hover:text-fg" data-copy-md={md}><IconCopy />{labels.copyMarkdown}</button>
+          <details className="relative inline-flex items-stretch" data-menu>
+            <summary className="chevron inline-flex items-center justify-center w-[30px] border border-border rounded-r-lg bg-surface text-muted cursor-pointer hover:bg-hover hover:text-fg" aria-label="More actions" />
+            <div className="absolute left-0 top-[calc(100%+.4rem)] z-30 min-w-[17rem] flex flex-col gap-px p-1.5 bg-surface border border-border rounded-xl shadow-xl">
+              <button className={menuItem} data-copy-md={md}>
+                <IconCopy className="flex-none mt-0.5 text-muted" />
+                <span className="flex flex-col min-w-0"><span className="font-semibold text-[.9rem] text-fg">{labels.copyMarkdown}</span><span className="text-[.8rem] text-muted">{labels.copyMarkdownHint}</span></span>
               </button>
-              <a className="copy-page-item" href={md}>
-                <IconFile />
-                <span className="cp-text"><span className="cp-title">{labels.viewMarkdown} <IconExternal /></span><span className="cp-hint">{labels.viewMarkdownHint}</span></span>
+              <a className={menuItem} href={md}>
+                <IconFile className="flex-none mt-0.5 text-muted" />
+                <span className="flex flex-col min-w-0"><span className="inline-flex items-center gap-1 font-semibold text-[.9rem] text-fg">{labels.viewMarkdown} <IconExternal className="text-muted" /></span><span className="text-[.8rem] text-muted">{labels.viewMarkdownHint}</span></span>
               </a>
-              <a className="copy-page-item" href={`https://chatgpt.com/?q=${prompt}`} target="_blank" rel="noreferrer">
-                <IconChat />
-                <span className="cp-text"><span className="cp-title">{labels.openInChatGPT} <IconExternal /></span><span className="cp-hint">{labels.openInChatGPTHint}</span></span>
+              <a className={menuItem} href={`https://chatgpt.com/?q=${prompt}`} target="_blank" rel="noreferrer">
+                <IconChat className="flex-none mt-0.5 text-muted" />
+                <span className="flex flex-col min-w-0"><span className="inline-flex items-center gap-1 font-semibold text-[.9rem] text-fg">{labels.openInChatGPT} <IconExternal className="text-muted" /></span><span className="text-[.8rem] text-muted">{labels.openInChatGPTHint}</span></span>
               </a>
-              <a className="copy-page-item" href={`https://claude.ai/new?q=${prompt}`} target="_blank" rel="noreferrer">
-                <IconChat />
-                <span className="cp-text"><span className="cp-title">{labels.openInClaude} <IconExternal /></span><span className="cp-hint">{labels.openInClaudeHint}</span></span>
+              <a className={menuItem} href={`https://claude.ai/new?q=${prompt}`} target="_blank" rel="noreferrer">
+                <IconChat className="flex-none mt-0.5 text-muted" />
+                <span className="flex flex-col min-w-0"><span className="inline-flex items-center gap-1 font-semibold text-[.9rem] text-fg">{labels.openInClaude} <IconExternal className="text-muted" /></span><span className="text-[.8rem] text-muted">{labels.openInClaudeHint}</span></span>
               </a>
             </div>
           </details>
         </div>
       </div>
       <article className="prose" dangerouslySetInnerHTML={{ __html: doc.html }} />
-      <nav className="pager">
-        {doc.prev ? <a href={href(docPath(basePath, doc.prev.slug))}><div className="dir">← {labels.previous}</div><div className="ttl">{doc.prev.title}</div></a> : <span />}
-        {doc.next ? <a className="next" href={href(docPath(basePath, doc.next.slug))}><div className="dir">{labels.next} →</div><div className="ttl">{doc.next.title}</div></a> : <span />}
+      <nav className="flex justify-between gap-4 mt-12 pt-6 border-t border-border">
+        {doc.prev ? <a className="flex-1 px-4 py-3.5 border border-border rounded-xl hover:border-accent" href={href(docPath(basePath, doc.prev.slug))}><div className="text-muted text-[.78rem]">← {labels.previous}</div><div className="font-semibold text-accent">{doc.prev.title}</div></a> : <span />}
+        {doc.next ? <a className="flex-1 px-4 py-3.5 border border-border rounded-xl hover:border-accent text-right" href={href(docPath(basePath, doc.next.slug))}><div className="text-muted text-[.78rem]">{labels.next} →</div><div className="font-semibold text-accent">{doc.next.title}</div></a> : <span />}
       </nav>
       <script dangerouslySetInnerHTML={{ __html: COPY_JS + CODE_JS + TABS_JS }} />
     </DocsShell>
@@ -244,13 +261,13 @@ export function DocsPage({ site, sidebar, tabs, doc, basePath = "/docs", labels 
 /** Search results list (used inside a DocsShell). */
 export function SearchResults({ query, hits, basePath = "/docs", labels = DEFAULT_LABELS, href = (p) => p }: { query: string; hits: SearchHit[]; basePath?: string; labels?: Labels; href?: Href }) {
   return (
-    <div className="results">
-      <h1 style={{ fontSize: "1.4rem" }}>{query ? `${labels.search}: “${query}”` : labels.search}</h1>
-      {query && hits.length === 0 && <p style={{ color: "var(--muted)" }}>{labels.noResults}</p>}
+    <div className="max-w-[760px] mx-auto my-8 px-6">
+      <h1 className="text-[1.4rem] font-display">{query ? `${labels.search}: “${query}”` : labels.search}</h1>
+      {query && hits.length === 0 && <p className="text-muted">{labels.noResults}</p>}
       {hits.map((h, i) => (
-        <a key={i} className="result" href={href(docPath(basePath, h.slug))}>
-          <div className="meta"><span>{h.section} · {h.title}</span><span>cos {h.score}</span></div>
-          <p style={{ margin: ".3rem 0 0", color: "#444" }}>{h.text.slice(0, 140)}…</p>
+        <a key={i} className="block border border-border rounded-xl px-4 py-4 mb-3.5 hover:border-accent" href={href(docPath(basePath, h.slug))}>
+          <div className="flex justify-between text-muted text-[.8rem]"><span>{h.section} · {h.title}</span><span>cos {h.score}</span></div>
+          <p className="mt-1 text-fg-soft">{h.text.slice(0, 140)}…</p>
         </a>
       ))}
     </div>

@@ -31,10 +31,12 @@
     "./meta": {
       "types": "./dist/meta.d.ts",
       "import": "./dist/meta.js"
-    }
+    },
+    "./css": "./css/preset.css"
   },
   "files": [
-    "dist"
+    "dist",
+    "css"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
