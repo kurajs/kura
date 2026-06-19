@@ -173,6 +173,9 @@ a.card:hover { border-color: var(--accent); }
 .nav-bar .nav-bar-label { font-weight: 600; color: var(--fg); flex: none; }
 .nav-bar .nav-bar-context { color: var(--muted); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nav-bar .nav-bar-context::before { content: "·"; margin-right: .5rem; }
+/* Keyboard focus (e.g. focus returning here after Esc closes the drawer): a soft background instead
+   of the browser's default box outline, which clashed with the bottom divider (thick-bottom look). */
+.nav-bar:focus-visible { outline: none; background: var(--hover); }
 .drawer-backdrop { display: none; }
 .drawer-tabs { display: none; flex-wrap: wrap; gap: .4rem; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
 .drawer-tab { padding: .3rem .7rem; border: 1px solid var(--border); border-radius: 999px; font-size: .85rem; color: var(--fg-soft); }
