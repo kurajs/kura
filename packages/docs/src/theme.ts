@@ -103,8 +103,14 @@ a { color: inherit; text-decoration: none; }
 .prose { line-height: 1.65; font-size: 1rem; }
 .prose h1, .prose h2, .prose h3 { font-family: var(--font-display); font-weight: 600; letter-spacing: -.01em; }
 .prose h1 { font-size: 2rem; font-weight: 500; margin: 0 0 .5rem; }
-.prose h2 { font-size: 1.4rem; margin: 2.2rem 0 .8rem; padding-top: .4rem; scroll-margin-top: 72px; }
-.prose h3 { font-size: 1.12rem; margin: 1.6rem 0 .6rem; scroll-margin-top: 72px; }
+.prose h2 { font-size: 1.4rem; margin: 2.2rem 0 .8rem; padding-top: .4rem; scroll-margin-top: calc(var(--topbar-h) + .75rem); }
+.prose h3 { font-size: 1.12rem; margin: 1.6rem 0 .6rem; scroll-margin-top: calc(var(--topbar-h) + .75rem); }
+/* With a sticky tab bar (desktop/tablet), an anchored heading must clear topbar + tabbar, not just the
+   topbar — otherwise a ToC/#hash jump lands the heading behind the tab bar. Mobile hides the tab bar, so
+   the base offset (topbar only) is correct there. */
+@media (min-width: 721px) {
+  .tabbar ~ .shell .prose h2, .tabbar ~ .shell .prose h3 { scroll-margin-top: calc(var(--topbar-h) + var(--tabbar-h) + .75rem); }
+}
 .prose p { margin: .8rem 0; }
 .prose ul, .prose ol { padding-left: 1.4rem; }
 .prose li { margin: .3rem 0; }
