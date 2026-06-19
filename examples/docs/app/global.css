@@ -1,2 +1,2 @@
-/* The Kura docs theme is provided by @kurajs/docs (injected by <DocsShell>).
-   Add app-specific overrides below — they cascade after the injected theme. */
+@import "tailwindcss";
+@import "@kurajs/docs/css";

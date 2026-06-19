@@ -1,2 +1,7 @@
-/* The Kura docs theme is provided by @kurajs/docs (injected by <DocsShell>).
-   Add app-specific overrides below — they cascade after the injected theme. */
+/* June ships Tailwind built-in. Pull in Tailwind, then Kura's docs theme preset (tokens, the
+   typography plugin for rendered Markdown, dark mode, and the sidebar/drawer styling). */
+@import "tailwindcss";
+@import "@kurajs/docs/css";
+
+/* App-specific overrides go below — they cascade after the preset. Override design tokens to rebrand
+   (e.g. `:root { --accent: #e11d48 }`), or add your own Tailwind utilities in the markup. */
