@@ -66,6 +66,20 @@ export type DocView = {
 };
 export type SearchHit = { slug: string; title: string; section: string; text: string; score: number };
 
+// Compact inline icons (lucide-style, currentColor) for the page-action menu.
+const IconCopy = () => (
+  <svg className="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg>
+);
+const IconFile = () => (
+  <svg className="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M16 21H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6l4 4v12a2 2 0 0 1-2 2z" /><path d="M9 13h6M9 17h4" /></svg>
+);
+const IconChat = () => (
+  <svg className="ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z" /></svg>
+);
+const IconExternal = () => (
+  <svg className="ico-ext" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9" /></svg>
+);
+
 /** The 3-column chrome: top bar · sidebar · content · ToC. Injects the theme. */
 export function DocsShell({ site, sidebar, tabs, active, toc, basePath = "/docs", pageTitle, labels = DEFAULT_LABELS, href = (p) => p, localeSwitch, children }: {
   site?: SiteInfo;
@@ -97,7 +111,7 @@ export function DocsShell({ site, sidebar, tabs, active, toc, basePath = "/docs"
         </form>
         <nav className="links">
           {localeSwitch && localeSwitch.length > 1 && currentLang && (
-            <details className="lang">
+            <details className="lang" data-menu>
               <summary className="lang-current">{currentLang.name}</summary>
               <div className="lang-menu">
                 {localeSwitch.map((l) => (
@@ -177,7 +191,7 @@ export function DocsShell({ site, sidebar, tabs, active, toc, basePath = "/docs"
           <a className="powered-by" href="https://kura.build/" target="_blank" rel="noreferrer">Powered by Kura</a>
         </div>
       </footer>
-      <script dangerouslySetInnerHTML={{ __html: FOCUS_JS + THEME_TOGGLE_JS + LANG_JS + DRAWER_JS }} />
+      <script dangerouslySetInnerHTML={{ __html: FOCUS_JS + THEME_TOGGLE_JS + MENU_JS + DRAWER_JS }} />
     </>
   );
 }
@@ -191,10 +205,31 @@ export function DocsPage({ site, sidebar, tabs, doc, basePath = "/docs", labels 
       <div className="breadcrumb">{doc.section ? `${doc.section} / ` : ""}{doc.title}</div>
       {doc.notTranslated && <div className="not-translated">{labels.notTranslated}</div>}
       <div className="page-actions">
-        <button className="btn primary" data-copy-md={md}>{labels.copyMarkdown}</button>
-        <a className="btn" href={md}>{labels.viewMarkdown}</a>
-        <a className="btn" href={`https://chatgpt.com/?q=${prompt}`} target="_blank" rel="noreferrer">{labels.openInChatGPT}</a>
-        <a className="btn" href={`https://claude.ai/new?q=${prompt}`} target="_blank" rel="noreferrer">{labels.openInClaude}</a>
+        {/* Split button (Mintlify-style): primary "Copy" + a chevron that opens the actions menu. */}
+        <div className="copy-page">
+          <button className="copy-page-main" data-copy-md={md}><IconCopy />{labels.copyMarkdown}</button>
+          <details className="copy-page-menu" data-menu>
+            <summary className="copy-page-toggle" aria-label="More actions" />
+            <div className="copy-page-list">
+              <button className="copy-page-item" data-copy-md={md}>
+                <IconCopy />
+                <span className="cp-text"><span className="cp-title">{labels.copyMarkdown}</span><span className="cp-hint">{labels.copyMarkdownHint}</span></span>
+              </button>
+              <a className="copy-page-item" href={md}>
+                <IconFile />
+                <span className="cp-text"><span className="cp-title">{labels.viewMarkdown} <IconExternal /></span><span className="cp-hint">{labels.viewMarkdownHint}</span></span>
+              </a>
+              <a className="copy-page-item" href={`https://chatgpt.com/?q=${prompt}`} target="_blank" rel="noreferrer">
+                <IconChat />
+                <span className="cp-text"><span className="cp-title">{labels.openInChatGPT} <IconExternal /></span><span className="cp-hint">{labels.openInChatGPTHint}</span></span>
+              </a>
+              <a className="copy-page-item" href={`https://claude.ai/new?q=${prompt}`} target="_blank" rel="noreferrer">
+                <IconChat />
+                <span className="cp-text"><span className="cp-title">{labels.openInClaude} <IconExternal /></span><span className="cp-hint">{labels.openInClaudeHint}</span></span>
+              </a>
+            </div>
+          </details>
+        </div>
       </div>
       <article className="prose" dangerouslySetInnerHTML={{ __html: doc.html }} />
       <nav className="pager">
@@ -228,8 +263,10 @@ const THEME_INIT_JS = `(function(){try{var p=localStorage.getItem('kura-theme')|
 // The topbar toggle cycles system → light → dark, persists the pref, and tracks the OS while on system.
 const THEME_TOGGLE_JS = `(function(){var b=document.querySelector('[data-theme-toggle]');if(!b)return;var d=document.documentElement,order=['system','light','dark'],icon={system:'🖥',light:'☀',dark:'☾'};function pref(){return d.getAttribute('data-theme-pref')||'system';}function res(p){return p==='dark'||(p==='system'&&matchMedia('(prefers-color-scheme:dark)').matches)?'dark':'light';}function set(p){d.setAttribute('data-theme-pref',p);d.setAttribute('data-theme',res(p));try{localStorage.setItem('kura-theme',p);}catch(e){}b.textContent=icon[p];b.setAttribute('title','Theme: '+p);}set(pref());b.addEventListener('click',function(){set(order[(order.indexOf(pref())+1)%order.length]);});try{matchMedia('(prefers-color-scheme:dark)').addEventListener('change',function(){if(pref()==='system')d.setAttribute('data-theme',res('system'));});}catch(e){}})();`;
 const FOCUS_JS = `document.addEventListener('keydown',function(e){if(e.key==='/' && !/INPUT|TEXTAREA/.test((document.activeElement||{}).tagName||'')){e.preventDefault();var s=document.querySelector('.search-box');if(s)s.focus();}});`;
-// Language dropdown: close on outside-click / Escape (the <details> opens natively).
-const LANG_JS = `document.addEventListener('click',function(e){document.querySelectorAll('details.lang[open]').forEach(function(d){if(!d.contains(e.target))d.removeAttribute('open');});});document.addEventListener('keydown',function(e){if(e.key==='Escape')document.querySelectorAll('details.lang[open]').forEach(function(d){d.removeAttribute('open');});});`;
+// Dropdown menus (<details data-menu> — language switcher, page-actions): native open; close on
+// outside-click / Escape, and after activating an item (a link, or the copy button — deferred so the
+// copy handler runs first).
+const MENU_JS = `document.addEventListener('click',function(e){var t=e.target;document.querySelectorAll('details[data-menu][open]').forEach(function(d){if(!d.contains(t))d.removeAttribute('open');});var it=t.closest&&t.closest('details[data-menu] a, details[data-menu] [data-copy-md]');if(it){var dd=it.closest('details[data-menu]');if(dd)setTimeout(function(){dd.removeAttribute('open');},0);}});document.addEventListener('keydown',function(e){if(e.key==='Escape')document.querySelectorAll('details[data-menu][open]').forEach(function(d){d.removeAttribute('open');});});`;
 // Mobile nav drawer: the "Navigation" bar opens it; backdrop / a nav-link tap (incl. clientRouter
 // soft-nav) / Escape close it; <html.drawer-open> drives the slide-in + body scroll-lock. While open,
 // focus moves into the drawer and Tab is trapped inside it; closing returns focus to the opener.

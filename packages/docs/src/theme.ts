@@ -103,6 +103,23 @@ a { color: inherit; text-decoration: none; }
 .btn { display: inline-flex; align-items: center; gap: .35rem; padding: .35rem .7rem; font-size: .82rem; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--fg-soft); cursor: pointer; }
 .btn:hover { background: var(--hover); }
 .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+/* Page-actions split button (Mintlify-style): primary "Copy" + a chevron that opens an actions menu. */
+.copy-page { position: relative; display: inline-flex; align-items: stretch; }
+.copy-page-main { display: inline-flex; align-items: center; gap: .4rem; padding: .4rem .8rem; font-size: .85rem; font-family: inherit; border: 1px solid var(--border); border-right: 0; border-radius: 8px 0 0 8px; background: var(--surface); color: var(--fg-soft); cursor: pointer; }
+.copy-page-main:hover { background: var(--hover); color: var(--fg); }
+.copy-page-toggle { list-style: none; display: inline-flex; align-items: center; justify-content: center; width: 30px; border: 1px solid var(--border); border-radius: 0 8px 8px 0; background: var(--surface); color: var(--muted); cursor: pointer; }
+.copy-page-toggle::-webkit-details-marker { display: none; }
+.copy-page-toggle::after { content: "⌄"; line-height: 1; transition: transform .15s; }
+.copy-page-menu[open] .copy-page-toggle::after { transform: rotate(180deg); }
+.copy-page-toggle:hover { background: var(--hover); color: var(--fg); }
+.copy-page-list { position: absolute; left: 0; top: calc(100% + .4rem); z-index: 30; min-width: 17rem; display: flex; flex-direction: column; gap: 1px; padding: .35rem; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.14); }
+.copy-page-item { display: flex; align-items: flex-start; gap: .6rem; width: 100%; padding: .5rem .6rem; border: 0; border-radius: 8px; background: none; color: var(--fg-soft); text-align: left; cursor: pointer; font-family: inherit; }
+.copy-page-item:hover { background: var(--hover); }
+.copy-page-item .ico { flex: none; margin-top: .1rem; color: var(--muted); }
+.cp-text { display: flex; flex-direction: column; min-width: 0; }
+.cp-title { display: inline-flex; align-items: center; gap: .25rem; font-weight: 600; font-size: .9rem; color: var(--fg); }
+.cp-title .ico-ext { color: var(--muted); }
+.cp-hint { font-size: .8rem; color: var(--muted); }
 .prose { line-height: 1.65; font-size: 1rem; }
 .prose h1, .prose h2, .prose h3 { font-family: var(--font-display); font-weight: 600; letter-spacing: -.01em; }
 .prose h1 { font-size: 2rem; font-weight: 500; margin: 0 0 .5rem; }
