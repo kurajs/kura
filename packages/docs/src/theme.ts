@@ -41,7 +41,7 @@ a { color: inherit; text-decoration: none; }
 /* Language switcher: a compact dropdown (current language + chevron), opens a menu — scales to many
    locales without crowding the topbar (vs the old inline segmented control). */
 .lang { position: relative; }
-.lang > summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: .3rem; padding: .3rem .6rem; border: 1px solid var(--border); border-radius: 8px; color: var(--fg-soft); font-size: .85rem; }
+.lang > summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: .3rem; padding: .3rem .6rem; border: 1px solid var(--border); border-radius: 8px; color: var(--fg-soft); font-size: .85rem; white-space: nowrap; }
 .lang > summary::-webkit-details-marker { display: none; }
 .lang > summary::after { content: "⌄"; color: var(--muted); line-height: 1; transition: transform .15s; }
 .lang[open] > summary::after { transform: rotate(180deg); }
@@ -62,8 +62,6 @@ a { color: inherit; text-decoration: none; }
 .tabbar ~ .shell .sidebar { top: calc(var(--topbar-h) + var(--tabbar-h)); height: calc(100vh - var(--topbar-h) - var(--tabbar-h)); }
 .tabbar ~ .shell .toc { top: calc(var(--topbar-h) + var(--tabbar-h)); max-height: calc(100vh - var(--topbar-h) - var(--tabbar-h)); }
 .shell { display: grid; grid-template-columns: var(--sidebar-w) minmax(0,1fr) var(--toc-w); align-items: start; max-width: 1280px; margin: 0 auto; }
-@media (max-width: 1024px) { .shell { grid-template-columns: var(--sidebar-w) minmax(0,1fr); } .toc { display: none; } }
-@media (max-width: 720px) { .shell { grid-template-columns: 1fr; } .sidebar { display: none; } }
 .sidebar { position: sticky; top: 56px; height: calc(100vh - 56px); overflow-y: auto; padding: 1.5rem 1rem; border-right: 1px solid var(--border); }
 .sidebar .group { margin-bottom: 1.25rem; }
 /* Section title as a prominent anchor (Mintlify-style): same size as items, but bolder and at full
@@ -162,4 +160,20 @@ a.card:hover { border-color: var(--accent); }
 .tab-panel { padding: 1rem 1.1rem; }
 .tab-panel > :first-child { margin-top: 0; }
 .tab-panel > :last-child { margin-bottom: 0; }
+
+/* Responsive — kept LAST so these win over the base rules above (same specificity → source order). */
+@media (max-width: 1024px) { .shell { grid-template-columns: var(--sidebar-w) minmax(0,1fr); } .toc { display: none; } }
+@media (max-width: 720px) {
+  .shell { grid-template-columns: 1fr; }
+  .sidebar { display: none; }
+  /* Reclaim horizontal space on phones: small content gutters (was 2.5rem desktop). */
+  .content { padding: 1.25rem 1rem 3rem; }
+  /* Tighter topbar; the search field flexes to fill the row instead of a fixed 280px that
+     overflowed and crowded the language button. */
+  .topbar { padding: 0 1rem; gap: .6rem; }
+  .topbar form { margin-left: .5rem; flex: 1 1 auto; min-width: 0; }
+  .search-box { width: 100%; max-width: none; }
+  .tabbar-inner { padding: 0 1rem; }
+  .site-footer-inner { padding: 1.1rem 1rem; }
+}
 `;
