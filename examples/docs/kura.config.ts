@@ -30,6 +30,7 @@ export const kura = createDocs({
     labels: {
       "ja-JP": {
         onThisPage: "目次",
+        navigation: "ナビゲーション",
         searchPlaceholder: "ドキュメントを検索…  (/ キー)",
         copyMarkdown: "Markdown をコピー",
         viewMarkdown: "Markdown として表示",
