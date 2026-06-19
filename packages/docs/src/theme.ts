@@ -93,7 +93,10 @@ a { color: inherit; text-decoration: none; }
 .sidebar .folder > .folder-title:has(.folder-link.active) { background: var(--accent-soft); }
 /* Nested list: indent + guide line, offset 1px below the parent summary. */
 .sidebar .folder .items { margin: 1px 0 0 .5rem; padding-left: .6rem; border-left: 1px solid var(--border); }
-.content { padding: 2rem 2.5rem 5rem; min-width: 0; }
+/* .content IS the main element. June injects a default main { width: min(720px,…); margin: 72px auto }
+   for simple apps; Kura owns its own grid layout, so neutralize that (full grid cell, no stray top
+   margin) — the .content class outranks June's element selector. */
+.content { width: auto; max-width: none; margin: 0; padding: 2rem 2.5rem 5rem; min-width: 0; }
 .breadcrumb { color: var(--muted); font-size: .82rem; margin-bottom: 1rem; }
 .not-translated { margin: 0 0 1.2rem; padding: .6rem .85rem; font-size: .85rem; border: 1px solid var(--warn-border); border-left: 3px solid #d97706; border-radius: 0 8px 8px 0; background: var(--warn-bg); color: var(--warn-fg); }
 .page-actions { display: flex; gap: .5rem; flex-wrap: wrap; margin: 0 0 1.5rem; }
