@@ -282,6 +282,7 @@ export function createDocs<T extends DocLike>(opts: {
           site={site}
           sidebar={sidebarFor(d.locale, tabFoldersFor(""))}
           tabs={tabBarFor(d.locale, "")}
+          pageTitle={labelsFor(d.locale).search}
           labels={labelsFor(d.locale)}
           href={hrefFor(d.locale)}
           localeSwitch={switchFor(d.locale, `/search${qs}`)}

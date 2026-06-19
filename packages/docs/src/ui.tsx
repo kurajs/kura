@@ -67,13 +67,15 @@ export type DocView = {
 export type SearchHit = { slug: string; title: string; section: string; text: string; score: number };
 
 /** The 3-column chrome: top bar · sidebar · content · ToC. Injects the theme. */
-export function DocsShell({ site, sidebar, tabs, active, toc, basePath = "/docs", labels = DEFAULT_LABELS, href = (p) => p, localeSwitch, children }: {
+export function DocsShell({ site, sidebar, tabs, active, toc, basePath = "/docs", pageTitle, labels = DEFAULT_LABELS, href = (p) => p, localeSwitch, children }: {
   site?: SiteInfo;
   sidebar: SidebarGroup[];
   tabs?: TabLink[];
   active?: string;
   toc?: Toc;
   basePath?: string;
+  /** Current page title — shown as context on the mobile "Navigation" bar (Tab / page). */
+  pageTitle?: string;
   labels?: Labels;
   href?: Href;
   localeSwitch?: LocaleLink[];
@@ -82,6 +84,7 @@ export function DocsShell({ site, sidebar, tabs, active, toc, basePath = "/docs"
   const brand = site?.brand ?? site?.name ?? "Kura";
   const currentLang = localeSwitch?.find((l) => l.active) ?? localeSwitch?.[0];
   const activeTab = tabs?.find((t) => t.active);
+  const navContext = [activeTab?.title, pageTitle].filter(Boolean).join(" / ");
   return (
     <>
       {/* Resolve + apply the theme on <html> BEFORE the styles below paint — no flash. */}
@@ -118,7 +121,7 @@ export function DocsShell({ site, sidebar, tabs, active, toc, basePath = "/docs"
       <button className="nav-bar" data-drawer-open aria-controls="docs-nav" aria-expanded="false">
         <span className="nav-bar-icon" aria-hidden="true">☰</span>
         <span className="nav-bar-label">{labels.navigation}</span>
-        {activeTab && <span className="nav-bar-context">{activeTab.title}</span>}
+        {navContext && <span className="nav-bar-context">{navContext}</span>}
       </button>
       <div className="drawer-backdrop" data-drawer-close aria-hidden="true" />
       <div className="shell">
@@ -184,7 +187,7 @@ export function DocsPage({ site, sidebar, tabs, doc, basePath = "/docs", labels 
   const md = href(docPath(basePath, `${doc.slug}.md`));
   const prompt = encodeURIComponent(`Please read this doc and answer my questions: ${doc.title}`);
   return (
-    <DocsShell site={site} sidebar={sidebar} tabs={tabs} active={doc.slug} toc={doc.toc} basePath={basePath} labels={labels} href={href} localeSwitch={localeSwitch}>
+    <DocsShell site={site} sidebar={sidebar} tabs={tabs} active={doc.slug} toc={doc.toc} basePath={basePath} pageTitle={doc.title} labels={labels} href={href} localeSwitch={localeSwitch}>
       <div className="breadcrumb">{doc.section ? `${doc.section} / ` : ""}{doc.title}</div>
       {doc.notTranslated && <div className="not-translated">{labels.notTranslated}</div>}
       <div className="page-actions">
@@ -228,8 +231,9 @@ const FOCUS_JS = `document.addEventListener('keydown',function(e){if(e.key==='/'
 // Language dropdown: close on outside-click / Escape (the <details> opens natively).
 const LANG_JS = `document.addEventListener('click',function(e){document.querySelectorAll('details.lang[open]').forEach(function(d){if(!d.contains(e.target))d.removeAttribute('open');});});document.addEventListener('keydown',function(e){if(e.key==='Escape')document.querySelectorAll('details.lang[open]').forEach(function(d){d.removeAttribute('open');});});`;
 // Mobile nav drawer: the "Navigation" bar opens it; backdrop / a nav-link tap (incl. clientRouter
-// soft-nav) / Escape close it; <html.drawer-open> drives the slide-in + body scroll-lock.
-const DRAWER_JS = `(function(){var root=document.documentElement;function set(o){root.classList.toggle('drawer-open',o);var b=document.querySelector('[data-drawer-open]');if(b)b.setAttribute('aria-expanded',o?'true':'false');}document.addEventListener('click',function(e){if(e.target.closest('[data-drawer-open]')){e.preventDefault();set(!root.classList.contains('drawer-open'));return;}if(e.target.closest('[data-drawer-close]')){set(false);return;}if(e.target.closest('#docs-nav a'))set(false);});document.addEventListener('keydown',function(e){if(e.key==='Escape')set(false);});})();`;
+// soft-nav) / Escape close it; <html.drawer-open> drives the slide-in + body scroll-lock. While open,
+// focus moves into the drawer and Tab is trapped inside it; closing returns focus to the opener.
+const DRAWER_JS = `(function(){var root=document.documentElement;function opener(){return document.querySelector('[data-drawer-open]');}function items(){var d=document.getElementById('docs-nav');if(!d)return[];return[].filter.call(d.querySelectorAll('a[href],button:not([disabled]),summary,[tabindex]:not([tabindex="-1"])'),function(el){return el.offsetParent!==null;});}function set(o){var was=root.classList.contains('drawer-open');root.classList.toggle('drawer-open',o);var b=opener();if(b)b.setAttribute('aria-expanded',o?'true':'false');if(o){var f=items();if(f[0])f[0].focus();}else if(was&&b)b.focus();}document.addEventListener('click',function(e){if(e.target.closest('[data-drawer-open]')){e.preventDefault();set(!root.classList.contains('drawer-open'));return;}if(e.target.closest('[data-drawer-close]')){set(false);return;}if(e.target.closest('#docs-nav a'))set(false);});document.addEventListener('keydown',function(e){if(e.key==='Escape'){set(false);return;}if(e.key==='Tab'&&root.classList.contains('drawer-open')){var f=items();if(!f.length)return;var first=f[0],last=f[f.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}else if(f.indexOf(document.activeElement)<0){e.preventDefault();first.focus();}}});})();`;
 const COPY_JS = `document.querySelectorAll('[data-copy-md]').forEach(function(b){b.addEventListener('click',async function(){try{var r=await fetch(b.getAttribute('data-copy-md'));var t=await r.text();await navigator.clipboard.writeText(t);var o=b.textContent;b.textContent='Copied';setTimeout(function(){b.textContent=o;},1500);}catch(e){alert('Copy failed: '+e);}});});`;
 const CODE_JS = `document.querySelectorAll('.prose pre').forEach(function(pre){if(pre.querySelector('.copy-code'))return;var b=document.createElement('button');b.className='copy-code';b.textContent='Copy';b.addEventListener('click',async function(){var c=pre.querySelector('code');try{await navigator.clipboard.writeText(c?c.innerText:pre.innerText);var o=b.textContent;b.textContent='Copied';setTimeout(function(){b.textContent=o;},1200);}catch(e){}});pre.appendChild(b);});`;
 const TABS_JS = `document.querySelectorAll('.tabs').forEach(function(t){t.querySelectorAll('.tab-btn').forEach(function(b){b.addEventListener('click',function(){var i=b.getAttribute('data-tab');t.querySelectorAll('.tab-btn').forEach(function(x){x.classList.toggle('active',x.getAttribute('data-tab')===i);});t.querySelectorAll('.tab-panel').forEach(function(p){p.hidden=p.getAttribute('data-tab')!==i;});});});});`;

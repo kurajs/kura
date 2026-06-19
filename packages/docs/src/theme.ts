@@ -170,8 +170,8 @@ a.card:hover { border-color: var(--accent); }
    with the tabs folded in at the top. A collapsible "On this page" replaces the side ToC. */
 .nav-bar { display: none; align-items: center; gap: .6rem; width: 100%; padding: .7rem 1rem; background: var(--bg); border-bottom: 1px solid var(--border); color: var(--fg-soft); font-size: .9rem; text-align: left; cursor: pointer; }
 .nav-bar .nav-bar-icon { font-size: 1.05rem; line-height: 1; }
-.nav-bar .nav-bar-label { font-weight: 600; color: var(--fg); }
-.nav-bar .nav-bar-context { color: var(--muted); }
+.nav-bar .nav-bar-label { font-weight: 600; color: var(--fg); flex: none; }
+.nav-bar .nav-bar-context { color: var(--muted); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nav-bar .nav-bar-context::before { content: "·"; margin-right: .5rem; }
 .drawer-backdrop { display: none; }
 .drawer-tabs { display: none; flex-wrap: wrap; gap: .4rem; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
