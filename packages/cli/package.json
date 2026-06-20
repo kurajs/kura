@@ -1,6 +1,6 @@
 {
   "name": "@kurajs/cli",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "type": "module",
   "description": "Kura CLI — dev, build, deploy, and index a Kura docs app (one surface over June).",
   "bin": {
@@ -15,7 +15,7 @@
   "license": "MIT",
   "dependencies": {
     "@kurajs/core": "^0.0.1",
-    "@kurajs/docs": "^0.0.5"
+    "@kurajs/docs": "^0.0.7"
   },
   "peerDependencies": {
     "@junejs/cli": ">=0.0.25 <0.1.0",
