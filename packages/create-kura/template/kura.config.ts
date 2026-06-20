@@ -2,10 +2,16 @@
 import { createDocs } from "@kurajs/docs";
 import { DOCS, doc } from "./app/_content";
 import { MDX } from "./app/_mdx";
+import { META, META_LOCALES } from "./app/_meta";
 
 export const kura = createDocs({
   content: { DOCS, doc },
   mdxHtml: MDX,
+  // Folder-driven nav metadata, frozen from content/docs/**/meta.json by `kura index`. Empty until
+  // you add meta.json files; then top-level folders become sidebar sections (titles + order from
+  // meta.json, Fumadocs-compatible) and a root meta.json `tabs` array turns on the tab bar.
+  meta: META,
+  metaLocales: META_LOCALES,
   config: {
     sections: ["Getting started", "Guides"],
     site: { name: "PROJECT_NAME", brand: "PROJECT_NAME" },

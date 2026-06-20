@@ -6,3 +6,4 @@ dist/
 app/_content.ts
 app/_index.ts
 app/_mdx.ts
+app/_meta.ts
