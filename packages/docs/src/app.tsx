@@ -243,6 +243,7 @@ export function createDocs<T extends DocLike>(opts: {
       labels={d.labels}
       href={hrefFor(d.locale)}
       localeSwitch={switchFor(d.locale, docPath(basePath, d.doc.slug))}
+      mermaidCdn={opts.config.mermaidCdn}
     />
   );
   const md = (d: DocPage) => stripMdx(doc(d.doc.slug, d.locale)?.original ?? "");

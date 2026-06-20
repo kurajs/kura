@@ -213,7 +213,7 @@ export function DocsShell({ site, sidebar, tabs, active, toc, basePath = "/docs"
 }
 
 /** A full doc page: breadcrumb · page actions (copy md / open in LLM) · prose · pager. */
-export function DocsPage({ site, sidebar, tabs, doc, basePath = "/docs", labels = DEFAULT_LABELS, href = (p) => p, localeSwitch }: { site?: SiteInfo; sidebar: SidebarGroup[]; tabs?: TabLink[]; doc: DocView; basePath?: string; labels?: Labels; href?: Href; localeSwitch?: LocaleLink[] }) {
+export function DocsPage({ site, sidebar, tabs, doc, basePath = "/docs", labels = DEFAULT_LABELS, href = (p) => p, localeSwitch, mermaidCdn }: { site?: SiteInfo; sidebar: SidebarGroup[]; tabs?: TabLink[]; doc: DocView; basePath?: string; labels?: Labels; href?: Href; localeSwitch?: LocaleLink[]; mermaidCdn?: string }) {
   const md = href(docPath(basePath, `${doc.slug}.md`));
   const prompt = encodeURIComponent(`Please read this doc and answer my questions: ${doc.title}`);
   const menuItem = "flex items-start gap-2.5 w-full px-2.5 py-2 rounded-lg bg-transparent border-0 text-fg-soft text-left cursor-pointer hover:bg-hover";
@@ -253,7 +253,7 @@ export function DocsPage({ site, sidebar, tabs, doc, basePath = "/docs", labels 
         {doc.prev ? <a className="flex-1 px-4 py-3.5 border border-border rounded-xl hover:border-accent" href={href(docPath(basePath, doc.prev.slug))}><div className="text-muted text-[.78rem]">← {labels.previous}</div><div className="font-semibold text-accent">{doc.prev.title}</div></a> : <span />}
         {doc.next ? <a className="flex-1 px-4 py-3.5 border border-border rounded-xl hover:border-accent text-right" href={href(docPath(basePath, doc.next.slug))}><div className="text-muted text-[.78rem]">{labels.next} →</div><div className="font-semibold text-accent">{doc.next.title}</div></a> : <span />}
       </nav>
-      <script dangerouslySetInnerHTML={{ __html: COPY_JS + CODE_JS + TABS_JS }} />
+      <script dangerouslySetInnerHTML={{ __html: COPY_JS + CODE_JS + TABS_JS + mermaidJs(mermaidCdn ?? MERMAID_CDN) }} />
     </DocsShell>
   );
 }
@@ -291,3 +291,16 @@ const DRAWER_JS = `(function(){var root=document.documentElement;function opener
 const COPY_JS = `document.querySelectorAll('[data-copy-md]').forEach(function(b){b.addEventListener('click',async function(){try{var r=await fetch(b.getAttribute('data-copy-md'));var t=await r.text();await navigator.clipboard.writeText(t);var o=b.textContent;b.textContent='Copied';setTimeout(function(){b.textContent=o;},1500);}catch(e){alert('Copy failed: '+e);}});});`;
 const CODE_JS = `document.querySelectorAll('.prose pre').forEach(function(pre){if(pre.querySelector('.copy-code'))return;var b=document.createElement('button');b.className='copy-code';b.textContent='Copy';b.addEventListener('click',async function(){var c=pre.querySelector('code');try{await navigator.clipboard.writeText(c?c.innerText:pre.innerText);var o=b.textContent;b.textContent='Copied';setTimeout(function(){b.textContent=o;},1200);}catch(e){}});pre.appendChild(b);});`;
 const TABS_JS = `document.querySelectorAll('.tabs').forEach(function(t){t.querySelectorAll('.tab-btn').forEach(function(b){b.addEventListener('click',function(){var i=b.getAttribute('data-tab');t.querySelectorAll('.tab-btn').forEach(function(x){x.classList.toggle('active',x.getAttribute('data-tab')===i);});t.querySelectorAll('.tab-panel').forEach(function(p){p.hidden=p.getAttribute('data-tab')!==i;});});});});`;
+// Render ```mermaid code fences client-side. Self-guards (no `.language-mermaid` → returns before
+// importing anything), so pages without diagrams pay nothing and the lib never enters the worker
+// bundle. Sources are captured once into placeholder divs; re-rendered on `data-theme` flips so
+// diagrams recolor with the theme toggle.
+const MERMAID_CDN = "https://esm.sh/mermaid@11";
+const mermaidJs = (cdn: string): string =>
+  `(function(){var blocks=document.querySelectorAll('code.language-mermaid');if(!blocks.length)return;` +
+  `var items=[];blocks.forEach(function(c){var pre=c.closest('pre')||c;var h=document.createElement('div');h.className='mermaid-diagram';pre.replaceWith(h);items.push({src:c.textContent,holder:h});});` +
+  `var lib,id=0;function load(){return lib||(lib=import(${JSON.stringify(cdn)}).then(function(m){return m.default;}));}` +
+  `function theme(){return document.documentElement.getAttribute('data-theme')==='dark'?'dark':'default';}` +
+  `function run(){load().then(function(mermaid){mermaid.initialize({startOnLoad:false,securityLevel:'loose',theme:theme()});items.forEach(function(it){mermaid.render('kura-mmd-'+(id++),it.src).then(function(r){it.holder.innerHTML=r.svg;}).catch(function(e){it.holder.innerHTML='<pre class="mermaid-error">'+String((e&&e.message)||e)+'</pre>';});});}).catch(function(){});}` +
+  `run();var cur=document.documentElement.getAttribute('data-theme');` +
+  `new MutationObserver(function(){var t=document.documentElement.getAttribute('data-theme');if(t!==cur){cur=t;run();}}).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});})();`;

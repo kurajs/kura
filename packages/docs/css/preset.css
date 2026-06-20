@@ -161,6 +161,9 @@
 .step > :first-child { margin-top: 0; }
 .step > :last-child { margin-bottom: 0; }
 .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+/* ```mermaid fences, rendered client-side into this container (see mermaidJs in ui.tsx). */
+.mermaid-diagram { display: flex; justify-content: center; margin: 1.5rem 0; }
+.mermaid-diagram svg { max-width: 100%; height: auto; }
 
 /* --- mobile nav drawer state machine (parent <html.drawer-open>; utilities can't target it) --- */
 .drawer-backdrop { display: none; }

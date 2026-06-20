@@ -35,6 +35,12 @@ export interface KuraConfig {
    * (e.g. `{ "ja-JP": { Guides: "ガイド" } }`).
    */
   tabLabels?: Record<string, Record<string, string>>;
+  /**
+   * Where the client loads Mermaid from to render ```mermaid code fences. Lazy-imported in the
+   * browser (and only on pages that actually contain a diagram), so it never enters the worker
+   * bundle. Defaults to `https://esm.sh/mermaid@11`; override to pin a version or self-host.
+   */
+  mermaidCdn?: string;
   // theme, agent toggles, etc. land here later.
 }
 
