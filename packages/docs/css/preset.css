@@ -152,6 +152,14 @@
 /* --- MDX widgets rendered from Markdown (steps counters + JS-toggled tabs) --- */
 .steps { counter-reset: step; border-left: 2px solid var(--border); margin-left: .5rem; padding-left: 1.5rem; }
 .steps > * { position: relative; }
+.step { counter-increment: step; margin: 1.25rem 0; }
+.step::before {
+  content: counter(step); position: absolute; left: -2.25rem; top: 0;
+  display: grid; place-items: center; width: 1.5rem; height: 1.5rem;
+  border-radius: 999px; background: var(--accent); color: #fff; font-size: .8rem; font-weight: 600;
+}
+.step > :first-child { margin-top: 0; }
+.step > :last-child { margin-bottom: 0; }
 .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
 
 /* --- mobile nav drawer state machine (parent <html.drawer-open>; utilities can't target it) --- */

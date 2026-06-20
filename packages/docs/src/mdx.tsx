@@ -27,16 +27,27 @@ function Callout({ type = "note", title, children }: { type?: string; title?: st
     createElement("div", { className: "callout-body" }, children),
   );
 }
-function Card({ title, href, children }: { title?: string; href?: string; children?: ReactNode }) {
+function Card({ title, description, href, children }: { title?: string; description?: string; href?: string; children?: ReactNode }) {
   const inner = [
     title ? createElement("p", { className: "m-0 mb-1 font-bold", key: "t" }, title) : null,
-    createElement("div", { key: "b" }, children),
+    description ? createElement("p", { className: "m-0 text-[.9rem] text-muted", key: "d" }, description) : null,
+    children ? createElement("div", { key: "b" }, children) : null,
   ];
   const cls = "block my-4 px-4 py-4 border border-border rounded-xl bg-surface" + (href ? " hover:border-accent" : "");
   return href ? createElement("a", { className: cls, href }, inner) : createElement("div", { className: cls }, inner);
 }
+// Responsive grid of <Card>s. `[&>*]:my-0` cancels each Card's standalone `my-4` (the grid `gap`
+// owns the spacing here); `[&>*]:h-full` equalizes cell heights. Whole, scannable class literals.
+function Cards({ children }: { children?: ReactNode }) {
+  return createElement("div", { className: "cards grid gap-3 my-5 sm:grid-cols-2 [&>*]:my-0 [&>*]:h-full" }, children);
+}
 function Steps({ children }: { children?: ReactNode }) {
   return createElement("div", { className: "steps" }, children);
+}
+// <Steps><Step>…</Step><Step>…</Step></Steps> — each Step carries the `.step` hook the preset
+// numbers via `counter-increment` (the `.steps` counter badge sits on its left rule).
+function Step({ children }: { children?: ReactNode }) {
+  return createElement("div", { className: "step" }, children);
 }
 
 // <Tabs><Tab label="A">…</Tab><Tab label="B">…</Tab></Tabs>
@@ -61,7 +72,7 @@ function Tabs({ children }: { children?: ReactNode }) {
   );
 }
 
-export const mdxComponents = { Callout, Card, Steps, Tabs, Tab };
+export const mdxComponents = { Callout, Card, Cards, Steps, Step, Tabs, Tab };
 
 const cache = new Map<string, string>();
 
