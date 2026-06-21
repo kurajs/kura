@@ -218,8 +218,11 @@ export function createDocs<T extends DocLike>(opts: {
     };
   };
 
-  // The site's first page: the first page of the first tab when tabs are on, else the global first.
+  // The site's landing page (`/`): a root `content/docs/index.md` (slug "") if present — so a
+  // hand-written home wins — else the first page of the first tab (or the global first).
   const first = (locale?: string): T | undefined => {
+    const root = doc("", locale);
+    if (root) return root;
     const defs = tabDefs();
     return orderedFor(locale, defs ? defs[0]!.pages : undefined)[0];
   };
