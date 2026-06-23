@@ -27,21 +27,28 @@ test("a CJK query finds the right doc via bigram BM25", () => {
   assert.equal(bm.search("資料庫")[0]?.id, "b");
 });
 
-test("Intl.Segmenter is available in this runtime", () => {
-  assert.equal(hasSegmenter(), true);
-});
-
-test("cjkSegmenter word-segments Chinese (native Intl.Segmenter)", () => {
+// Behavior depends on the runtime's ICU: run the native-segmentation assertions only
+// where Intl.Segmenter exists, so the suite still passes on minimal-ICU / edge runtimes
+// (where cjkSegmenter is designed to fall back).
+test("cjkSegmenter word-segments Chinese where Intl.Segmenter is available", { skip: !hasSegmenter() }, () => {
   const toks = cjkSegmenter("zh")("搜尋引擎很快");
-  // ICU should produce word-level units (not bigrams); at minimum non-empty word-like tokens.
+  // ICU produces word-level units (not bigrams); at minimum non-empty word-like tokens.
   assert.ok(toks.length >= 1);
   assert.ok(toks.every((t) => t.length >= 1));
   assert.ok(toks.join("").includes("搜"));
 });
 
-test("cjkSegmenter falls back to bigram when no segmenter is provided", () => {
-  const fellBack = cjkSegmenter("zh", { fallback: cjkBigram() });
-  assert.equal(typeof fellBack, "function"); // smoke: constructs without throwing
+test("cjkSegmenter falls back to bigram when Intl.Segmenter is unavailable", () => {
+  const intl = globalThis.Intl as { Segmenter?: unknown };
+  const saved = intl.Segmenter;
+  try {
+    delete intl.Segmenter; // simulate a runtime without segmentation support
+    assert.equal(hasSegmenter(), false);
+    const tok = cjkSegmenter("zh", { fallback: cjkBigram() });
+    assert.deepEqual(tok("搜尋引擎"), ["搜尋", "尋引", "引擎"]); // bigram output, not native words
+  } finally {
+    intl.Segmenter = saved;
+  }
 });
 
 test("byLocale wires segmenter for zh and latin elsewhere in one index", () => {
