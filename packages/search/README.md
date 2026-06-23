@@ -62,7 +62,7 @@ Traditional/Simplified Chinese (script *and* regional vocabulary, e.g. 软件↔
 keyword query matches across variants — no extra Kura package required:
 
 ```ts
-import * as OpenCC from "opencc-js"; // npm i opencc-js  (Apache-2.0)
+import * as OpenCC from "opencc-js"; // npm i opencc-js  (MIT; bundled dictionary data is Apache-2.0)
 import { pipeline } from "@kurajs/search";
 import { cjkSegmenter } from "@kurajs/tokenizers";
 

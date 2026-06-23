@@ -54,5 +54,5 @@ defineKura({
 
 ## 相依
 
-`opencc-js`(Apache-2.0,約 5MB 詞典)只有需要繁简通用的站才安裝;單一字體的站台
-其實不需要它。
+`opencc-js`(MIT;內含約 5MB 的 opencc-data 詞典,採 Apache-2.0)只有需要繁简通用的
+站才安裝;單一字體的站台其實不需要它。
