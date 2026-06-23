@@ -95,6 +95,8 @@
   --tw-prose-quote-borders: var(--accent);
   --tw-prose-captions: var(--muted);
   --tw-prose-code: var(--fg);
+  /* Shiki dual-theme: CSS vars emitted by the highlighter; the values below are fallbacks for
+     non-highlighted blocks (plain text fences without a recognised language). */
   --tw-prose-pre-code: #e6edf3;
   --tw-prose-pre-bg: #0d1117;
   --tw-prose-th-borders: var(--border);
@@ -145,6 +147,14 @@
 .no-scrollbar::-webkit-scrollbar { display: none; }
 /* Mobile "Navigation" bar: a "·" separator before the active-page context. */
 .nav-bar-context::before { content: "·"; margin-right: .5rem; }
+
+/* --- Shiki dual-theme: switch between --shiki-light and --shiki-dark via [data-theme="dark"] ---
+   defaultColor:false means Shiki emits CSS vars on every span; these rules activate them.
+   The !important beats Tailwind Typography's prose color (which would override inline var()). */
+.prose pre { color: var(--shiki-light); background-color: var(--shiki-light-bg) !important; }
+.prose pre span { color: var(--shiki-light) !important; font-style: var(--shiki-light-font-style); font-weight: var(--shiki-light-font-weight); text-decoration: var(--shiki-light-text-decoration); }
+[data-theme="dark"] .prose pre { color: var(--shiki-dark); background-color: var(--shiki-dark-bg) !important; }
+[data-theme="dark"] .prose pre span { color: var(--shiki-dark) !important; font-style: var(--shiki-dark-font-style); font-weight: var(--shiki-dark-font-weight); text-decoration: var(--shiki-dark-text-decoration); }
 
 /* --- copy-code button (injected by CODE_JS into each <pre>, so it has no React className) --- */
 .copy-code {

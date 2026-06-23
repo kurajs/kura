@@ -4,6 +4,8 @@
 // rendered HTML is frozen at build and loaded at runtime instead of compiling per request.
 import { evaluate } from "@mdx-js/mdx";
 import remarkGfm from "remark-gfm";
+import rehypeShikiFromHighlighter from "@shikijs/rehype/core";
+import { createHighlighter } from "shiki";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement, Children, isValidElement, type ReactElement, type ReactNode } from "react";
 import * as runtime from "react/jsx-runtime";
@@ -77,13 +79,48 @@ function Tabs({ children }: { children?: ReactNode }) {
 
 export const mdxComponents = { Callout, Card, Cards, Steps, Step, Tabs, Tab };
 
+// Highlighter singleton — created once per build process, shared across all mdxToHtml calls.
+// Dual-theme (light + dark): CSS variables strategy so the rendered HTML switches with
+// [data-theme="dark"] without any JS or re-render. Curated language list covers typical docs content.
+type Highlighter = Awaited<ReturnType<typeof createHighlighter>>;
+let _highlighter: Highlighter | null = null;
+async function getHighlighter(): Promise<Highlighter> {
+  if (!_highlighter) {
+    _highlighter = await createHighlighter({
+      themes: ["github-light", "github-dark-default"],
+      langs: [
+        "typescript", "tsx", "javascript", "jsx",
+        "bash", "sh", "shell",
+        "json", "jsonc", "yaml", "toml",
+        "html", "css",
+        "markdown", "mdx",
+        "python", "go", "rust",
+        "sql", "graphql",
+        "diff", "text",
+      ],
+    });
+  }
+  return _highlighter;
+}
+
 const cache = new Map<string, string>();
 
 /** Compile MDX source to a static HTML string (curated components rendered). Cached. */
 export async function mdxToHtml(source: string, components: Record<string, unknown> = mdxComponents): Promise<string> {
   const hit = cache.get(source);
   if (hit !== undefined) return hit;
-  const mod = await evaluate(source, { ...(runtime as Record<string, unknown>), remarkPlugins: [remarkGfm] } as never);
+  const highlighter = await getHighlighter();
+  const mod = await evaluate(source, {
+    ...(runtime as Record<string, unknown>),
+    remarkPlugins: [remarkGfm],
+    rehypePlugins: [[rehypeShikiFromHighlighter, highlighter, {
+      themes: { light: "github-light", dark: "github-dark-default" },
+      // defaultColor: false → emit CSS vars (--shiki-light / --shiki-dark) instead of inline
+      // style on every span. The preset.css switches between them via [data-theme="dark"].
+      defaultColor: false,
+      addLanguageClass: true,
+    }]],
+  } as never);
   const Content = (mod as { default: (props: { components?: unknown }) => unknown }).default;
   const html = renderToStaticMarkup(createElement(Content as never, { components }) as never);
   cache.set(source, html);
