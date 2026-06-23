@@ -273,7 +273,7 @@ export function SearchResults({ query, hits, basePath = "/docs", labels = DEFAUL
       {query && hits.length === 0 && <p className="text-muted">{labels.noResults}</p>}
       {hits.map((h, i) => (
         <a key={i} className="block border border-border rounded-xl px-4 py-4 mb-3.5 hover:border-accent" href={href(docPath(basePath, h.slug))}>
-          <div className="flex justify-between text-muted text-[.8rem]"><span>{h.section} · {h.title}</span><span>cos {h.score}</span></div>
+          <div className="flex justify-between text-muted text-[.8rem]"><span>{h.section} · {h.title}</span><span>score {h.score}</span></div>
           <p className="mt-1 text-fg-soft">{h.text.slice(0, 140)}…</p>
         </a>
       ))}
