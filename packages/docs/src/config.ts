@@ -22,7 +22,8 @@ export interface KuraConfig {
   embedder?: Embedder;
   /** Per-locale keyword tokenizer for search. Default: CJK locales use native word
    *  segmentation (Intl.Segmenter), others use the Latin tokenizer. Override to customize —
-   *  e.g. `byLocale({ "zh-TW": pipeline({ pre: [normalizeChinese()], segment: cjkSegmenter("zh-TW") }) })`. */
+   *  e.g. `byLocale({ "zh-TW": cjkSegmenter("zh-TW") })`, or add 繁/簡 normalization with a
+   *  `pipeline({ pre: [...] })` (see @kurajs/search README). */
   tokenizer?: TokenizerResolver;
   /**
    * Per-locale UI string overrides. en-US is the built-in default (DEFAULT_LABELS);

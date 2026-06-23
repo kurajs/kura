@@ -10,8 +10,9 @@ import { stripMdx } from "./util.ts";
 
 // Default per-locale keyword tokenizer policy: CJK locales get native word
 // segmentation (Intl.Segmenter, falling back to bigram); everything else uses the
-// Latin tokenizer. Override via KuraConfig.tokenizer — e.g. to fold 繁/簡 with
-// @kurajs/opencc on zh-TW. Tokenizers are cached per locale (Intl.Segmenter is not free).
+// Latin tokenizer. Override via KuraConfig.tokenizer — e.g. to fold 繁/簡 with an
+// OpenCC pipeline on zh-TW (see @kurajs/search README). Tokenizers are cached per
+// locale (Intl.Segmenter is not free).
 const CJK_PRIMARY = new Set(["zh", "ja", "ko"]);
 export function defaultTokenizer(): TokenizerResolver {
   const cache = new Map<string, Tokenizer>();
