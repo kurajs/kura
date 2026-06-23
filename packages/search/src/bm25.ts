@@ -84,6 +84,15 @@ export class Bm25<M = unknown> {
     return this.ids.length;
   }
 
+  /**
+   * Tokenize text exactly as this index does (the configured tokenizer / resolver for `lang`).
+   * Use it to align downstream work — e.g. snippet anchoring — with how queries are matched,
+   * since a per-locale or normalizing tokenizer can produce different terms than a naive split.
+   */
+  tokensOf(text: string, lang?: string): string[] {
+    return this.tokenizerFor(lang)(text);
+  }
+
   /** Index more records. Records are appended; there is no de-duplication by id. */
   add(records: Iterable<Bm25Record<M>>): void {
     const tf = new Map<string, number>();
