@@ -99,6 +99,16 @@ test("keyword snippet lands on a whole-token match, not a substring inside a wor
   assert.ok(/final/i.test(hits[0]!.text), "snippet should land on whole-word 'cat', not 'concatenation'");
 });
 
+test("keyword snippet handles CJK queries (no whitespace word boundaries)", async () => {
+  // CJK has no whitespace, so the word-boundary regex can't match between Han chars; the
+  // snippet must fall back to the term's position rather than start-of-doc.
+  const body = "前言內容佔據文件開頭很長一段文字所以天真的摘要會從這裡開始而錯過重點直到後段我們才提到向量搜尋引擎這個關鍵詞作結尾。";
+  const entries = [{ slug: "z", locale: "zh-TW", data: { title: "說明", section: "" }, body }] as unknown as DocLike[];
+  const hits = await createSearch({ entries }).search("向量搜尋", { locale: "zh-TW" });
+  assert.equal(hits[0]?.slug, "z");
+  assert.ok(hits[0]!.text.includes("向量搜尋"), "CJK snippet should land on the matched term");
+});
+
 test("hybrid (embedder) fuses keyword + semantic and de-dups locale variants by slug", async () => {
   // Same slug "a" in two locales (as DOCS would carry); "b" is unrelated.
   const entries = [

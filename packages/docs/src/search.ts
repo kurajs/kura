@@ -92,7 +92,13 @@ function snippetAround(body: string, query: string): string {
   // lowercased alphanumerics from latinTokenizer, so they're regex-safe without escaping;
   // the Unicode look-around is a script-aware word boundary (better than \b for accents).
   const re = new RegExp("(?<![\\p{L}\\p{N}])(?:" + tokens.join("|") + ")(?![\\p{L}\\p{N}])", "iu");
-  const at = body.search(re);
+  let at = body.search(re);
+  if (at < 0) {
+    // No word-boundary match. CJK has no whitespace boundaries (the look-around can't match
+    // between Han characters), so fall back to the first plain substring occurrence.
+    const lc = body.toLowerCase();
+    for (const t of tokens) { const i = lc.indexOf(t); if (i >= 0 && (at < 0 || i < at)) at = i; }
+  }
   const start = at > 60 ? at - 40 : 0;
   return body.slice(start, start + 160).trim();
 }
