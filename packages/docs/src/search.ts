@@ -78,14 +78,25 @@ function snippetAround(body: string, query: string): string {
 }
 
 function keywordSearch(index: Bm25<KeywordData>, query: string, topK: number): SearchHit[] {
-  return index.search(query, { topK }).map((h) => ({
-    slug: h.data.slug,
-    title: h.data.title,
-    section: h.data.section,
-    text: snippetAround(h.data.body, query),
-    score: Number(h.score.toFixed(3)),
-    ...(h.data.locale ? { locale: h.data.locale } : {}),
-  }));
+  // Collapse a slug's locale variants (DOCS carries every locale) into one hit, keeping the
+  // highest-scoring one — otherwise RRF, which fuses by slug, would see the same slug at
+  // several ranks and over-boost it. Over-fetch so dedup still yields up to topK slugs.
+  const seen = new Set<string>();
+  const out: SearchHit[] = [];
+  for (const h of index.search(query, { topK: topK * 4 })) {
+    if (seen.has(h.data.slug)) continue;
+    seen.add(h.data.slug);
+    out.push({
+      slug: h.data.slug,
+      title: h.data.title,
+      section: h.data.section,
+      text: snippetAround(h.data.body, query),
+      score: Number(h.score.toFixed(3)),
+      ...(h.data.locale ? { locale: h.data.locale } : {}),
+    });
+    if (out.length >= topK) break;
+  }
+  return out;
 }
 
 // Collapse a vector search's many per-chunk hits into one ranked hit per slug.
