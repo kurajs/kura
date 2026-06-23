@@ -32,7 +32,7 @@ const records = walk(root).map((file) => {
   // survive stripMdx and would split a term when the tokenizer runs.)
   const body = raw.replace(/^---[\s\S]*?---/, "").trim();
   const title = (raw.match(/title:\s*(.+)/)?.[1] ?? file).trim();
-  const rel = path.relative(root, file);
+  const rel = path.relative(root, file).split(path.sep).join("/"); // POSIX separators (Windows-safe)
   const lang = rel.startsWith("ja-JP/") ? "ja" : "zh-TW"; // default locale = zh-TW
   const slug = rel.replace(/\.md$/, "");
   return { id: slug, text: `${title}\n${body}`, lang, data: { slug } };
