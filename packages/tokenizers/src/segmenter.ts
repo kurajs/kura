@@ -35,7 +35,9 @@ export function cjkSegmenter(locale: string, opts: { fallback?: Tokenizer } = {}
   return (text) => {
     const out: string[] = [];
     for (const s of seg.segment(text)) {
-      if (s.isWordLike) out.push(s.segment.toLowerCase());
+      // `isWordLike` is spec'd for word granularity, but some polyfills/old engines omit it;
+      // when it's absent, keep any segment containing a letter or number.
+      if (s.isWordLike ?? /[\p{L}\p{N}]/u.test(s.segment)) out.push(s.segment.toLowerCase());
     }
     return out;
   };
