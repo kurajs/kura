@@ -16,10 +16,12 @@ const CJK_PRIMARY = new Set(["zh", "ja", "ko"]);
 export function defaultTokenizer(): TokenizerResolver {
   const cache = new Map<string, Tokenizer>();
   return (lang) => {
-    const primary = lang?.split("-")[0];
-    if (!lang || !primary || !CJK_PRIMARY.has(primary)) return latinTokenizer;
-    let tok = cache.get(lang);
-    if (!tok) { tok = cjkSegmenter(lang); cache.set(lang, tok); }
+    if (!lang) return latinTokenizer;
+    const l = lang.toLowerCase(); // BCP 47 tags are case-insensitive (also keeps the cache keyed once)
+    const primary = l.split("-")[0];
+    if (!primary || !CJK_PRIMARY.has(primary)) return latinTokenizer;
+    let tok = cache.get(l);
+    if (!tok) { tok = cjkSegmenter(l); cache.set(l, tok); }
     return tok;
   };
 }
@@ -84,20 +86,22 @@ function buildKeywordIndex(entries: readonly DocLike[], tokenizer: TokenizerReso
   );
 }
 
-function snippetAround(body: string, query: string): string {
-  const tokens = latinTokenizer(query);
+// `tokens` are the query terms as the BM25 index produced them (per-locale / normalized) —
+// so the snippet anchors on what actually matched, not on a naive re-split of the query.
+function snippetAround(body: string, tokens: string[]): string {
   if (!tokens.length) return body.slice(0, 160).trim();
-  // Land on the first WHOLE-token match (BM25 has no stemming), so a query token doesn't
-  // hit a substring inside a larger word ("cat" must not match "concatenate"). Tokens are
-  // lowercased alphanumerics from latinTokenizer, so they're regex-safe without escaping;
-  // the Unicode look-around is a script-aware word boundary (better than \b for accents).
-  const re = new RegExp("(?<![\\p{L}\\p{N}])(?:" + tokens.join("|") + ")(?![\\p{L}\\p{N}])", "iu");
+  // Land on the first WHOLE-token match (BM25 has no stemming), so a query token doesn't hit
+  // a substring inside a larger word ("cat" must not match "concatenate"). Tokens can come
+  // from any tokenizer now, so escape them for the regex. The Unicode look-around is a
+  // script-aware word boundary (better than \b for accents).
+  const esc = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp("(?<![\\p{L}\\p{N}])(?:" + tokens.map(esc).join("|") + ")(?![\\p{L}\\p{N}])", "iu");
   let at = body.search(re);
   if (at < 0) {
     // No word-boundary match. CJK has no whitespace boundaries (the look-around can't match
     // between Han characters), so fall back to the first plain substring occurrence.
     const lc = body.toLowerCase();
-    for (const t of tokens) { const i = lc.indexOf(t); if (i >= 0 && (at < 0 || i < at)) at = i; }
+    for (const t of tokens) { const i = lc.indexOf(t.toLowerCase()); if (i >= 0 && (at < 0 || i < at)) at = i; }
   }
   const start = at > 60 ? at - 40 : 0;
   return body.slice(start, start + 160).trim();
@@ -110,13 +114,14 @@ function keywordSearch(index: Bm25<KeywordData>, query: string, limit: number, f
   // is same-language (mirrors collapseSemantic). Fetch `fetchK` rows (default limit*4 for
   // dedup headroom; a caller that already over-fetched passes fetchK = limit). `locale` also
   // tokenizes the query per-locale (CJK), matching how each doc was indexed.
+  const queryTokens = index.tokensOf(query, locale); // the exact terms BM25 matches on
   const best = new Map<string, { hit: SearchHit; score: number }>();
   for (const h of index.search(query, { topK: fetchK, lang: locale })) {
     const hit: SearchHit = {
       slug: h.data.slug,
       title: h.data.title,
       section: h.data.section,
-      text: snippetAround(h.data.body, query),
+      text: snippetAround(h.data.body, queryTokens),
       score: Number(h.score.toFixed(3)),
       ...(h.data.locale ? { locale: h.data.locale } : {}),
     };
