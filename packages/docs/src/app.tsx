@@ -16,6 +16,7 @@ import type { KuraConfig } from "./config.ts";
 import { resolveLabels, pickLabel, type Labels } from "./labels.ts";
 import { localeHref, type I18nConfig } from "@junejs/core/i18n";
 import { stripMdx } from "./util.ts";
+import { createOgRoute } from "./og.js";
 
 type DocCtx = { params?: { slug?: string }; locale?: string };
 type SearchCtx = { url: URL; locale?: string };
@@ -206,10 +207,12 @@ export function createDocs<T extends DocLike>(opts: {
     const { prev, next } = prevNextOf(e.slug, locale);
     // A non-default locale that resolved to a non-variant entry fell back to default.
     const notTranslated = !!(locale && defaultLocale && locale !== defaultLocale && e.locale !== locale);
+    const description = e.data.description ? String(e.data.description) : undefined;
     return {
       slug: e.slug,
       title: String(e.data.title ?? e.slug),
       section: sectionLabel(locale, String(e.data.section ?? "")),
+      ...(description ? { description } : {}),
       html,
       toc,
       prev: prev ? { slug: prev.slug, title: String(prev.data.title ?? prev.slug) } : null,
@@ -254,7 +257,22 @@ export function createDocs<T extends DocLike>(opts: {
     const e = doc(d.doc.slug, d.locale);
     return { slug: d.doc.slug, title: d.doc.title, section: d.doc.section, locale: d.locale, markdown: e?.original, body: e?.body };
   };
-  const metadata = (d: DocPage) => ({ title: d.doc.title });
+  const siteUrl = opts.config.siteUrl;
+  const siteDesc = opts.config.site?.description;
+  const metadata = (d: DocPage) => {
+    const desc = d.doc.description ?? siteDesc;
+    const ogImage = siteUrl ? `${siteUrl}/og/${d.doc.slug}.png` : undefined;
+    return {
+      title: d.doc.title,
+      ...(desc ? { description: desc } : {}),
+      openGraph: {
+        title: d.doc.title,
+        ...(desc ? { description: desc } : {}),
+        ...(ogImage ? { image: ogImage } : {}),
+        type: "article" as const,
+      },
+    };
+  };
 
   const docRoute = {
     loader: (ctx: DocCtx): DocPage => {
@@ -299,6 +317,11 @@ export function createDocs<T extends DocLike>(opts: {
     metadata: { title: "Search" },
   };
 
+  // OG image route — /og/[slug].png → kura-branded card for each doc page.
+  // Add app/og/[slug]/route.ts with `export default kura.ogRoute` to enable.
+  // Override by calling createOgRoute() directly with a custom card renderer.
+  const ogRoute = createOgRoute({ DOCS }, opts.config);
+
   return {
     nav: navFor(defaultLocale),
     navFor,
@@ -310,5 +333,6 @@ export function createDocs<T extends DocLike>(opts: {
     docRoute,
     home,
     searchRoute,
+    ogRoute,
   };
 }

@@ -50,6 +50,11 @@ export interface KuraConfig {
   /** Deploy target passed to June (target, worker/function name, custom domain). */
   deploy?: { target?: "workers" | "vercel" | "deno"; name?: string; domain?: string };
   /**
+   * Canonical site URL (e.g. "https://kura.build"). When set, og:image and canonical tags use
+   * absolute URLs so social media crawlers can fetch them. Falls back to relative paths when absent.
+   */
+  siteUrl?: string;
+  /**
    * i18n routing config — passed to June and to createDocs(). Define locales and paths here
    * so both the server router and the docs framework share a single source of truth.
    * Re-exported as KuraI18nConfig from @kurajs/docs for type-safe inline definitions.

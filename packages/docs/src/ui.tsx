@@ -68,6 +68,8 @@ export type DocView = {
   slug: string;
   title: string;
   section: string;
+  /** Per-page description from frontmatter (`description:` field), used for meta description + OG. */
+  description?: string;
   html: string;
   toc: Toc;
   prev: { slug: string; title: string } | null;
