@@ -1,0 +1,45 @@
+{
+  "name": "@kurajs/tokenizers",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Kura — pluggable CJK / multilingual tokenizers for @kurajs/search (bigram + native Intl.Segmenter).",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --experimental-strip-types --test test/*.test.ts"
+  },
+  "keywords": [
+    "kura",
+    "tokenizer",
+    "cjk",
+    "chinese",
+    "japanese",
+    "bigram",
+    "intl-segmenter"
+  ],
+  "homepage": "https://kura.build",
+  "license": "MIT",
+  "dependencies": {
+    "@kurajs/search": "^0.0.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  },
+  "author": "Lawrence Lin",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kurajs/kura.git",
+    "directory": "packages/tokenizers"
+  }
+}
