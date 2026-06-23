@@ -41,6 +41,8 @@ reads and what an agent calls can never drift apart.
   switcher, and cross-lingual search (English + a Japanese demo locale).
 - [`examples/search`](examples/search) — semantic search over a SQLite corpus, reachable by
   humans (HTML), programs (`.json`), and agents (`/mcp`).
+- [`examples/docs-cjk`](examples/docs-cjk) — CJK keyword search: per-locale tokenization
+  (繁中 / 日本語 via `Intl.Segmenter`) plus opt-in 繁/简 normalization with OpenCC.
 
 ## Development
 
