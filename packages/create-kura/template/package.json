@@ -9,16 +9,13 @@
     "deploy": "kura deploy --no-embed"
   },
   "dependencies": {
-    "@junejs/core": "^0.0.32",
     "@kurajs/core": "^0.0.1",
-    "@kurajs/docs": "^0.0.7",
+    "@kurajs/docs": "^0.0.13",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
-    "@junejs/cli": "^0.0.32",
-    "@junejs/server": "^0.0.30",
-    "@kurajs/cli": "^0.0.7",
+    "@kurajs/cli": "^0.0.9",
     "@tailwindcss/node": "^4.3.1",
     "@tailwindcss/oxide": "^4.3.1",
     "@tailwindcss/typography": "^0.5.20",

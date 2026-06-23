@@ -1,6 +1,6 @@
-import { defineJune } from "@junejs/core/config";
+// @kura-generated — do not edit. Configure your site in kura.config.ts instead.
+import { kuraJuneConfig } from "@kurajs/docs";
+import kuraConfig from "./kura.config.ts";
+import { DOCS } from "./app/_content";
 
-export default defineJune({
-  site: { name: "PROJECT_NAME", description: "The knowledgebase for humans and agents." },
-  agent: { enabled: true }, // /mcp, /llms.txt, per-page .md/.json projections
-});
+export default kuraJuneConfig(kuraConfig, { DOCS });
