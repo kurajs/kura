@@ -7,7 +7,7 @@ name: release
 #
 # One-time npm setup (per package, on npmjs.com → package → Settings → Trusted Publisher):
 #   Publisher: GitHub Actions · Org/User: kurajs · Repository: kura · Workflow: release.yml
-# Do this for @kurajs/core, @kurajs/transformers, @kurajs/docs, @kurajs/cli, create-kura.
+# Do this for @kurajs/core, @kurajs/search, @kurajs/tokenizers, @kurajs/transformers, @kurajs/docs, @kurajs/cli, create-kura.
 
 on:
   push:
@@ -26,9 +26,9 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
