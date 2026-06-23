@@ -1,7 +1,8 @@
 // Search wiring: build a search index from a content collection (build time) and
 // load/serve it at runtime. Encapsulates chunking + the Kb engine + embedder.
 import { Kb } from "@kurajs/core";
-import type { Embedder } from "@kurajs/core";
+import type { Embedder, KbHit } from "@kurajs/core";
+import { Bm25, rrfScored, latinTokenizer } from "@kurajs/search";
 import type { DocLike } from "./nav.ts";
 import { stripMdx } from "./util.ts";
 
@@ -41,42 +42,88 @@ export interface SearchHandle {
   search(query: string, opts?: { topK?: number; locale?: string }): Promise<SearchHit[]>;
 }
 
-// Lexical fallback used when no embedder is configured (e.g. a Cloudflare Workers deploy
-// without Workers AI). Pure JS, zero-dependency: rank docs by query-term hits in title /
-// section / body. Not semantic, but real search with no model and no native deps.
-function lexicalSearch(entries: readonly DocLike[], query: string, topK: number): SearchHit[] {
-  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
-  if (!terms.length) return [];
-  const hits: SearchHit[] = [];
-  for (const e of entries) {
-    const title = String(e.data.title ?? e.slug);
-    const section = String(e.data.section ?? "");
-    const body = stripMdx(e.body ?? "");
-    const lcTitle = title.toLowerCase(), lcSection = section.toLowerCase(), lcBody = body.toLowerCase();
-    let score = 0;
-    let firstAt = -1;
-    for (const t of terms) {
-      if (lcTitle.includes(t)) score += 5;
-      if (lcSection.includes(t)) score += 2;
-      const occ = lcBody.split(t).length - 1;
-      score += Math.min(occ, 5);
-      const at = lcBody.indexOf(t);
-      if (at >= 0 && (firstAt < 0 || at < firstAt)) firstAt = at;
-    }
-    if (score <= 0) continue;
-    const start = firstAt > 60 ? firstAt - 40 : 0;
-    const text = body.slice(start, start + 160).trim();
-    hits.push({ slug: e.slug, title, section, text, score, ...(e.locale ? { locale: e.locale } : {}) });
+// Keyword search via BM25 (Okapi), used when no embedder is configured (e.g. a
+// Cloudflare Workers deploy without Workers AI). Pure JS, zero-dependency, no model —
+// but a real ranked index: BM25's IDF + length normalization far outrank naive
+// substring hit-counting (XQuAD en: R@1 92% vs 46%). Title and section are folded
+// into the indexed text; a snippet is cut around the first query hit for display.
+type KeywordData = { slug: string; title: string; section: string; body: string; locale?: string };
+
+function buildKeywordIndex(entries: readonly DocLike[]): Bm25<KeywordData> {
+  return Bm25.from(
+    entries.map((e) => {
+      const title = String(e.data.title ?? e.slug);
+      const section = String(e.data.section ?? "");
+      const body = stripMdx(e.body ?? "");
+      return {
+        id: `${e.locale ?? "_"}:${e.slug}`,
+        text: `${title}\n${section}\n${body}`,
+        data: { slug: e.slug, title, section, body, ...(e.locale ? { locale: e.locale } : {}) },
+      };
+    }),
+  );
+}
+
+function snippetAround(body: string, query: string): string {
+  const tokens = latinTokenizer(query);
+  if (!tokens.length) return body.slice(0, 160).trim();
+  // Land on the first WHOLE-token match (BM25 has no stemming), so a query token doesn't
+  // hit a substring inside a larger word ("cat" must not match "concatenate"). Tokens are
+  // lowercased alphanumerics from latinTokenizer, so they're regex-safe without escaping;
+  // the Unicode look-around is a script-aware word boundary (better than \b for accents).
+  const re = new RegExp("(?<![\\p{L}\\p{N}])(?:" + tokens.join("|") + ")(?![\\p{L}\\p{N}])", "iu");
+  const at = body.search(re);
+  const start = at > 60 ? at - 40 : 0;
+  return body.slice(start, start + 160).trim();
+}
+
+function keywordSearch(index: Bm25<KeywordData>, query: string, limit: number, fetchK = limit * 4, locale?: string): SearchHit[] {
+  // Collapse a slug's locale variants (DOCS carries every locale) into one hit — otherwise
+  // RRF, which fuses by slug, would see the same slug at several ranks and over-boost it.
+  // Keep the highest-BM25 variant, breaking ties toward the reader's `locale` so the snippet
+  // is same-language (mirrors collapseSemantic). Fetch `fetchK` rows (default limit*4 for
+  // dedup headroom; a caller that already over-fetched passes fetchK = limit).
+  const best = new Map<string, { hit: SearchHit; score: number }>();
+  for (const h of index.search(query, { topK: fetchK })) {
+    const hit: SearchHit = {
+      slug: h.data.slug,
+      title: h.data.title,
+      section: h.data.section,
+      text: snippetAround(h.data.body, query),
+      score: Number(h.score.toFixed(3)),
+      ...(h.data.locale ? { locale: h.data.locale } : {}),
+    };
+    const prev = best.get(h.data.slug);
+    if (!prev) { best.set(h.data.slug, { hit, score: h.score }); continue; }
+    const prefer = h.score > prev.score || (!!locale && h.data.locale === locale && prev.hit.locale !== locale && h.score >= prev.score);
+    if (prefer) best.set(h.data.slug, { hit, score: h.score });
   }
-  return hits.sort((a, b) => b.score - a.score).slice(0, topK);
+  return [...best.values()].sort((a, b) => b.score - a.score).slice(0, limit).map((e) => e.hit);
+}
+
+// Collapse a vector search's many per-chunk hits into one ranked hit per slug.
+// bge-m3 is multilingual, so a query naturally ranks same-language chunks higher;
+// on top of that we tie-break toward the reader's locale for a same-language snippet.
+function collapseSemantic(raw: KbHit<SearchData>[], locale?: string): SearchHit[] {
+  const best = new Map<string, { hit: SearchHit; score: number }>();
+  for (const h of raw) {
+    const hit: SearchHit = { slug: h.data.slug, title: h.data.title, section: h.data.section, score: Number(h.score.toFixed(3)), text: h.data.text, locale: h.data.locale };
+    const prev = best.get(h.data.slug);
+    if (!prev) { best.set(h.data.slug, { hit, score: h.score }); continue; }
+    const prefer = h.score > prev.score || (locale && h.data.locale === locale && prev.hit.locale !== locale && h.score >= prev.score - 0.04);
+    if (prefer) best.set(h.data.slug, { hit, score: h.score });
+  }
+  return [...best.values()].sort((a, b) => b.score - a.score).map((e) => e.hit);
 }
 
 /**
- * Runtime search. With an embedder, runs semantic search over a precomputed index (fast; no
- * corpus embedding on the request thread), warming the model shortly after boot. WITHOUT an
- * embedder, search degrades to a zero-dependency lexical scan over the entries — so a site
- * still deploys (and searches) on Cloudflare Workers with no Workers AI. The embedder is the
- * optional upgrade from lexical to semantic.
+ * Runtime search. With an embedder, runs HYBRID search: semantic vectors (over a
+ * precomputed index — no corpus embedding on the request thread) fused with BM25
+ * keyword via Reciprocal Rank Fusion, giving keyword precision plus semantic /
+ * cross-lingual recall. The model is warmed shortly after boot. WITHOUT an embedder,
+ * search falls back to the zero-dependency BM25 keyword index alone — so a site still
+ * deploys (and searches well) on Cloudflare Workers with no Workers AI. The embedder
+ * is the optional upgrade from keyword-only to hybrid.
  */
 export function createSearch(opts: {
   entries: readonly DocLike[];
@@ -84,41 +131,41 @@ export function createSearch(opts: {
   indexBytes?: Uint8Array;
   warm?: boolean;
 }): SearchHandle {
-  // No embedder → lexical mode (no Kb, no index needed).
+  // No embedder → BM25 keyword mode. The index is built lazily from the bundled
+  // entries on first search and cached; building is cheap at docs scale.
   if (!opts.embedder) {
+    let index: Bm25<KeywordData> | null = null;
     return {
       getKb: async () => null,
-      search: async (query, o) => lexicalSearch(opts.entries, query, o?.topK ?? 8),
+      search: async (query, o) => keywordSearch((index ??= buildKeywordIndex(opts.entries)), query, o?.topK ?? 8, undefined, o?.locale),
     };
   }
   const embedder = opts.embedder;
   let building: Promise<Kb<SearchData>> | null = null;
+  let keyword: Bm25<KeywordData> | null = null;
   const getKb = () =>
     (building ??= opts.indexBytes
       ? Promise.resolve(Kb.load<SearchData>(opts.indexBytes, { embedder }))
       : indexKb(opts.entries, embedder));
+  const getKeyword = () => (keyword ??= buildKeywordIndex(opts.entries));
 
   if (opts.warm !== false) {
     setTimeout(() => { getKb().then((kb) => kb.searchText("warm", { topK: 1 })).catch(() => {}); }, 50);
   }
 
   const search = async (query: string, o?: { topK?: number; locale?: string }): Promise<SearchHit[]> => {
-    const kb = await getKb();
     const topK = o?.topK ?? 8;
-    // Over-fetch so we can collapse a doc's many chunks (and its locale variants) into one
-    // hit per slug. bge-m3 is multilingual, so a query naturally ranks same-language chunks
-    // higher; on top of that we prefer the active locale's variant when scores are comparable.
-    const raw = await kb.searchText(query, { topK: topK * 4 });
-    const best = new Map<string, { hit: SearchHit; score: number }>();
-    for (const h of raw) {
-      const hit: SearchHit = { slug: h.data.slug, title: h.data.title, section: h.data.section, score: Number(h.score.toFixed(3)), text: h.data.text, locale: h.data.locale };
-      const prev = best.get(h.data.slug);
-      if (!prev) { best.set(h.data.slug, { hit, score: h.score }); continue; }
-      // Keep the higher score; tie-break toward the reader's locale for a same-language snippet.
-      const prefer = h.score > prev.score || (o?.locale && h.data.locale === o.locale && prev.hit.locale !== o.locale && h.score >= prev.score - 0.04);
-      if (prefer) best.set(h.data.slug, { hit, score: h.score });
-    }
-    return [...best.values()].sort((a, b) => b.score - a.score).slice(0, topK).map((e) => e.hit);
+    const depth = topK * 4; // over-fetch from each side so RRF has rank signal to fuse
+    const kb = await getKb();
+    const semantic = collapseSemantic(await kb.searchText(query, { topK: depth }), o?.locale);
+    const keywordHits = keywordSearch(getKeyword(), query, depth, depth, o?.locale); // caller already over-fetched
+    // Hybrid: keyword precision (exact terms) + semantic / cross-lingual recall, fused by
+    // rank so BM25 scores and cosine similarities don't need to be comparable. Keyword first
+    // so a doc found by both lists keeps the query-term snippet; semantic-only hits keep their chunk.
+    // Use the fused RRF score for `score` so it's consistent with the returned ordering (the
+    // per-list BM25/cosine score on the representative hit would not be).
+    return rrfScored<SearchHit>([{ hits: keywordHits }, { hits: semantic }], (h) => h.slug, { topK })
+      .map(({ item, score }) => ({ ...item, score: Number(score.toFixed(4)) }));
   };
 
   return { getKb, search };

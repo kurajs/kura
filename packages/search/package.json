@@ -1,0 +1,42 @@
+{
+  "name": "@kurajs/search",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Kura — retrieval engine: BM25 keyword search (+ hybrid fusion), portable and zero-dependency. Pairs with @kurajs/core's vector search.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --experimental-strip-types --test test/*.test.ts"
+  },
+  "keywords": [
+    "kura",
+    "june",
+    "bm25",
+    "search",
+    "full-text",
+    "keyword",
+    "knowledgebase"
+  ],
+  "homepage": "https://kura.build",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  },
+  "author": "Lawrence Lin",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kurajs/kura.git",
+    "directory": "packages/search"
+  }
+}

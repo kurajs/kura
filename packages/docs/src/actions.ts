@@ -23,7 +23,7 @@ export function docsActions(opts: {
   const search_docs = defineAction({
     id: "search_docs",
     description:
-      "Semantic search over the docs. Returns the most relevant passages with their doc slug, title, and similarity score.",
+      "Hybrid keyword + semantic search over the docs. Returns the most relevant passages with their doc slug, title, and relevance score.",
     input: {
       type: "object",
       properties: {
