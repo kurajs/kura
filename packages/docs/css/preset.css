@@ -122,8 +122,11 @@
   background: var(--code-bg); padding: .12em .35em; border-radius: 5px; font-weight: 400; font-size: .88em;
 }
 .prose :where(code)::before, .prose :where(code)::after { content: none; }
-/* Curated MDX blocks contain prose; zero their outer child margins so they don't double-space. */
-.callout-body > :first-child, .tab-panel > :first-child { margin-top: 0; }
+/* Curated MDX blocks contain prose; zero their outer child margins so they don't double-space.
+   `.callout > :first-child` also flattens the optional callout title — a <p> that sits OUTSIDE
+   .callout-body, whose own `m-0` ties with `.prose :where(p)` on specificity (0,1,0) and loses on
+   cascade order. The descendant-combinator selectors here are (0,2,0), so they win cleanly. */
+.callout-body > :first-child, .tab-panel > :first-child, .callout > :first-child { margin-top: 0; }
 .callout-body > :last-child, .tab-panel > :last-child { margin-bottom: 0; }
 
 /* --- pseudo-element chevrons + native marker hide (dropdowns / collapsibles) --- */

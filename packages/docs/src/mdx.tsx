@@ -24,7 +24,7 @@ function Callout({ type = "note", title, children }: { type?: string; title?: st
   const tone = CALLOUT_TONE[type] ?? "border-l-border bg-surface-2";
   return createElement(
     "div",
-    { className: `my-5 px-4 py-3 border border-border border-l-[3px] rounded-r-lg ${tone}` },
+    { className: `callout my-5 px-4 py-3 border border-border border-l-[3px] rounded-r-lg ${tone}` },
     title ? createElement("p", { className: "m-0 mb-1 font-bold text-[.9rem]" }, title) : null,
     createElement("div", { className: "callout-body" }, children),
   );
