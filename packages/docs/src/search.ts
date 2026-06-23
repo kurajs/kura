@@ -3,8 +3,26 @@
 import { Kb } from "@kurajs/core";
 import type { Embedder, KbHit } from "@kurajs/core";
 import { Bm25, rrfScored, latinTokenizer } from "@kurajs/search";
+import type { Tokenizer, TokenizerResolver } from "@kurajs/search";
+import { cjkSegmenter } from "@kurajs/tokenizers";
 import type { DocLike } from "./nav.ts";
 import { stripMdx } from "./util.ts";
+
+// Default per-locale keyword tokenizer policy: CJK locales get native word
+// segmentation (Intl.Segmenter, falling back to bigram); everything else uses the
+// Latin tokenizer. Override via KuraConfig.tokenizer — e.g. to fold 繁/簡 with
+// @kurajs/opencc on zh-TW. Tokenizers are cached per locale (Intl.Segmenter is not free).
+const CJK_PRIMARY = new Set(["zh", "ja", "ko"]);
+export function defaultTokenizer(): TokenizerResolver {
+  const cache = new Map<string, Tokenizer>();
+  return (lang) => {
+    const primary = lang?.split("-")[0];
+    if (!lang || !primary || !CJK_PRIMARY.has(primary)) return latinTokenizer;
+    let tok = cache.get(lang);
+    if (!tok) { tok = cjkSegmenter(lang); cache.set(lang, tok); }
+    return tok;
+  };
+}
 
 export type SearchData = { slug: string; title: string; section: string; text: string; locale?: string };
 export type SearchHit = { slug: string; title: string; section: string; text: string; score: number; locale?: string };
@@ -49,7 +67,7 @@ export interface SearchHandle {
 // into the indexed text; a snippet is cut around the first query hit for display.
 type KeywordData = { slug: string; title: string; section: string; body: string; locale?: string };
 
-function buildKeywordIndex(entries: readonly DocLike[]): Bm25<KeywordData> {
+function buildKeywordIndex(entries: readonly DocLike[], tokenizer: TokenizerResolver): Bm25<KeywordData> {
   return Bm25.from(
     entries.map((e) => {
       const title = String(e.data.title ?? e.slug);
@@ -58,9 +76,11 @@ function buildKeywordIndex(entries: readonly DocLike[]): Bm25<KeywordData> {
       return {
         id: `${e.locale ?? "_"}:${e.slug}`,
         text: `${title}\n${section}\n${body}`,
+        lang: e.locale, // tokenize each doc by its own locale
         data: { slug: e.slug, title, section, body, ...(e.locale ? { locale: e.locale } : {}) },
       };
     }),
+    { resolveTokenizer: tokenizer },
   );
 }
 
@@ -82,9 +102,10 @@ function keywordSearch(index: Bm25<KeywordData>, query: string, limit: number, f
   // RRF, which fuses by slug, would see the same slug at several ranks and over-boost it.
   // Keep the highest-BM25 variant, breaking ties toward the reader's `locale` so the snippet
   // is same-language (mirrors collapseSemantic). Fetch `fetchK` rows (default limit*4 for
-  // dedup headroom; a caller that already over-fetched passes fetchK = limit).
+  // dedup headroom; a caller that already over-fetched passes fetchK = limit). `locale` also
+  // tokenizes the query per-locale (CJK), matching how each doc was indexed.
   const best = new Map<string, { hit: SearchHit; score: number }>();
-  for (const h of index.search(query, { topK: fetchK })) {
+  for (const h of index.search(query, { topK: fetchK, lang: locale })) {
     const hit: SearchHit = {
       slug: h.data.slug,
       title: h.data.title,
@@ -130,14 +151,17 @@ export function createSearch(opts: {
   embedder?: Embedder;
   indexBytes?: Uint8Array;
   warm?: boolean;
+  /** Per-locale keyword tokenizer. Default {@link defaultTokenizer} (CJK via Intl.Segmenter). */
+  tokenizer?: TokenizerResolver;
 }): SearchHandle {
+  const tokenizer = opts.tokenizer ?? defaultTokenizer();
   // No embedder → BM25 keyword mode. The index is built lazily from the bundled
   // entries on first search and cached; building is cheap at docs scale.
   if (!opts.embedder) {
     let index: Bm25<KeywordData> | null = null;
     return {
       getKb: async () => null,
-      search: async (query, o) => keywordSearch((index ??= buildKeywordIndex(opts.entries)), query, o?.topK ?? 8, undefined, o?.locale),
+      search: async (query, o) => keywordSearch((index ??= buildKeywordIndex(opts.entries, tokenizer)), query, o?.topK ?? 8, undefined, o?.locale),
     };
   }
   const embedder = opts.embedder;
@@ -147,7 +171,7 @@ export function createSearch(opts: {
     (building ??= opts.indexBytes
       ? Promise.resolve(Kb.load<SearchData>(opts.indexBytes, { embedder }))
       : indexKb(opts.entries, embedder));
-  const getKeyword = () => (keyword ??= buildKeywordIndex(opts.entries));
+  const getKeyword = () => (keyword ??= buildKeywordIndex(opts.entries, tokenizer));
 
   if (opts.warm !== false) {
     setTimeout(() => { getKb().then((kb) => kb.searchText("warm", { topK: 1 })).catch(() => {}); }, 50);

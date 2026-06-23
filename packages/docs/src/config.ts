@@ -1,4 +1,5 @@
 import type { Embedder } from "@kurajs/core";
+import type { TokenizerResolver } from "@kurajs/search";
 import type { I18nConfig } from "@junejs/core/i18n";
 import type { Labels } from "./labels.ts";
 import type { DocLike } from "./nav.ts";
@@ -19,6 +20,10 @@ export interface KuraConfig {
   site?: { name?: string; brand?: string; description?: string; titleTemplate?: string };
   /** Embedding engine for search (e.g. transformers()); injected for local↔cloud parity. */
   embedder?: Embedder;
+  /** Per-locale keyword tokenizer for search. Default: CJK locales use native word
+   *  segmentation (Intl.Segmenter), others use the Latin tokenizer. Override to customize —
+   *  e.g. `byLocale({ "zh-TW": pipeline({ pre: [normalizeChinese()], segment: cjkSegmenter("zh-TW") }) })`. */
+  tokenizer?: TokenizerResolver;
   /**
    * Per-locale UI string overrides. en-US is the built-in default (DEFAULT_LABELS);
    * each locale supplies only the strings it changes. Keyed by the same locale tags
