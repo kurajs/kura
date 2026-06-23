@@ -1,7 +1,8 @@
 // Reciprocal Rank Fusion — combine several ranked result lists into one ranking
-// without needing comparable scores. Each item contributes 1/(k + rank) for every
-// list it appears in, so items ranked well in multiple lists rise to the top. The
-// classic k=60 makes fusion robust to any single list's score scale (Cormack 2009).
+// without needing comparable scores. Each item contributes weight/(k + rank + 1) for
+// every list it appears in, where rank is 0-based — i.e. the classic 1/(k + rank) with
+// 1-based ranks — so items ranked well in multiple lists rise to the top. The classic
+// k=60 makes fusion robust to any single list's score scale (Cormack 2009).
 //
 // This is how Kura blends keyword (BM25) precision with semantic / cross-lingual
 // recall: BM25 scores and cosine similarities aren't comparable, but their ranks are.
