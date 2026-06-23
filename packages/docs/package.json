@@ -61,7 +61,7 @@
   "homepage": "https://kura.build",
   "license": "MIT",
   "dependencies": {
-    "@junejs/og": "file:../../../../junebuild/june/packages/og",
+    "@junejs/og": "^0.0.4",
     "@kurajs/core": "^0.0.1",
     "@kurajs/search": "^0.0.1",
     "@kurajs/tokenizers": "^0.0.1",

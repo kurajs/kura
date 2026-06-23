@@ -41,6 +41,8 @@ jobs:
 
       # Build in dependency order (core → transformers → docs → cli).
       - run: npm run build -w @kurajs/core
+      - run: npm run build -w @kurajs/search
+      - run: npm run build -w @kurajs/tokenizers
       - run: npm run build -w @kurajs/transformers
       - run: npm run build -w @kurajs/docs
       - run: npm run build -w @kurajs/cli
