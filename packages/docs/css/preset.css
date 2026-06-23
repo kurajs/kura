@@ -127,7 +127,13 @@
 /* --- pseudo-element chevrons + native marker hide (dropdowns / collapsibles) --- */
 .chevron { list-style: none; }
 .chevron::-webkit-details-marker { display: none; }
-.chevron::after { content: "⌄"; color: var(--muted); line-height: 1; transition: transform .15s; }
+/* SVG chevron via mask (not a text glyph) so it centers font-independently and tints with currentColor. */
+.chevron::after {
+  content: ""; display: inline-block; width: .9em; height: .9em; background-color: currentColor;
+  -webkit-mask: var(--kura-chevron) center / contain no-repeat; mask: var(--kura-chevron) center / contain no-repeat;
+  transition: transform .15s;
+}
+:root { --kura-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
 [open] > .chevron::after { transform: rotate(180deg); }
 /* Sidebar folder chevron: a right-pointing caret that rotates down when open (sits after the label). */
 .folder-title { list-style: none; }

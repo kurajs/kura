@@ -217,17 +217,23 @@ export function DocsPage({ site, sidebar, tabs, doc, basePath = "/docs", labels 
   const md = href(docPath(basePath, `${doc.slug}.md`));
   const prompt = encodeURIComponent(`Please read this doc and answer my questions: ${doc.title}`);
   const menuItem = "flex items-start gap-2.5 w-full px-2.5 py-2 rounded-lg bg-transparent border-0 text-fg-soft text-left cursor-pointer hover:bg-hover";
+  // Title row (Mintlify-style): lift the page's leading <h1> out of the article into a header row so
+  // the copy/actions split button sits to its right; strip it from the body to avoid a duplicate.
+  // Use the content heading's own markup (falls back to the frontmatter title) so it never diverges.
+  const h1 = doc.html.match(/^\s*<h1\b[^>]*>([\s\S]*?)<\/h1>\s*/i);
+  const headingHtml = h1 ? h1[1] : doc.title;
+  const bodyHtml = h1 ? doc.html.slice(h1[0].length) : doc.html;
   return (
     <DocsShell site={site} sidebar={sidebar} tabs={tabs} active={doc.slug} toc={doc.toc} basePath={basePath} pageTitle={doc.title} labels={labels} href={href} localeSwitch={localeSwitch}>
-      <div className="text-muted text-[.82rem] mb-4">{doc.section ? `${doc.section} / ` : ""}{doc.title}</div>
-      {doc.notTranslated && <div className="mb-5 px-3.5 py-2.5 text-[.85rem] border border-warn-border border-l-[3px] border-l-amber-600 rounded-r-lg bg-warn-bg text-warn-fg">{labels.notTranslated}</div>}
-      <div className="flex gap-2 flex-wrap mb-6">
+      {doc.section && <div className="text-muted text-[.82rem] mb-2">{doc.section}</div>}
+      <div className="flex items-center justify-between gap-4 mb-6">
+        <div className="prose"><h1 className="!m-0" dangerouslySetInnerHTML={{ __html: headingHtml }} /></div>
         {/* Split button (Mintlify-style): primary "Copy" + a chevron that opens the actions menu. */}
-        <div className="relative inline-flex items-stretch">
+        <div className="relative inline-flex items-stretch flex-none">
           <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[.85rem] border border-border border-r-0 rounded-l-lg bg-surface text-fg-soft cursor-pointer hover:bg-hover hover:text-fg" data-copy-md={md}><IconCopy />{labels.copyMarkdown}</button>
           <details className="relative inline-flex items-stretch" data-menu>
             <summary className="chevron inline-flex items-center justify-center w-[30px] border border-border rounded-r-lg bg-surface text-muted cursor-pointer hover:bg-hover hover:text-fg" aria-label="More actions" />
-            <div className="absolute left-0 top-[calc(100%+.4rem)] z-30 min-w-[17rem] flex flex-col gap-px p-1.5 bg-surface border border-border rounded-xl shadow-xl">
+            <div className="absolute right-0 top-[calc(100%+.4rem)] z-30 min-w-[17rem] flex flex-col gap-px p-1.5 bg-surface border border-border rounded-xl shadow-xl">
               <button className={menuItem} data-copy-md={md}>
                 <IconCopy className="flex-none mt-0.5 text-muted" />
                 <span className="flex flex-col min-w-0"><span className="font-semibold text-[.9rem] text-fg">{labels.copyMarkdown}</span><span className="text-[.8rem] text-muted">{labels.copyMarkdownHint}</span></span>
@@ -248,7 +254,8 @@ export function DocsPage({ site, sidebar, tabs, doc, basePath = "/docs", labels 
           </details>
         </div>
       </div>
-      <article className="prose" dangerouslySetInnerHTML={{ __html: doc.html }} />
+      {doc.notTranslated && <div className="mb-5 px-3.5 py-2.5 text-[.85rem] border border-warn-border border-l-[3px] border-l-amber-600 rounded-r-lg bg-warn-bg text-warn-fg">{labels.notTranslated}</div>}
+      <article className="prose" dangerouslySetInnerHTML={{ __html: bodyHtml }} />
       <nav className="flex justify-between gap-4 mt-12 pt-6 border-t border-border">
         {doc.prev ? <a className="flex-1 px-4 py-3.5 border border-border rounded-xl hover:border-accent" href={href(docPath(basePath, doc.prev.slug))}><div className="text-muted text-[.78rem]">← {labels.previous}</div><div className="font-semibold text-accent">{doc.prev.title}</div></a> : <span />}
         {doc.next ? <a className="flex-1 px-4 py-3.5 border border-border rounded-xl hover:border-accent text-right" href={href(docPath(basePath, doc.next.slug))}><div className="text-muted text-[.78rem]">{labels.next} →</div><div className="font-semibold text-accent">{doc.next.title}</div></a> : <span />}
