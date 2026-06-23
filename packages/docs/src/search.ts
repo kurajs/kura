@@ -159,7 +159,7 @@ export function createSearch(opts: {
     const keywordHits = keywordSearch(getKeyword(), query, depth);
     // Hybrid: keyword precision (exact terms) + semantic / cross-lingual recall, fused by
     // rank so BM25 scores and cosine similarities don't need to be comparable. Keyword first
-    // so a doc both find share the query-term snippet; semantic-only hits keep their chunk.
+    // so a doc found by both lists keeps the query-term snippet; semantic-only hits keep their chunk.
     // Use the fused RRF score for `score` so it's consistent with the returned ordering (the
     // per-list BM25/cosine score on the representative hit would not be).
     return rrfScored<SearchHit>([{ hits: keywordHits }, { hits: semantic }], (h) => h.slug, { topK })
