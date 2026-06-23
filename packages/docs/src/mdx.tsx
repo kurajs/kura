@@ -27,19 +27,22 @@ function Callout({ type = "note", title, children }: { type?: string; title?: st
     createElement("div", { className: "callout-body" }, children),
   );
 }
+// `not-prose` keeps the typography plugin from restyling the card: otherwise the <a> picks up prose
+// link color + underline and the <p>s get prose paragraph margins (the big gaps). With it excluded,
+// the explicit classes below fully own the look.
 function Card({ title, description, href, children }: { title?: string; description?: string; href?: string; children?: ReactNode }) {
   const inner = [
-    title ? createElement("p", { className: "m-0 mb-1 font-bold", key: "t" }, title) : null,
-    description ? createElement("p", { className: "m-0 text-[.9rem] text-muted", key: "d" }, description) : null,
-    children ? createElement("div", { key: "b" }, children) : null,
+    title ? createElement("p", { className: "m-0 mb-1.5 font-bold text-fg", key: "t" }, title) : null,
+    description ? createElement("p", { className: "m-0 text-[.9rem] text-muted leading-snug", key: "d" }, description) : null,
+    children ? createElement("div", { className: "mt-2", key: "b" }, children) : null,
   ];
-  const cls = "block my-4 px-4 py-4 border border-border rounded-xl bg-surface" + (href ? " hover:border-accent" : "");
+  const cls = "not-prose block my-4 px-4 py-3.5 border border-border rounded-xl bg-surface no-underline" + (href ? " hover:border-accent" : "");
   return href ? createElement("a", { className: cls, href }, inner) : createElement("div", { className: cls }, inner);
 }
 // Responsive grid of <Card>s. `[&>*]:my-0` cancels each Card's standalone `my-4` (the grid `gap`
 // owns the spacing here); `[&>*]:h-full` equalizes cell heights. Whole, scannable class literals.
 function Cards({ children }: { children?: ReactNode }) {
-  return createElement("div", { className: "cards grid gap-3 my-5 sm:grid-cols-2 [&>*]:my-0 [&>*]:h-full" }, children);
+  return createElement("div", { className: "not-prose cards grid gap-4 my-5 sm:grid-cols-2 [&>*]:my-0 [&>*]:h-full" }, children);
 }
 function Steps({ children }: { children?: ReactNode }) {
   return createElement("div", { className: "steps" }, children);
