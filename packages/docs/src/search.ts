@@ -65,15 +65,15 @@ function buildKeywordIndex(entries: readonly DocLike[]): Bm25<KeywordData> {
 }
 
 function snippetAround(body: string, query: string): string {
-  const lc = body.toLowerCase();
-  let firstAt = -1;
-  // Tokenize the query the same way BM25 does, so the snippet lands on a term that
-  // actually matched (whitespace-splitting would miss "node.js" → "node"/"js" etc.).
-  for (const t of latinTokenizer(query)) {
-    const at = lc.indexOf(t);
-    if (at >= 0 && (firstAt < 0 || at < firstAt)) firstAt = at;
-  }
-  const start = firstAt > 60 ? firstAt - 40 : 0;
+  const tokens = latinTokenizer(query);
+  if (!tokens.length) return body.slice(0, 160).trim();
+  // Land on the first WHOLE-token match (BM25 has no stemming), so a query token doesn't
+  // hit a substring inside a larger word ("cat" must not match "concatenate"). Tokens are
+  // lowercased alphanumerics from latinTokenizer, so they're regex-safe without escaping;
+  // the Unicode look-around is a script-aware word boundary (better than \b for accents).
+  const re = new RegExp("(?<![\\p{L}\\p{N}])(?:" + tokens.join("|") + ")(?![\\p{L}\\p{N}])", "iu");
+  const at = body.search(re);
+  const start = at > 60 ? at - 40 : 0;
   return body.slice(start, start + 160).trim();
 }
 

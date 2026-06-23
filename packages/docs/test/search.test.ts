@@ -49,6 +49,18 @@ test("keyword search ranks the doc with the rare query term first", async () => 
   assert.equal(hits[0]?.slug, "b");
 });
 
+test("keyword snippet lands on a whole-token match, not a substring inside a word", async () => {
+  const body =
+    "A long preamble of filler so the start-of-doc snippet is clearly different here indeed. " +
+    "We first discuss concatenation of strings, then later mention a cat in the final sentence.";
+  const entries = [{ slug: "d", data: { title: "Guide", section: "" }, body }] as unknown as DocLike[];
+  // BM25 matches the whole token "cat"; the snippet must land on the standalone "cat"
+  // (near "final"), not on "concatenation" at the document start.
+  const hits = await createSearch({ entries }).search("cat");
+  assert.equal(hits[0]?.slug, "d");
+  assert.ok(/final/i.test(hits[0]!.text), "snippet should land on whole-word 'cat', not 'concatenation'");
+});
+
 test("hybrid (embedder) fuses keyword + semantic and de-dups locale variants by slug", async () => {
   // Same slug "a" in two locales (as DOCS would carry); "b" is unrelated.
   const entries = [
