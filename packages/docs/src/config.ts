@@ -1,5 +1,7 @@
 import type { Embedder } from "@kurajs/core";
 import type { Labels } from "./labels.ts";
+import type { DocLike } from "./nav.ts";
+import { kuraLlms } from "./agent.ts";
 
 export interface KuraConfig {
   /** URL prefix for doc pages (default `/docs`). Set `""` to mount docs at the site root. The route
@@ -9,8 +11,8 @@ export interface KuraConfig {
   basePath?: string;
   /** Sidebar group order (sections). */
   sections?: string[];
-  /** Site identity shown in the chrome. */
-  site?: { name?: string; brand?: string; description?: string };
+  /** Site identity shown in the chrome and passed to June (name, brand, description, titleTemplate). */
+  site?: { name?: string; brand?: string; description?: string; titleTemplate?: string };
   /** Embedding engine for search (e.g. transformers()); injected for local↔cloud parity. */
   embedder?: Embedder;
   /**
@@ -41,10 +43,44 @@ export interface KuraConfig {
    * bundle. Defaults to `https://esm.sh/mermaid@11`; override to pin a version or self-host.
    */
   mermaidCdn?: string;
-  // theme, agent toggles, etc. land here later.
+  /** Deploy target passed to June (target, worker/function name, custom domain). */
+  deploy?: { target?: "workers" | "vercel" | "deno"; name?: string; domain?: string };
+  /**
+   * Pass-through to defineJune() for advanced June features not yet surfaced by Kura.
+   * Example: `june: { clientRouter: true }`. Avoid using this for fields Kura already
+   * covers (site, deploy, agent) — those are merged automatically by kuraJuneConfig().
+   */
+  june?: Record<string, unknown>;
 }
 
 /** Identity helper — gives `kura.config.ts` full type-checking + inference. */
 export function defineKura(config: KuraConfig): KuraConfig {
   return config;
+}
+
+/**
+ * Build a June config from a KuraConfig. Called by the thin `june.config.ts` shim so the
+ * user only ever edits `kura.config.ts`. Handles site/deploy/agent wiring automatically;
+ * advanced june options flow through via `config.june`.
+ *
+ * Usage in june.config.ts:
+ *   import { kuraJuneConfig } from "@kurajs/docs";
+ *   import kuraConfig from "./kura.config.ts";
+ *   import { DOCS } from "./app/_content";
+ *   export default kuraJuneConfig(kuraConfig, { DOCS });
+ */
+export function kuraJuneConfig<T extends DocLike>(
+  config: KuraConfig,
+  content: { DOCS: readonly T[] },
+): unknown {
+  // Lazy import so @junejs/core is only resolved at runtime (peer dep — always present in a
+  // running Kura app, because @kurajs/cli brings in @junejs/cli which brings in @junejs/core).
+  // Using a dynamic shape avoids a hard compile-time dep on @junejs/core types here.
+  const { site, deploy, june = {} } = config;
+  return {
+    ...(site ? { site } : {}),
+    ...(deploy ? { deploy } : {}),
+    agent: { enabled: true, llms: kuraLlms({ DOCS: content.DOCS }) },
+    ...june,
+  };
 }
