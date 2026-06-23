@@ -25,6 +25,33 @@ function fakeEmbedder(markers: string[]): Embedder {
   };
 }
 
+const entries: DocLike[] = [
+  { slug: "vec", locale: "zh-TW", data: { title: "向量搜尋", section: "概念" }, body: "本文介紹向量搜尋引擎如何運作與索引建立。" },
+  { slug: "db", locale: "zh-TW", data: { title: "資料庫", section: "概念" }, body: "資料庫索引、查詢最佳化與儲存結構。" },
+  { slug: "tok", locale: "ja", data: { title: "トークナイザ", section: "概念" }, body: "日本語の単語分割と全文検索の仕組みを説明します。" },
+  { slug: "intro", locale: "en", data: { title: "Introduction", section: "Guide" }, body: "A quick introduction to the search engine and indexing." },
+] as unknown as DocLike[];
+
+test("keyword search (no embedder) segments CJK per locale via the default tokenizer", async () => {
+  const search = createSearch({ entries });
+  const top = async (q: string, locale?: string) => (await search.search(q, { topK: 3, locale }))[0]?.slug;
+
+  assert.equal(await top("向量搜尋", "zh-TW"), "vec"); // Chinese, word-segmented
+  assert.equal(await top("資料庫", "zh-TW"), "db");
+  assert.equal(await top("単語分割", "ja"), "tok"); // Japanese, word-segmented
+  assert.equal(await top("indexing", "en"), "intro"); // Latin still works
+});
+
+test("a custom per-locale tokenizer override is honored", async () => {
+  let called = false;
+  const search = createSearch({
+    entries,
+    tokenizer: () => (text: string) => { called = true; return text.toLowerCase().split(/\s+/).filter(Boolean); },
+  });
+  await search.search("introduction", { locale: "en" });
+  assert.ok(called, "the provided tokenizer resolver should be used");
+});
+
 test("keyword snippet aligns with BM25 tokenization for punctuated queries", async () => {
   // Body padded so a naive (start-of-doc) snippet would miss the match. BM25 tokenizes
   // "react/redux" → ["react","redux"]; the snippet must use the same tokenization (not a
@@ -33,19 +60,19 @@ test("keyword snippet aligns with BM25 tokenization for punctuated queries", asy
     "Introductory filler text padding the very start of this document so that a naive snippet " +
     "would begin here and never reach the relevant part of the page at all, truly. " +
     "Later on the guide explains how to wire React and Redux together for predictable state.";
-  const entries = [{ slug: "d", data: { title: "Guide", section: "" }, body }] as unknown as DocLike[];
+  const doc = [{ slug: "d", data: { title: "Guide", section: "" }, body }] as unknown as DocLike[];
 
-  const hits = await createSearch({ entries }).search("react/redux");
+  const hits = await createSearch({ entries: doc }).search("react/redux");
   assert.equal(hits[0]?.slug, "d");
   assert.ok(/redux/i.test(hits[0]!.text), "snippet should land on the matched term, not the doc start");
 });
 
 test("keyword search ranks the doc with the rare query term first", async () => {
-  const entries = [
+  const docs = [
     { slug: "a", data: { title: "Intro", section: "" }, body: "general overview and getting started" },
     { slug: "b", data: { title: "Kubernetes", section: "" }, body: "deploying to a kubernetes cluster with helm" },
   ] as unknown as DocLike[];
-  const hits = await createSearch({ entries }).search("kubernetes deployment");
+  const hits = await createSearch({ entries: docs }).search("kubernetes deployment");
   assert.equal(hits[0]?.slug, "b");
 });
 
@@ -70,6 +97,16 @@ test("keyword snippet lands on a whole-token match, not a substring inside a wor
   const hits = await createSearch({ entries }).search("cat");
   assert.equal(hits[0]?.slug, "d");
   assert.ok(/final/i.test(hits[0]!.text), "snippet should land on whole-word 'cat', not 'concatenation'");
+});
+
+test("keyword snippet handles CJK queries (no whitespace word boundaries)", async () => {
+  // CJK has no whitespace, so the word-boundary regex can't match between Han chars; the
+  // snippet must fall back to the term's position rather than start-of-doc.
+  const body = "前言內容佔據文件開頭很長一段文字所以天真的摘要會從這裡開始而錯過重點直到後段我們才提到向量搜尋引擎這個關鍵詞作結尾。";
+  const entries = [{ slug: "z", locale: "zh-TW", data: { title: "說明", section: "" }, body }] as unknown as DocLike[];
+  const hits = await createSearch({ entries }).search("向量搜尋", { locale: "zh-TW" });
+  assert.equal(hits[0]?.slug, "z");
+  assert.ok(hits[0]!.text.includes("向量搜尋"), "CJK snippet should land on the matched term");
 });
 
 test("hybrid (embedder) fuses keyword + semantic and de-dups locale variants by slug", async () => {

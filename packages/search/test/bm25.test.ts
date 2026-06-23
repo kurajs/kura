@@ -49,6 +49,15 @@ test("length normalization: a focused short doc beats a long diluted one", () =>
   assert.equal(bm.search("kubernetes")[0]?.id, "short");
 });
 
+test("tokensOf exposes the index's tokenization (per the configured resolver + lang)", () => {
+  const bm = Bm25.from<unknown>(
+    [{ id: "a", text: "x" }],
+    { resolveTokenizer: (lang) => (lang === "rev" ? (s) => [s.split("").reverse().join("")] : (s) => s.toLowerCase().split(/\s+/).filter(Boolean)) },
+  );
+  assert.deepEqual(bm.tokensOf("Hello World"), ["hello", "world"]);
+  assert.deepEqual(bm.tokensOf("abc", "rev"), ["cba"]); // resolver picks the per-lang tokenizer
+});
+
 test("a negative topK returns no hits (not slice's drop-last behavior)", () => {
   const bm = Bm25.from([{ id: "a", text: "x" }, { id: "b", text: "x" }, { id: "c", text: "x" }]);
   assert.deepEqual(bm.search("x", { topK: -1 }), []);

@@ -3,7 +3,7 @@
 // and the browser. Validated to far exceed naive substring scoring (XQuAD en:
 // R@1 92% vs 46%, see prototypes/fts-bench/verify-bm25-vs-lexical.mjs).
 
-import type { Tokenizer } from "./tokenize.ts";
+import type { Tokenizer, TokenizerResolver } from "./tokenize.ts";
 import { latinTokenizer } from "./tokenize.ts";
 
 export type Bm25Record<M = unknown> = {
@@ -11,6 +11,8 @@ export type Bm25Record<M = unknown> = {
   id: string;
   /** Text to index for this record. */
   text: string;
+  /** Language tag (e.g. "ja"); selects a tokenizer when a resolver is configured. */
+  lang?: string;
 } & (undefined extends M
   ? { /** Arbitrary payload returned with each hit. */ data?: M }
   : { /** Payload returned with each hit (required because `M` excludes `undefined`). */ data: M });
@@ -27,13 +29,17 @@ export interface Bm25Options {
   k1?: number;
   /** Document-length normalization (Okapi `b`). Default 0.75. */
   b?: number;
-  /** Tokenizer. Default {@link latinTokenizer}; inject a CJK tokenizer for space-free scripts. */
+  /** Single tokenizer. Default {@link latinTokenizer}; inject a CJK tokenizer for space-free scripts. */
   tokenize?: Tokenizer;
+  /** Per-language tokenizer (e.g. `byLocale({...})`). Overrides `tokenize` and selects by record/query `lang`. */
+  resolveTokenizer?: TokenizerResolver;
 }
 
 export interface Bm25SearchOptions {
   /** Maximum number of hits to return. Default 10. */
   topK?: number;
+  /** Language tag for the query; selects a tokenizer when a resolver is configured. */
+  lang?: string;
 }
 
 /**
@@ -45,6 +51,7 @@ export class Bm25<M = unknown> {
   private readonly k1: number;
   private readonly b: number;
   private readonly tokenize: Tokenizer;
+  private readonly resolve?: TokenizerResolver;
 
   // term -> flat postings [docId0, tf0, docId1, tf1, ...]; docId is the array index below.
   private postings = new Map<string, number[]>();
@@ -57,6 +64,12 @@ export class Bm25<M = unknown> {
     this.k1 = opts.k1 ?? 1.2;
     this.b = opts.b ?? 0.75;
     this.tokenize = opts.tokenize ?? latinTokenizer;
+    this.resolve = opts.resolveTokenizer;
+  }
+
+  /** Tokenizer for a language: the resolver's pick, or the single tokenizer. */
+  private tokenizerFor(lang?: string): Tokenizer {
+    return this.resolve ? this.resolve(lang) : this.tokenize;
   }
 
   /** Build an index from records in one call. */
@@ -71,6 +84,15 @@ export class Bm25<M = unknown> {
     return this.ids.length;
   }
 
+  /**
+   * Tokenize text exactly as this index does (the configured tokenizer / resolver for `lang`).
+   * Use it to align downstream work — e.g. snippet anchoring — with how queries are matched,
+   * since a per-locale or normalizing tokenizer can produce different terms than a naive split.
+   */
+  tokensOf(text: string, lang?: string): string[] {
+    return this.tokenizerFor(lang)(text);
+  }
+
   /** Index more records. Records are appended; there is no de-duplication by id. */
   add(records: Iterable<Bm25Record<M>>): void {
     const tf = new Map<string, number>();
@@ -79,7 +101,7 @@ export class Bm25<M = unknown> {
       this.ids.push(rec.id);
       this.store.push(rec.data as M);
 
-      const toks = this.tokenize(rec.text);
+      const toks = this.tokenizerFor(rec.lang)(rec.text);
       this.docLen.push(toks.length);
       this.totalLen += toks.length;
 
@@ -100,7 +122,7 @@ export class Bm25<M = unknown> {
   search(query: string, opts: Bm25SearchOptions = {}): Bm25Hit<M>[] {
     const n = this.ids.length;
     if (!n) return [];
-    const terms = [...new Set(this.tokenize(query))];
+    const terms = [...new Set(this.tokenizerFor(opts.lang)(query))];
     if (!terms.length) return [];
 
     const avgdl = this.totalLen / n;

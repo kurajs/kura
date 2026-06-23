@@ -72,7 +72,7 @@ export function createDocs<T extends DocLike>(opts: {
       : undefined;
 
   const site: SiteInfo = { name: opts.config.site?.name, brand: opts.config.site?.brand };
-  const search = createSearch({ entries: DOCS, embedder: opts.config.embedder, indexBytes: opts.indexBytes });
+  const search = createSearch({ entries: DOCS, embedder: opts.config.embedder, indexBytes: opts.indexBytes, tokenizer: opts.config.tokenizer });
   const actions = docsActions({ search, entries: DOCS, doc });
 
   // Folder nav metadata for a locale: the default `meta`, with this locale's per-folder overrides
