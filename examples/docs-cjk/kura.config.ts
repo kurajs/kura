@@ -39,8 +39,9 @@ const kuraConfig = defineKura({
 
   // ── The point of this example ──
   // Per-locale keyword tokenizer: zh-TW gets OpenCC fold + Intl.Segmenter, ja gets
-  // Intl.Segmenter, everything else falls back to the Latin tokenizer. `default` is the
-  // zh-TW chain because this site's primary language is Traditional Chinese.
+  // Intl.Segmenter, en gets the Latin tokenizer. Any locale NOT in this map (and the
+  // default locale when its docs are untagged) falls back to `default` — here the zh-TW
+  // chain, since this site's primary language is Traditional Chinese.
   tokenizer: byLocale({
     default: zhTW,
     "zh-TW": zhTW,
