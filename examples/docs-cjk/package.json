@@ -1,0 +1,29 @@
+{
+  "name": "@kurajs/example-docs-cjk",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "kura dev --no-embed",
+    "build": "kura build --no-embed",
+    "deploy": "kura deploy --no-embed",
+    "verify": "node verify.mjs"
+  },
+  "dependencies": {
+    "@kurajs/docs": "^0.0.13",
+    "@kurajs/search": "^0.0.1",
+    "@kurajs/tokenizers": "^0.0.1",
+    "opencc-js": "^1.0.5",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@kurajs/cli": "^0.0.9",
+    "@tailwindcss/node": "^4.3.1",
+    "@tailwindcss/oxide": "^4.3.1",
+    "@tailwindcss/typography": "^0.5.20",
+    "@types/react": "^19.2.0",
+    "tailwindcss": "^4.3.1",
+    "typescript": "^5.9.0"
+  }
+}
