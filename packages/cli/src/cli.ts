@@ -252,7 +252,7 @@ function findJuneBin(cwd: string): string | null {
 function runJune(cwd: string, args: string[]): Promise<number> {
   const bin = findJuneBin(cwd);
   if (!bin) {
-    console.error("kura: couldn't find the `june` bin — is @junejs/cli installed?");
+    console.error("kura: couldn't find the June runtime — try reinstalling @kurajs/cli.");
     return Promise.resolve(1);
   }
   return new Promise((resolve) => {

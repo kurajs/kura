@@ -4,23 +4,19 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "june dev",
-    "gen": "june gen && kura index",
-    "build": "june gen && kura index && june build",
-    "predev": "june gen && kura index"
+    "dev": "kura dev",
+    "build": "kura build",
+    "deploy": "kura deploy"
   },
   "dependencies": {
-    "@junejs/core": "^0.0.27",
-    "@kurajs/core": "*",
-    "@kurajs/docs": "*",
-    "@kurajs/transformers": "*",
+    "@kurajs/docs": "^0.0.13",
+    "@kurajs/transformers": "^0.0.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
     "@huggingface/transformers": "3.8.1",
-    "@junejs/cli": "^0.0.27",
-    "@junejs/server": "^0.0.27",
+    "@kurajs/cli": "^0.0.9",
     "@tailwindcss/node": "^4.3.1",
     "@tailwindcss/oxide": "^4.3.1",
     "@tailwindcss/typography": "^0.5.20",

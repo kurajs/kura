@@ -1,7 +1,11 @@
 import type { Embedder } from "@kurajs/core";
+import type { I18nConfig } from "@junejs/core/i18n";
 import type { Labels } from "./labels.ts";
 import type { DocLike } from "./nav.ts";
 import { kuraLlms } from "./agent.ts";
+
+/** i18n config shape — re-exported so apps import from @kurajs/docs, not @junejs/core. */
+export type KuraI18nConfig = I18nConfig;
 
 export interface KuraConfig {
   /** URL prefix for doc pages (default `/docs`). Set `""` to mount docs at the site root. The route
@@ -46,9 +50,15 @@ export interface KuraConfig {
   /** Deploy target passed to June (target, worker/function name, custom domain). */
   deploy?: { target?: "workers" | "vercel" | "deno"; name?: string; domain?: string };
   /**
+   * i18n routing config — passed to June and to createDocs(). Define locales and paths here
+   * so both the server router and the docs framework share a single source of truth.
+   * Re-exported as KuraI18nConfig from @kurajs/docs for type-safe inline definitions.
+   */
+  i18n?: KuraI18nConfig;
+  /**
    * Pass-through to defineJune() for advanced June features not yet surfaced by Kura.
    * Example: `june: { clientRouter: true }`. Avoid using this for fields Kura already
-   * covers (site, deploy, agent) — those are merged automatically by kuraJuneConfig().
+   * covers (site, deploy, agent, i18n) — those are merged automatically by kuraJuneConfig().
    */
   june?: Record<string, unknown>;
 }
@@ -76,10 +86,11 @@ export function kuraJuneConfig<T extends DocLike>(
   // Lazy import so @junejs/core is only resolved at runtime (peer dep — always present in a
   // running Kura app, because @kurajs/cli brings in @junejs/cli which brings in @junejs/core).
   // Using a dynamic shape avoids a hard compile-time dep on @junejs/core types here.
-  const { site, deploy, june = {} } = config;
+  const { site, deploy, i18n, june = {} } = config;
   return {
     ...(site ? { site } : {}),
     ...(deploy ? { deploy } : {}),
+    ...(i18n ? { i18n } : {}),
     agent: { enabled: true, llms: kuraLlms({ DOCS: content.DOCS }) },
     ...june,
   };

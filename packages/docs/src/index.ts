@@ -3,7 +3,7 @@ export type { DocLike, Toc, Nav, NavNode } from "./nav.ts";
 export { parseMeta, validatePages, mergeMeta } from "./meta.ts";
 export type { MetaConfig, MetaMap, TabConfig } from "./meta.ts";
 export { defineKura, kuraJuneConfig } from "./config.ts";
-export type { KuraConfig } from "./config.ts";
+export type { KuraConfig, KuraI18nConfig } from "./config.ts";
 export { createSearch, buildIndex, chunk } from "./search.ts";
 export type { SearchData, SearchHit, SearchHandle } from "./search.ts";
 export { createDocs } from "./app.tsx";
