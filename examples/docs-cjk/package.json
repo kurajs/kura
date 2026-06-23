@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "kura dev",
-    "build": "kura build",
-    "deploy": "kura deploy",
+    "dev": "kura dev --no-embed",
+    "build": "kura build --no-embed",
+    "deploy": "kura deploy --no-embed",
     "verify": "node verify.mjs"
   },
   "dependencies": {
