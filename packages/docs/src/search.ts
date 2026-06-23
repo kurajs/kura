@@ -77,27 +77,28 @@ function snippetAround(body: string, query: string): string {
   return body.slice(start, start + 160).trim();
 }
 
-function keywordSearch(index: Bm25<KeywordData>, query: string, limit: number, fetchK = limit * 4): SearchHit[] {
-  // Collapse a slug's locale variants (DOCS carries every locale) into one hit, keeping the
-  // highest-scoring one — otherwise RRF, which fuses by slug, would see the same slug at
-  // several ranks and over-boost it. Fetch `fetchK` rows (default limit*4 for dedup headroom;
-  // a caller that already over-fetched passes fetchK = limit) and keep up to `limit` slugs.
-  const seen = new Set<string>();
-  const out: SearchHit[] = [];
+function keywordSearch(index: Bm25<KeywordData>, query: string, limit: number, fetchK = limit * 4, locale?: string): SearchHit[] {
+  // Collapse a slug's locale variants (DOCS carries every locale) into one hit — otherwise
+  // RRF, which fuses by slug, would see the same slug at several ranks and over-boost it.
+  // Keep the highest-BM25 variant, breaking ties toward the reader's `locale` so the snippet
+  // is same-language (mirrors collapseSemantic). Fetch `fetchK` rows (default limit*4 for
+  // dedup headroom; a caller that already over-fetched passes fetchK = limit).
+  const best = new Map<string, { hit: SearchHit; score: number }>();
   for (const h of index.search(query, { topK: fetchK })) {
-    if (seen.has(h.data.slug)) continue;
-    seen.add(h.data.slug);
-    out.push({
+    const hit: SearchHit = {
       slug: h.data.slug,
       title: h.data.title,
       section: h.data.section,
       text: snippetAround(h.data.body, query),
       score: Number(h.score.toFixed(3)),
       ...(h.data.locale ? { locale: h.data.locale } : {}),
-    });
-    if (out.length >= limit) break;
+    };
+    const prev = best.get(h.data.slug);
+    if (!prev) { best.set(h.data.slug, { hit, score: h.score }); continue; }
+    const prefer = h.score > prev.score || (!!locale && h.data.locale === locale && prev.hit.locale !== locale && h.score >= prev.score);
+    if (prefer) best.set(h.data.slug, { hit, score: h.score });
   }
-  return out;
+  return [...best.values()].sort((a, b) => b.score - a.score).slice(0, limit).map((e) => e.hit);
 }
 
 // Collapse a vector search's many per-chunk hits into one ranked hit per slug.
@@ -136,7 +137,7 @@ export function createSearch(opts: {
     let index: Bm25<KeywordData> | null = null;
     return {
       getKb: async () => null,
-      search: async (query, o) => keywordSearch((index ??= buildKeywordIndex(opts.entries)), query, o?.topK ?? 8),
+      search: async (query, o) => keywordSearch((index ??= buildKeywordIndex(opts.entries)), query, o?.topK ?? 8, undefined, o?.locale),
     };
   }
   const embedder = opts.embedder;
@@ -157,7 +158,7 @@ export function createSearch(opts: {
     const depth = topK * 4; // over-fetch from each side so RRF has rank signal to fuse
     const kb = await getKb();
     const semantic = collapseSemantic(await kb.searchText(query, { topK: depth }), o?.locale);
-    const keywordHits = keywordSearch(getKeyword(), query, depth, depth); // caller already over-fetched
+    const keywordHits = keywordSearch(getKeyword(), query, depth, depth, o?.locale); // caller already over-fetched
     // Hybrid: keyword precision (exact terms) + semantic / cross-lingual recall, fused by
     // rank so BM25 scores and cosine similarities don't need to be comparable. Keyword first
     // so a doc found by both lists keeps the query-term snippet; semantic-only hits keep their chunk.

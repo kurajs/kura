@@ -49,6 +49,17 @@ test("keyword search ranks the doc with the rare query term first", async () => 
   assert.equal(hits[0]?.slug, "b");
 });
 
+test("keyword-only search breaks same-slug locale ties toward the reader's locale", async () => {
+  // Identical bodies → identical BM25 scores → tie; the reader's locale variant should win.
+  const docs = [
+    { slug: "p", locale: "en", data: { title: "P", section: "" }, body: "alpha alpha alpha beta gamma" },
+    { slug: "p", locale: "ja", data: { title: "P", section: "" }, body: "alpha alpha alpha beta gamma" },
+  ] as unknown as DocLike[];
+  const search = createSearch({ entries: docs }); // no embedder → keyword path
+  assert.equal((await search.search("alpha", { locale: "ja" }))[0]?.locale, "ja");
+  assert.equal((await search.search("alpha", { locale: "en" }))[0]?.locale, "en");
+});
+
 test("keyword snippet lands on a whole-token match, not a substring inside a word", async () => {
   const body =
     "A long preamble of filler so the start-of-doc snippet is clearly different here indeed. " +
