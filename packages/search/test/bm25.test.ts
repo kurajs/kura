@@ -49,6 +49,12 @@ test("length normalization: a focused short doc beats a long diluted one", () =>
   assert.equal(bm.search("kubernetes")[0]?.id, "short");
 });
 
+test("a negative topK returns no hits (not slice's drop-last behavior)", () => {
+  const bm = Bm25.from([{ id: "a", text: "x" }, { id: "b", text: "x" }, { id: "c", text: "x" }]);
+  assert.deepEqual(bm.search("x", { topK: -1 }), []);
+  assert.equal(bm.search("x", { topK: 1.9 }).length, 1);
+});
+
 test("empty index and no-match queries are safe", () => {
   assert.deepEqual(new Bm25().search("anything"), []);
   const bm = Bm25.from([{ id: "a", text: "hello world" }]);

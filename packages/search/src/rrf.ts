@@ -34,7 +34,7 @@ export interface RrfHit<T> {
  * whose payload you'd rather display (e.g. the keyword snippet) first.
  */
 export function rrfScored<T>(lists: readonly RrfList<T>[], idOf: (hit: T) => string, opts: RrfOptions = {}): RrfHit<T>[] {
-  const k = opts.k ?? 60;
+  const k = Math.max(0, opts.k ?? 60); // keep the 1/(k+rank+1) denominator positive
   const score = new Map<string, number>();
   const rep = new Map<string, T>();
   for (const list of lists) {
@@ -47,7 +47,10 @@ export function rrfScored<T>(lists: readonly RrfList<T>[], idOf: (hit: T) => str
     }
   }
   const fused = [...score.entries()].sort((a, b) => b[1] - a[1]);
-  const sliced = opts.topK != null ? fused.slice(0, opts.topK) : fused;
+  // Normalize topK to a non-negative integer so a negative/float value can't hit slice()'s
+  // surprising semantics (e.g. slice(0, -1) would drop the last item instead of returning none).
+  const limit = opts.topK != null ? Math.max(0, Math.floor(opts.topK)) : undefined;
+  const sliced = limit != null ? fused.slice(0, limit) : fused;
   return sliced.map(([id, s]) => ({ item: rep.get(id) as T, score: s }));
 }
 

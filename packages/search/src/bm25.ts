@@ -119,7 +119,9 @@ export class Bm25<M = unknown> {
       }
     }
 
-    const topK = opts.topK ?? 10;
+    // Normalize topK to a non-negative integer; a negative/float value would hit slice()'s
+    // surprising semantics (slice(0, -1) drops the last item rather than returning none).
+    const topK = Math.max(0, Math.floor(opts.topK ?? 10));
     return [...scores.entries()]
       .sort((a, b) => b[1] - a[1])
       .slice(0, topK)

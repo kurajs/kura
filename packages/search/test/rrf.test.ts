@@ -42,6 +42,12 @@ test("empty input is safe", () => {
   assert.deepEqual(rrfScored([], (h: { id: string }) => h.id), []);
 });
 
+test("a negative or fractional topK is normalized (no slice(0,-1) surprise)", () => {
+  const l = [{ hits: [{ id: "a" }, { id: "b" }, { id: "c" }] }];
+  assert.deepEqual(rrf(l, (h) => h.id, { topK: -1 }), []); // not "drop the last item"
+  assert.equal(rrf(l, (h) => h.id, { topK: 1.9 }).length, 1); // floored
+});
+
 test("rrfScored returns fused scores in descending order, matching rrf's items", () => {
   const kw = [{ id: "a" }, { id: "b" }];
   const sem = [{ id: "b" }, { id: "c" }];
