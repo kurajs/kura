@@ -4,6 +4,7 @@
 // agents", and the shared grounding both Kura agents (maintainer + reader) build on. See
 // docs/kura-agent-architecture.md. NOTE: read-only by design — writes go through reviewed PRs.
 import { defineAction } from "@junejs/core/agent";
+export { defineAction } from "@junejs/core/agent";
 import type { SearchHandle } from "./search.ts";
 import type { DocLike } from "./nav.ts";
 

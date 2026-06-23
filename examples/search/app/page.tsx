@@ -1,4 +1,4 @@
-import type { Loaded } from "@junejs/core/route";
+import type { Loaded } from "@kurajs/docs";
 import { getKb, docCount } from "./kb";
 import "./actions"; // register defineAction()s (search_docs) into the agent/MCP registry
 

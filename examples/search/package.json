@@ -4,20 +4,19 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "june dev",
-    "build": "june build"
+    "dev": "kura dev",
+    "build": "kura build"
   },
   "dependencies": {
-    "@junejs/core": "^0.0.27",
-    "@kurajs/core": "*",
-    "@kurajs/transformers": "*",
+    "@junejs/server": "^0.0.39",
+    "@kurajs/docs": "^0.0.14",
+    "@kurajs/transformers": "^0.0.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
-    "@junejs/cli": "^0.0.27",
-    "@junejs/server": "^0.0.27",
     "@huggingface/transformers": "3.8.1",
+    "@kurajs/cli": "^0.0.9",
     "@types/react": "^19.2.0",
     "typescript": "^5.9.0"
   }

@@ -1,7 +1,7 @@
 // Agent tools. One defineAction() = a UI/server action AND an MCP tool at /mcp,
 // behind a single auth gate. search_docs shares the same KB + embedder as the
 // human-facing search route — one source, zero drift.
-import { defineAction } from "@junejs/core/agent";
+import { defineAction } from "@kurajs/docs/actions";
 import { getKb } from "./kb";
 
 export const search_docs = defineAction({
