@@ -77,13 +77,14 @@ function snippetAround(body: string, query: string): string {
   return body.slice(start, start + 160).trim();
 }
 
-function keywordSearch(index: Bm25<KeywordData>, query: string, topK: number): SearchHit[] {
+function keywordSearch(index: Bm25<KeywordData>, query: string, limit: number, fetchK = limit * 4): SearchHit[] {
   // Collapse a slug's locale variants (DOCS carries every locale) into one hit, keeping the
   // highest-scoring one — otherwise RRF, which fuses by slug, would see the same slug at
-  // several ranks and over-boost it. Over-fetch so dedup still yields up to topK slugs.
+  // several ranks and over-boost it. Fetch `fetchK` rows (default limit*4 for dedup headroom;
+  // a caller that already over-fetched passes fetchK = limit) and keep up to `limit` slugs.
   const seen = new Set<string>();
   const out: SearchHit[] = [];
-  for (const h of index.search(query, { topK: topK * 4 })) {
+  for (const h of index.search(query, { topK: fetchK })) {
     if (seen.has(h.data.slug)) continue;
     seen.add(h.data.slug);
     out.push({
@@ -94,7 +95,7 @@ function keywordSearch(index: Bm25<KeywordData>, query: string, topK: number): S
       score: Number(h.score.toFixed(3)),
       ...(h.data.locale ? { locale: h.data.locale } : {}),
     });
-    if (out.length >= topK) break;
+    if (out.length >= limit) break;
   }
   return out;
 }
@@ -156,7 +157,7 @@ export function createSearch(opts: {
     const depth = topK * 4; // over-fetch from each side so RRF has rank signal to fuse
     const kb = await getKb();
     const semantic = collapseSemantic(await kb.searchText(query, { topK: depth }), o?.locale);
-    const keywordHits = keywordSearch(getKeyword(), query, depth);
+    const keywordHits = keywordSearch(getKeyword(), query, depth, depth); // caller already over-fetched
     // Hybrid: keyword precision (exact terms) + semantic / cross-lingual recall, fused by
     // rank so BM25 scores and cosine similarities don't need to be comparable. Keyword first
     // so a doc found by both lists keeps the query-term snippet; semantic-only hits keep their chunk.
