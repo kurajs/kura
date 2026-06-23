@@ -280,7 +280,28 @@ function runKuraIndex(cwd: string): Promise<number> {
   });
 }
 
+// Generate june.config.ts from kura.config.ts so June can boot.
+// Users never edit this file — it's a generated shim that calls kuraJuneConfig().
+// Written before `june gen` so it exists when June reads it; the DOCS import it
+// references is created by `june gen` and only evaluated when June starts.
+function generateJuneConfig(cwd: string): void {
+  const kuraConfigPath = path.join(cwd, "kura.config.ts");
+  if (!fs.existsSync(kuraConfigPath)) return; // not a kura app, skip
+  const juneConfigPath = path.join(cwd, "june.config.ts");
+  const contents =
+    "// @kura-generated — do not edit. Configure your site in kura.config.ts instead.\n" +
+    'import { kuraJuneConfig } from "@kurajs/docs";\n' +
+    'import kuraConfig from "./kura.config.ts";\n' +
+    'import { DOCS } from "./app/_content";\n' +
+    "\n" +
+    "export default kuraJuneConfig(kuraConfig, { DOCS });\n";
+  if (!fs.existsSync(juneConfigPath) || fs.readFileSync(juneConfigPath, "utf8") !== contents) {
+    fs.writeFileSync(juneConfigPath, contents);
+  }
+}
+
 async function freeze(cwd: string): Promise<void> {
+  generateJuneConfig(cwd); // write june.config.ts from kura.config.ts
   let code = await runJune(cwd, ["gen"]); // june gen → app/_content.ts
   if (code) process.exit(code);
   code = await runKuraIndex(cwd); // kura index → app/_index.ts + _mdx.ts (own process)
