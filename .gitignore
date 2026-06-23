@@ -17,13 +17,5 @@ dist/
 # local databases
 *.db
 
-# benchmark data & vendored binaries (regenerable / external datasets)
-*.f32
-*.a
-*.tar.gz
-prototypes/**/drcd/
-prototypes/**/wasm-probe/
-prototypes/**/*.bin
-
 # local-only dev helpers (machine-specific paths/links; never committed)
 *.local.*
