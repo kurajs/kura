@@ -25,14 +25,12 @@ function walk(dir, acc = []) {
 }
 const records = walk(root).map((file) => {
   const raw = fs.readFileSync(file, "utf8");
-  // Strip frontmatter + inline markdown the way the docs build (stripMdx) does — emphasis
-  // markers must be removed WITHOUT inserting spaces, so 繁中 stays contiguous and segments
-  // as whole words (**程式**設計 → 程式設計, not 程式 / 設計).
-  const body = raw
-    .replace(/^---[\s\S]*?---/, "")
-    .replace(/^#{1,6}\s+/gm, "")
-    .replace(/[*`_]/g, "")
-    .trim();
+  // The app indexes each doc's body (frontmatter already parsed into `data`) after stripMdx,
+  // which only removes JSX/MDX component tags — it does NOT strip emphasis or headings. So we
+  // mirror that: strip just the frontmatter to recover the body, and otherwise leave Markdown
+  // intact. (This is why the demo content avoids `**` around CJK keywords: emphasis markers
+  // survive stripMdx and would split a term when the tokenizer runs.)
+  const body = raw.replace(/^---[\s\S]*?---/, "").trim();
   const title = (raw.match(/title:\s*(.+)/)?.[1] ?? file).trim();
   const rel = path.relative(root, file);
   const lang = rel.startsWith("ja-JP/") ? "ja" : "zh-TW"; // default locale = zh-TW
