@@ -6,14 +6,14 @@
 import type { Tokenizer } from "./tokenize.ts";
 import { latinTokenizer } from "./tokenize.ts";
 
-export interface Bm25Record<M = unknown> {
+export type Bm25Record<M = unknown> = {
   /** Stable identifier returned by search. */
   id: string;
   /** Text to index for this record. */
   text: string;
-  /** Arbitrary payload returned with each hit. */
-  data?: M;
-}
+} & (undefined extends M
+  ? { /** Arbitrary payload returned with each hit. */ data?: M }
+  : { /** Payload returned with each hit (required because `M` excludes `undefined`). */ data: M });
 
 export interface Bm25Hit<M = unknown> {
   id: string;

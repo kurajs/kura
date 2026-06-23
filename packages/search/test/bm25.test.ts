@@ -30,6 +30,17 @@ test("returns the payload and respects topK", () => {
   assert.deepEqual(hits[0]?.data, { n: 1 });
 });
 
+test("data is optional for the untyped (unknown) payload, carried through when typed", () => {
+  // unknown payload → data may be omitted; hit.data is undefined at runtime
+  const untyped = Bm25.from([{ id: "a", text: "hello world" }]);
+  assert.equal(untyped.search("hello")[0]?.data, undefined);
+  // typed payload (M excludes undefined) → data is carried through
+  const typed = Bm25.from<{ url: string }>([{ id: "a", text: "hello", data: { url: "/a" } }]);
+  assert.deepEqual(typed.search("hello")[0]?.data, { url: "/a" });
+  // (The compile-time guarantee — `data` required when M excludes undefined — is enforced by
+  //  tsc building src + the typed Bm25.from call sites in @kurajs/docs, not at strip-types runtime.)
+});
+
 test("length normalization: a focused short doc beats a long diluted one", () => {
   const bm = Bm25.from([
     { id: "short", text: "kubernetes" },

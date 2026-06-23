@@ -2,7 +2,7 @@
 // load/serve it at runtime. Encapsulates chunking + the Kb engine + embedder.
 import { Kb } from "@kurajs/core";
 import type { Embedder, KbHit } from "@kurajs/core";
-import { Bm25, rrf } from "@kurajs/search";
+import { Bm25, rrfScored, latinTokenizer } from "@kurajs/search";
 import type { DocLike } from "./nav.ts";
 import { stripMdx } from "./util.ts";
 
@@ -67,7 +67,9 @@ function buildKeywordIndex(entries: readonly DocLike[]): Bm25<KeywordData> {
 function snippetAround(body: string, query: string): string {
   const lc = body.toLowerCase();
   let firstAt = -1;
-  for (const t of query.toLowerCase().split(/\s+/).filter(Boolean)) {
+  // Tokenize the query the same way BM25 does, so the snippet lands on a term that
+  // actually matched (whitespace-splitting would miss "node.js" → "node"/"js" etc.).
+  for (const t of latinTokenizer(query)) {
     const at = lc.indexOf(t);
     if (at >= 0 && (firstAt < 0 || at < firstAt)) firstAt = at;
   }
@@ -147,7 +149,10 @@ export function createSearch(opts: {
     // Hybrid: keyword precision (exact terms) + semantic / cross-lingual recall, fused by
     // rank so BM25 scores and cosine similarities don't need to be comparable. Keyword first
     // so a doc both find share the query-term snippet; semantic-only hits keep their chunk.
-    return rrf<SearchHit>([{ hits: keywordHits }, { hits: semantic }], (h) => h.slug, { topK });
+    // Use the fused RRF score for `score` so it's consistent with the returned ordering (the
+    // per-list BM25/cosine score on the representative hit would not be).
+    return rrfScored<SearchHit>([{ hits: keywordHits }, { hits: semantic }], (h) => h.slug, { topK })
+      .map(({ item, score }) => ({ ...item, score: Number(score.toFixed(4)) }));
   };
 
   return { getKb, search };

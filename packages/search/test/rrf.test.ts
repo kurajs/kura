@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { rrf } from "../src/rrf.ts";
+import { rrf, rrfScored } from "../src/rrf.ts";
 
 const ids = (xs: { id: string }[]) => xs.map((x) => x.id);
 
@@ -39,4 +39,19 @@ test("topK truncates the fused result", () => {
 test("empty input is safe", () => {
   assert.deepEqual(rrf([], (h: { id: string }) => h.id), []);
   assert.deepEqual(rrf([{ hits: [] }], (h: { id: string }) => h.id), []);
+  assert.deepEqual(rrfScored([], (h: { id: string }) => h.id), []);
+});
+
+test("rrfScored returns fused scores in descending order, matching rrf's items", () => {
+  const kw = [{ id: "a" }, { id: "b" }];
+  const sem = [{ id: "b" }, { id: "c" }];
+  const lists = [{ hits: kw }, { hits: sem }];
+  const scored = rrfScored(lists, (h) => h.id);
+  // monotonically non-increasing scores
+  for (let i = 1; i < scored.length; i++) assert.ok(scored[i - 1]!.score >= scored[i]!.score);
+  // b appears in both lists → top fused score; exact RRF value (k=60)
+  assert.equal(scored[0]!.item.id, "b");
+  assert.ok(Math.abs(scored[0]!.score - (1 / (60 + 2) + 1 / (60 + 1))) < 1e-12);
+  // rrf() is rrfScored() without the scores, same order
+  assert.deepEqual(rrf(lists, (h) => h.id), scored.map((r) => r.item));
 });
