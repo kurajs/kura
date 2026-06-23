@@ -7,13 +7,20 @@ test("latinTokenizer lowercases and splits on non-alphanumerics", () => {
   assert.deepEqual(latinTokenizer("Hello, World! 42"), ["hello", "world", "42"]);
 });
 
-test("byLocale resolves exact tag, primary subtag, then default", () => {
-  const ja: (s: string) => string[] = (s) => ["JA:" + s];
-  const r = byLocale({ default: latinTokenizer, ja });
-  assert.deepEqual(r("ja")("x"), ["JA:x"]);
-  assert.deepEqual(r("ja-JP")("x"), ["JA:x"]); // primary subtag
-  assert.deepEqual(r("en")("A b"), ["a", "b"]); // falls to default
-  assert.deepEqual(r(undefined)("A b"), ["a", "b"]);
+test("byLocale resolves exact tag, primary subtag, then default (case-insensitive)", () => {
+  const zh: (s: string) => string[] = (s) => ["ZH:" + s];
+  // specific-tag registration: matched case-insensitively (BCP 47 tags are case-insensitive)
+  const r1 = byLocale({ default: latinTokenizer, "zh-TW": zh });
+  assert.deepEqual(r1("zh-TW")("x"), ["ZH:x"]);
+  assert.deepEqual(r1("zh-tw")("x"), ["ZH:x"]); // lowercased query
+  assert.deepEqual(r1("ZH-TW")("x"), ["ZH:x"]); // uppercased query
+  assert.deepEqual(r1("zh")("A b"), ["a", "b"]); // bare primary ≠ a specific-tag registration
+  // primary-tag registration: a regional query falls back to it
+  const r2 = byLocale({ default: latinTokenizer, zh });
+  assert.deepEqual(r2("zh")("x"), ["ZH:x"]);
+  assert.deepEqual(r2("ZH-Hant-TW")("x"), ["ZH:x"]); // primary subtag, any case
+  assert.deepEqual(r2("en")("A b"), ["a", "b"]); // falls to default
+  assert.deepEqual(r2(undefined)("A b"), ["a", "b"]);
 });
 
 test("pipeline composes pre-filters, segmenter, and token filters", () => {

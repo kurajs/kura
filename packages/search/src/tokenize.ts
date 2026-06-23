@@ -31,10 +31,15 @@ export const latinTokenizer: Tokenizer = (text) =>
  * (falling back to {@link latinTokenizer}).
  */
 export function byLocale(map: Record<string, Tokenizer> & { default?: Tokenizer }): TokenizerResolver {
+  // BCP 47 language tags are case-insensitive, so normalize both the keys and the lookup
+  // to lowercase — byLocale({ "zh-TW": t })("zh-tw") must resolve.
   const fallback = map.default ?? latinTokenizer;
+  const byTag = new Map<string, Tokenizer>();
+  for (const [k, v] of Object.entries(map)) if (k !== "default") byTag.set(k.toLowerCase(), v);
   return (lang) => {
     if (!lang) return fallback;
-    return map[lang] ?? map[lang.split("-")[0]!] ?? fallback;
+    const l = lang.toLowerCase();
+    return byTag.get(l) ?? byTag.get(l.split("-")[0]!) ?? fallback;
   };
 }
 
