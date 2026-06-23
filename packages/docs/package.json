@@ -1,6 +1,6 @@
 {
   "name": "@kurajs/docs",
-  "version": "0.0.11",
+  "version": "0.0.12",
   "type": "module",
   "description": "Kura — the docs framework on June. Sidebar, ToC, search, copy-markdown, and the agent surface (MCP) for a knowledgebase that serves humans and agents.",
   "exports": {
@@ -36,7 +36,8 @@
   },
   "files": [
     "dist",
-    "css"
+    "css",
+    "tsconfig.kura.json"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
