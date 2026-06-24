@@ -125,7 +125,9 @@ export function DocsShell({ site, sidebar, tabs, active, toc, basePath = "/docs"
       <header className="sticky top-0 z-20 flex items-center gap-4 h-14 px-5 bg-topbar-bg backdrop-blur-sm border-b border-border max-md:px-4 max-md:gap-2.5">
         <a className="flex items-center gap-1.5 font-bold text-[1.05rem]" href={href("/")}>{brand} <span className="font-normal text-muted text-[.85rem]">Docs</span></a>
         <form className="ml-auto max-md:ml-2 max-md:flex-1 max-md:min-w-0" method="get" action={href("/search")}>
-          <input className="w-[280px] max-w-[40vw] px-3 py-2 text-[.9rem] border border-border rounded-lg bg-surface-2 text-fg max-md:w-full max-md:max-w-none search-box" name="q" placeholder={labels.searchPlaceholder} aria-label={labels.search} />
+          {/* Real, submittable field for the no-JS floor; @kurajs/docs/client upgrades it into the
+              ⌘K palette (reading the data-* below for the JSON endpoint + locale-resolved doc base). */}
+          <input className="w-[280px] max-w-[40vw] px-3 py-2 text-[.9rem] border border-border rounded-lg bg-surface-2 text-fg max-md:w-full max-md:max-w-none search-box" name="q" placeholder={labels.searchPlaceholder} aria-label={labels.search} data-search-endpoint={`${href("/search")}.json`} data-doc-base={href(docPath(basePath, ""))} />
         </form>
         <nav className="flex items-center gap-4 text-muted text-[.9rem]">
           {localeSwitch && localeSwitch.length > 1 && currentLang && (
@@ -288,7 +290,10 @@ export function SearchResults({ query, hits, basePath = "/docs", labels = DEFAUL
 const THEME_INIT_JS = `(function(){try{var p=localStorage.getItem('kura-theme')||'system';var d=document.documentElement;d.setAttribute('data-theme-pref',p);d.setAttribute('data-theme',(p==='dark'||(p==='system'&&matchMedia('(prefers-color-scheme:dark)').matches))?'dark':'light');}catch(e){}})();`;
 // The topbar toggle cycles system → light → dark, persists the pref, and tracks the OS while on system.
 const THEME_TOGGLE_JS = `(function(){var b=document.querySelector('[data-theme-toggle]');if(!b)return;var d=document.documentElement,order=['system','light','dark'],icon={system:'🖥',light:'☀',dark:'☾'};function pref(){return d.getAttribute('data-theme-pref')||'system';}function res(p){return p==='dark'||(p==='system'&&matchMedia('(prefers-color-scheme:dark)').matches)?'dark':'light';}function set(p){d.setAttribute('data-theme-pref',p);d.setAttribute('data-theme',res(p));try{localStorage.setItem('kura-theme',p);}catch(e){}b.textContent=icon[p];b.setAttribute('title','Theme: '+p);}set(pref());b.addEventListener('click',function(){set(order[(order.indexOf(pref())+1)%order.length]);});try{matchMedia('(prefers-color-scheme:dark)').addEventListener('change',function(){if(pref()==='system')d.setAttribute('data-theme',res('system'));});}catch(e){}})();`;
-const FOCUS_JS = `document.addEventListener('keydown',function(e){if(e.key==='/' && !/INPUT|TEXTAREA/.test((document.activeElement||{}).tagName||'')){e.preventDefault();var s=document.querySelector('.search-box');if(s)s.focus();}});`;
+// "/" focuses the search box — the no-JS-module floor. Once @kurajs/docs/client enhances the
+// box into the ⌘K palette it sets <html data-ctrlk>, and this hands "/" off to the palette
+// (which binds "/" itself) instead of focusing the now-readonly trigger.
+const FOCUS_JS = `document.addEventListener('keydown',function(e){if(e.key==='/' && !document.documentElement.dataset.ctrlk && !/INPUT|TEXTAREA/.test((document.activeElement||{}).tagName||'')){e.preventDefault();var s=document.querySelector('.search-box');if(s)s.focus();}});`;
 // Dropdown menus (<details data-menu> — language switcher, page-actions): native open; close on
 // outside-click / Escape, and after activating an item (a link, or the copy button — deferred so the
 // copy handler runs first).

@@ -293,11 +293,16 @@ export function createDocs<T extends DocLike>(opts: {
   };
 
   const searchRoute = {
-    loader: async (ctx: SearchCtx): Promise<{ q: string; hits: SearchHit[]; locale?: string }> => {
+    loader: async (ctx: SearchCtx): Promise<{ q: string; hits: SearchHit[]; tokens: string[]; locale?: string }> => {
       const q = (ctx.url.searchParams.get("q") ?? "").trim();
-      return { q, hits: q ? await search.search(q, { topK: 8, locale: ctx.locale }) : [], locale: ctx.locale };
+      // `mode=keyword` → instant BM25 only (no ~200ms query embed), for per-keystroke typeahead;
+      // the default (page load / on submit) runs full hybrid. `tokens` are the exact terms the
+      // keyword index matched on, so a client highlights the same spans (CJK-correct).
+      const mode = ctx.url.searchParams.get("mode") === "keyword" ? "keyword" as const : undefined;
+      const hits = q ? await search.search(q, { topK: 8, locale: ctx.locale, mode }) : [];
+      return { q, hits, tokens: q ? search.tokensOf(q, ctx.locale) : [], locale: ctx.locale };
     },
-    View: (d: { q: string; hits: SearchHit[]; locale?: string }) => {
+    View: (d: { q: string; hits: SearchHit[]; tokens: string[]; locale?: string }) => {
       const qs = d.q ? `?q=${encodeURIComponent(d.q)}` : "";
       return (
         <DocsShell
@@ -313,7 +318,7 @@ export function createDocs<T extends DocLike>(opts: {
         </DocsShell>
       );
     },
-    json: (d: { q: string; hits: SearchHit[] }) => ({ q: d.q, hits: d.hits }),
+    json: (d: { q: string; hits: SearchHit[]; tokens: string[] }) => ({ q: d.q, hits: d.hits, tokens: d.tokens }),
     metadata: { title: "Search" },
   };
 

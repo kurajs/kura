@@ -13,6 +13,7 @@ dist/
 **/app/_meta.ts
 **/app/_index.bin
 **/app/_mdx.json
+**/app/_islands.gen.ts
 
 # local databases
 *.db

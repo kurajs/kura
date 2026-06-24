@@ -1,0 +1,44 @@
+{
+  "name": "@kurajs/ctrlk",
+  "version": "0.0.2",
+  "type": "module",
+  "description": "Kura — ⌘K command palette: a headless, zero-dependency command/search menu with a built-in default renderer. Framework-agnostic (vanilla DOM); mirrors cmdk's model & accessibility without React.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --experimental-strip-types --test test/*.test.ts"
+  },
+  "keywords": [
+    "kura",
+    "june",
+    "command-palette",
+    "cmdk",
+    "ctrl-k",
+    "command-menu",
+    "search",
+    "headless",
+    "a11y"
+  ],
+  "homepage": "https://kura.build",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  },
+  "author": "Lawrence Lin",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kurajs/kura.git",
+    "directory": "packages/ctrlk"
+  }
+}

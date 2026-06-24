@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createSearch } from "../src/search.ts";
+import { createSearch, splitByHeadings } from "../src/search.ts";
 import type { DocLike } from "../src/nav.ts";
 import type { Embedder } from "@kurajs/core";
 
@@ -107,6 +107,61 @@ test("keyword snippet handles CJK queries (no whitespace word boundaries)", asyn
   const hits = await createSearch({ entries }).search("向量搜尋", { locale: "zh-TW" });
   assert.equal(hits[0]?.slug, "z");
   assert.ok(hits[0]!.text.includes("向量搜尋"), "CJK snippet should land on the matched term");
+});
+
+test("splitByHeadings splits on ##/###, keeps an intro section, and ignores fenced code", () => {
+  const body = [
+    "Intro paragraph before any heading.",
+    "## Installation",
+    "Run the installer.",
+    "```sh",
+    "## not a heading (inside a fence)",
+    "```",
+    "### Advanced",
+    "Tweak the config.",
+  ].join("\n");
+  const secs = splitByHeadings(body);
+  assert.deepEqual(secs.map((s) => s.headingId), ["", "installation", "advanced"]);
+  assert.equal(secs[1]!.heading, "Installation");
+  assert.ok(secs[1]!.text.includes("not a heading"), "fenced ## stays in its section, not split out");
+  // empty body → a single intro section (never zero), so every doc indexes at least once
+  assert.deepEqual(splitByHeadings("").map((s) => s.headingId), [""]);
+});
+
+test("keyword search returns the matching heading's anchor for deep-linking", async () => {
+  const doc = [{
+    slug: "guide",
+    data: { title: "Guide", section: "Docs" },
+    body: [
+      "Overview of the whole guide and what it covers.",
+      "## Installation",
+      "Install the package and set the binary path.",
+      "## Deployment",
+      "Deploy to the edge with workers, configure routes and secrets.",
+    ].join("\n"),
+  }] as unknown as DocLike[];
+  const hits = await createSearch({ entries: doc }).search("deployment edge workers");
+  assert.equal(hits[0]?.slug, "guide");
+  assert.equal(hits[0]?.headingId, "deployment"); // aligns with nav.slugify → #deployment exists
+  assert.equal(hits[0]?.heading, "Deployment");
+});
+
+test("maxPerPage caps how many headings of one page appear in the results", async () => {
+  const body = ["alpha intro", "## A", "alpha one", "## B", "alpha two", "## C", "alpha three", "## D", "alpha four"].join("\n");
+  const doc = [{ slug: "p", data: { title: "P", section: "" }, body }] as unknown as DocLike[];
+  const hits = await createSearch({ entries: doc }).search("alpha", { topK: 8, maxPerPage: 2 });
+  assert.equal(hits.filter((h) => h.slug === "p").length, 2);
+});
+
+test("mode:'keyword' returns results without embedding the query (typeahead fast path)", async () => {
+  let embeds = 0;
+  const base = fakeEmbedder(["alpha"]);
+  const counting: Embedder = { ...base, embed: async (t) => { embeds++; return base.embed(t); } };
+  const doc = [{ slug: "p", data: { title: "Alpha guide", section: "" }, body: "alpha is covered here in this section thoroughly" }] as unknown as DocLike[];
+  const search = createSearch({ entries: doc, embedder: counting, warm: false });
+  const hits = await search.search("alpha", { mode: "keyword" });
+  assert.equal(hits[0]?.slug, "p");
+  assert.equal(embeds, 0, "keyword mode must not embed the query");
 });
 
 test("hybrid (embedder) fuses keyword + semantic and de-dups locale variants by slug", async () => {
