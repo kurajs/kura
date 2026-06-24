@@ -126,3 +126,31 @@ export async function mdxToHtml(source: string, components: Record<string, unkno
   cache.set(source, html);
   return html;
 }
+
+/** A page whose MDX failed to compile (e.g. an unfenced `{…}` MDX reads as a JS expression, or a
+ *  stray `<tag>`). It's left out of the map → the app falls back to plain-markdown HTML at runtime.
+ *  The caller MUST surface these: a silently dropped page is the worst failure mode (no error, no
+ *  filename — the author finds out in production). */
+export type MdxFailure = { bucket: string; slug: string; error: string };
+
+/** Compile every entry's MDX, bucketed (`default` + one per locale), COLLECTING per-page failures
+ *  instead of throwing. Centralizes "render all, report what broke" so the render count and the
+ *  loud per-page warning can't drift — and so the silent-drop regression is unit-testable. */
+export async function renderMdxBuckets(
+  buckets: { bucket: string; entries: { slug: string; body: string }[] }[],
+  components: Record<string, unknown> = mdxComponents,
+): Promise<{ map: Record<string, Record<string, string>>; failures: MdxFailure[] }> {
+  const map: Record<string, Record<string, string>> = {};
+  const failures: MdxFailure[] = [];
+  for (const { bucket, entries } of buckets) {
+    map[bucket] ??= {};
+    for (const e of entries) {
+      try {
+        map[bucket]![e.slug] = await mdxToHtml(e.body, components);
+      } catch (err) {
+        failures.push({ bucket, slug: e.slug, error: (err as Error).message });
+      }
+    }
+  }
+  return { map, failures };
+}

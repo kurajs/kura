@@ -50,7 +50,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "node --experimental-strip-types --test test/*.test.ts"
+    "test": "node --experimental-strip-types --test test/*.test.ts && bun test test/jsx/"
   },
   "keywords": [
     "kura",

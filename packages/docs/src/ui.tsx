@@ -30,7 +30,8 @@ const ROW = "flex items-center gap-1.5 leading-6 px-2 py-1.5 rounded-md text-sm"
  *  a folder → <details> whose children are a nested <ul>. A folder with an index renders its title as
  *  a link (clicking navigates to the folder's page); the chevron still toggles. The `folder`/
  *  `folder-title` classes are the component-CSS hooks (chevron ::after + marker hide live in preset). */
-function SidebarItems({ items, active, href, basePath, nested = false }: { items: SidebarNode[]; active?: string; href: Href; basePath: string; nested?: boolean }) {
+// Exported for tests (i18n nav-link regression: every link must route through `href`).
+export function SidebarItems({ items, active, href, basePath, nested = false }: { items: SidebarNode[]; active?: string; href: Href; basePath: string; nested?: boolean }) {
   return (
     <ul className={"flex flex-col gap-px" + (nested ? " mt-px ml-2 pl-2.5 border-l border-border" : "")}>
       {items.map((n) =>
