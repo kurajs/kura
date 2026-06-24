@@ -227,7 +227,10 @@ async function cmdIndex(): Promise<void> {
   // LOUD per-page failures: a page that fails MDX is silently dropped to plain-markdown html, so the
   // author never learns it broke unless we say so. Print slug + the first error line — NEVER swallow.
   for (const f of failures) {
-    console.error(`kura index: ⚠ MDX failed for "${f.slug}"${f.bucket !== "default" ? ` [${f.bucket}]` : ""} — ${f.error.split("\n")[0]} (renders as plain markdown; wrap any literal {…}/<…> in backticks, or set markdown: "commonmark")`);
+    // In commonmark mode the "set markdown: commonmark" hint is already in effect — drop it and just
+    // name the renderer that failed (a commonmark failure is a genuine parse error, not the {…} footgun).
+    const hint = commonmark ? "" : `; wrap any literal {…}/<…> in backticks, or set markdown: "commonmark"`;
+    console.error(`kura index: ⚠ ${commonmark ? "CommonMark" : "MDX"} failed for "${f.slug}"${f.bucket !== "default" ? ` [${f.bucket}]` : ""} — ${f.error.split("\n")[0]} (renders as plain markdown${hint})`);
   }
   // Count ATTEMPTS (not map size): a dropped page isn't in the map, so map size == ok and the ratio
   // would always read N/N — hiding the fallbacks and disagreeing with the "(N docs)" up-to-date line.
