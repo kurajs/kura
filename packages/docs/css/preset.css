@@ -143,8 +143,41 @@
 /* Sidebar folder chevron: a right-pointing caret that rotates down when open (sits after the label). */
 .folder-title { list-style: none; }
 .folder-title::-webkit-details-marker { display: none; }
-.folder-title::after { content: "›"; flex: none; color: var(--muted); transition: transform .15s; }
+.folder-title::after { content: "›"; flex: none; color: var(--muted); transition: transform .28s cubic-bezier(.4,0,.2,1); }
 .folder[open] > .folder-title::after { transform: rotate(90deg); }
+/* Sidebar folder expand/collapse — animate the NATIVE <details> content height with pure CSS, no JS.
+   `interpolate-size: allow-keywords` unlocks the height 0 ↔ auto transition; the discrete
+   content-visibility transition keeps the *close* from snapping. Verified animating on the real
+   flex <ul> in Chromium (+ Safari 18.4+); Firefox / older engines gracefully fall back to an
+   instant toggle. Gated on reduced-motion. (The references — Radix/Framer/AutoAnimate — all do
+   this in JS because their stacks predate these CSS features; Kura's native <details> gets it free.) */
+@media (prefers-reduced-motion: no-preference) {
+  /* interpolate-size must sit on a high ancestor: the UA ::details-content pseudo reads it from
+     the document root, so 0 ↔ auto can interpolate. */
+  :root { interpolate-size: allow-keywords; }
+  /* Animate height + a fade and a small drop-in slide, so the expand reads clearly even for a
+     short folder (height alone is too subtle). A strong ease-out (decelerate) makes it feel snappy
+     rather than linear. Collapse runs the same in reverse. */
+  .folder::details-content {
+    height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(-.375rem);
+    transition: height .3s cubic-bezier(.4,0,.2,1), opacity .26s ease, transform .3s cubic-bezier(.4,0,.2,1), content-visibility .3s allow-discrete;
+  }
+  /* Animate ONLY on a real state change — i.e. a user toggle (clicking the chevron). We deliberately
+     do NOT use @starting-style here: with hard-reload navigation the whole sidebar re-renders each
+     time, so @starting-style would replay the open animation on every page load — including when you
+     navigate WITHIN an already-open folder, shoving the items below it down on every click. The
+     references avoid this with a persistent (client-routed) sidebar that only animates state
+     transitions; until Kura's sidebar persists across nav (morph), the correct behavior is to animate
+     toggles and let navigation render the folder open instantly (no animation, no jank). */
+  .folder[open]::details-content {
+    height: auto;
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 /* Horizontal-scroll tab bar: hide the scrollbar (utilities can't target ::-webkit-scrollbar). */
 .no-scrollbar { scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
