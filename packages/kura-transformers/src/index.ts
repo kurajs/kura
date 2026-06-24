@@ -7,7 +7,7 @@ import { resolve, sep } from "node:path";
 // every later build then fails on the same corrupt cache) surfaces as an ONNX parse/deserialize error
 // rather than a download error. Detect that shape so we can wipe the cache and re-fetch.
 const isCorruptModel = (err: unknown): boolean =>
-  /protobuf|deserialize|external initializer|out of bounds|parsing failed|onnxruntime/i.test(
+  /protobuf|deserialize|external initializer|out of bounds|parsing failed/i.test(
     (err as Error)?.message ?? "",
   );
 
@@ -50,7 +50,9 @@ export function transformers(opts: TransformersOptions = {}): Embedder {
       const cached = resolve(cacheRoot, ...model.split("/"));
       // Refuse to delete outside the cache dir: a model id containing `..` would otherwise traverse
       // out via path normalization into arbitrary recursive deletion. If it escapes, rethrow as-is.
-      if (cached === cacheRoot || !cached.startsWith(cacheRoot + sep)) throw err;
+      // (Build the prefix from cacheRoot's own trailing sep so a root cacheDir like "/" still works.)
+      const prefix = cacheRoot.endsWith(sep) ? cacheRoot : cacheRoot + sep;
+      if (cached === cacheRoot || !cached.startsWith(prefix)) throw err;
       await rm(cached, { recursive: true, force: true }); // surface permission/IO errors (not swallowed)
       try {
         return await build();
