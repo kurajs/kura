@@ -105,13 +105,26 @@ async function getHighlighter(): Promise<Highlighter> {
 
 const cache = new Map<string, string>();
 
-/** Compile MDX source to a static HTML string (curated components rendered). Cached. */
-export async function mdxToHtml(source: string, components: Record<string, unknown> = mdxComponents): Promise<string> {
-  const hit = cache.get(source);
-  if (hit !== undefined) return hit;
+/** Compile a doc to a static HTML string. Cached (default components only — see below).
+ *  `format`: "mdx" (default) parses JS expressions `{…}` and JSX `<Tag/>`, so the curated components
+ *  (Callout/Tabs/…) render; "md" is plain CommonMark with no MDX/JSX parsing, so a literal `{…}` is
+ *  text (a literal `<tag>` is still raw HTML — escape it) and the curated JSX components do NOT
+ *  render. Opt in (markdown: "commonmark") for prose-only docs, to avoid MDX's expression footgun. */
+export async function mdxToHtml(
+  source: string,
+  components: Record<string, unknown> = mdxComponents,
+  format: "mdx" | "md" = "mdx",
+): Promise<string> {
+  // The cache key is format+source — it can't capture the `components` mapping identity, so only use
+  // the cache for the default components (the only mapping any caller passes in practice). Custom
+  // components bypass the cache to stay correct.
+  const cacheable = components === mdxComponents;
+  const key = `${format}\0${source}`;
+  if (cacheable) { const hit = cache.get(key); if (hit !== undefined) return hit; }
   const highlighter = await getHighlighter();
   const mod = await evaluate(source, {
     ...(runtime as Record<string, unknown>),
+    format,
     remarkPlugins: [remarkGfm],
     rehypePlugins: [[rehypeShikiFromHighlighter, highlighter, {
       themes: { light: "github-light", dark: "github-dark-default" },
@@ -123,7 +136,7 @@ export async function mdxToHtml(source: string, components: Record<string, unkno
   } as never);
   const Content = (mod as { default: (props: { components?: unknown }) => unknown }).default;
   const html = renderToStaticMarkup(createElement(Content as never, { components }) as never);
-  cache.set(source, html);
+  if (cacheable) cache.set(key, html);
   return html;
 }
 
@@ -139,6 +152,7 @@ export type MdxFailure = { bucket: string; slug: string; error: string };
 export async function renderMdxBuckets(
   buckets: { bucket: string; entries: { slug: string; body: string }[] }[],
   components: Record<string, unknown> = mdxComponents,
+  format: "mdx" | "md" = "mdx",
 ): Promise<{ map: Record<string, Record<string, string>>; failures: MdxFailure[] }> {
   const map: Record<string, Record<string, string>> = {};
   const failures: MdxFailure[] = [];
@@ -146,7 +160,7 @@ export async function renderMdxBuckets(
     map[bucket] ??= {};
     for (const e of entries) {
       try {
-        map[bucket]![e.slug] = await mdxToHtml(e.body, components);
+        map[bucket]![e.slug] = await mdxToHtml(e.body, components, format);
       } catch (err) {
         failures.push({ bucket, slug: e.slug, error: (err as Error).message });
       }
