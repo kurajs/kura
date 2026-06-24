@@ -271,7 +271,15 @@ export function createSearch(opts: {
   const getKeyword = () => (keyword ??= buildKeywordIndex(opts.entries, tokenizer));
 
   if (opts.warm !== false) {
-    setTimeout(() => { getKb().then((kb) => kb.searchText("warm", { topK: 1 })).catch(() => {}); }, 50);
+    // Kick the KB build off in the background so the first real query is fast. GUARDED: createDocs()
+    // runs at module top-level, and workerd forbids timers (and I/O) in global scope — so on Workers
+    // this throws synchronously and crashes worker startup. Swallow it; the index just builds lazily
+    // on the first request instead (getKb is memoized). Warming still works on long-running hosts.
+    try {
+      setTimeout(() => { getKb().then((kb) => kb.searchText("warm", { topK: 1 })).catch(() => {}); }, 50);
+    } catch {
+      /* workerd global scope — no eager warm; the first query builds the index */
+    }
   }
 
   const search = async (query: string, o?: SearchOptions): Promise<SearchHit[]> => {
