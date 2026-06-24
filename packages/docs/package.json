@@ -78,7 +78,8 @@
   "peerDependencies": {
     "@junejs/core": ">=0.0.29 <0.1.0",
     "react": "^19",
-    "react-dom": "^19"
+    "react-dom": "^19",
+    "@junejs/db": ">=0.0.40"
   },
   "peerDependenciesMeta": {
     "@junejs/core": {
@@ -88,6 +89,9 @@
       "optional": true
     },
     "react-dom": {
+      "optional": true
+    },
+    "@junejs/db": {
       "optional": true
     }
   },

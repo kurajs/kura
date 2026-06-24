@@ -11,10 +11,13 @@ import { createNav, treeOf, flattenTree, processHtml, topFolderOf, activeTabInde
 import { mergeMeta, type MetaMap, type TabConfig } from "./meta.ts";
 import { createSearch, type SearchHit } from "./search.ts";
 import { docsActions } from "./actions.ts";
-import { DocsPage, DocsShell, SearchResults, type SiteInfo, type SidebarGroup, type SidebarNode, type DocView, type Href, type LocaleLink, type TabLink } from "./ui.tsx";
+import { DocsPage, DocsShell, DocsLayoutShell, DocBody, SearchResults, type SiteInfo, type SidebarGroup, type SidebarNode, type DocView, type Href, type LocaleLink, type TabLink, type NavTab } from "./ui.tsx";
 import type { KuraConfig } from "./config.ts";
 import { resolveLabels, pickLabel, type Labels } from "./labels.ts";
 import { localeHref, type I18nConfig } from "@junejs/core/i18n";
+import { JuneOutlet } from "@junejs/core/outlet";
+import { currentLocale } from "@junejs/db";
+import type React from "react";
 import { stripMdx } from "./util.ts";
 import { createOgRoute } from "./og.js";
 
@@ -198,6 +201,31 @@ export function createDocs<T extends DocLike>(opts: {
   };
   const labelsFor = (locale?: string): Labels => resolveLabels(locale, opts.config.labels);
 
+  // The full nav for the persistent shell: every tab + its sidebar groups (the client filters to
+  // the active tab). No tabs → one unnamed tab carrying all groups.
+  const navTabsFor = (locale?: string): NavTab[] => {
+    const h = hrefFor(locale);
+    const defs = tabDefs();
+    if (!defs) return [{ key: "_", title: "", href: h(docPath(basePath, "")), groups: sidebarFor(locale) }];
+    return defs.map((t) => {
+      const landing = orderedFor(locale, t.pages)[0];
+      return { key: t.title, title: tabLabel(locale, t.title), href: h(docPath(basePath, landing ? landing.slug : t.pages[0]!)), groups: sidebarFor(locale, t.pages) };
+    });
+  };
+
+  // The PERSISTENT docs shell as a segment-boundary layout (mount it at app/layout.tsx with
+  // `export const segmentBoundary = true`). June renders it once per shell; a soft-nav swaps only
+  // the <JuneOutlet> content. The layout gets no ctx, so it reads the request locale + derives
+  // active state on the client (see DocsLayoutShell).
+  const layout = ({ children }: { children: React.ReactNode }) => {
+    const locale = opts.config.i18n ? currentLocale() : undefined;
+    return (
+      <DocsLayoutShell site={site} navTabs={navTabsFor(locale)} basePath={basePath} labels={labelsFor(locale)} href={hrefFor(locale)} localeSwitch={switchFor(locale, "")}>
+        <JuneOutlet>{children}</JuneOutlet>
+      </DocsLayoutShell>
+    );
+  };
+
   // MDX html for an entry: its own locale bucket → the default bucket → plain markdown html.
   const mdxFor = (e: T): string =>
     opts.mdxHtml?.[e.locale ?? "default"]?.[e.slug] ?? opts.mdxHtml?.default?.[e.slug] ?? e.html;
@@ -239,18 +267,10 @@ export function createDocs<T extends DocLike>(opts: {
     locale,
   });
 
+  // Content-only: the persistent shell (sidebar/topbar) lives in the segment-boundary `layout`;
+  // this renders just the page body into the <JuneOutlet>, so a soft-nav swaps only this region.
   const View = (d: DocPage) => (
-    <DocsPage
-      site={site}
-      sidebar={d.sidebar}
-      tabs={d.tabs}
-      doc={d.doc}
-      basePath={basePath}
-      labels={d.labels}
-      href={hrefFor(d.locale)}
-      localeSwitch={switchFor(d.locale, docPath(basePath, d.doc.slug))}
-      mermaidCdn={opts.config.mermaidCdn}
-    />
+    <DocBody doc={d.doc} basePath={basePath} labels={d.labels} href={hrefFor(d.locale)} mermaidCdn={opts.config.mermaidCdn} />
   );
   const md = (d: DocPage) => stripMdx(doc(d.doc.slug, d.locale)?.original ?? "");
   const json = (d: DocPage) => {
@@ -302,22 +322,12 @@ export function createDocs<T extends DocLike>(opts: {
       const hits = q ? await search.search(q, { topK: 8, locale: ctx.locale, mode }) : [];
       return { q, hits, tokens: q ? search.tokensOf(q, ctx.locale) : [], locale: ctx.locale };
     },
-    View: (d: { q: string; hits: SearchHit[]; tokens: string[]; locale?: string }) => {
-      const qs = d.q ? `?q=${encodeURIComponent(d.q)}` : "";
-      return (
-        <DocsShell
-          site={site}
-          sidebar={sidebarFor(d.locale, tabFoldersFor(""))}
-          tabs={tabBarFor(d.locale, "")}
-          pageTitle={labelsFor(d.locale).search}
-          labels={labelsFor(d.locale)}
-          href={hrefFor(d.locale)}
-          localeSwitch={switchFor(d.locale, `/search${qs}`)}
-        >
-          <SearchResults query={d.q} hits={d.hits} basePath={basePath} labels={labelsFor(d.locale)} href={hrefFor(d.locale)} />
-        </DocsShell>
-      );
-    },
+    // Content-only (renders into the shell's <JuneOutlet>); span the content + ToC columns.
+    View: (d: { q: string; hits: SearchHit[]; tokens: string[]; locale?: string }) => (
+      <main className="px-10 py-8 max-md:px-4" style={{ gridColumn: "2 / -1" }}>
+        <SearchResults query={d.q} hits={d.hits} basePath={basePath} labels={labelsFor(d.locale)} href={hrefFor(d.locale)} />
+      </main>
+    ),
     json: (d: { q: string; hits: SearchHit[]; tokens: string[] }) => ({ q: d.q, hits: d.hits, tokens: d.tokens }),
     metadata: { title: "Search" },
   };
@@ -335,6 +345,7 @@ export function createDocs<T extends DocLike>(opts: {
     sidebar: () => sidebarFor(defaultLocale),
     sidebarFor,
     site,
+    layout,
     docRoute,
     home,
     searchRoute,

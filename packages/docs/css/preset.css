@@ -140,6 +140,16 @@
 }
 :root { --kura-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
 [open] > .chevron::after { transform: rotate(180deg); }
+/* Sidebar active page — driven by aria-current (not a server className) so it works in the
+   PERSISTENT segment shell: the layout doesn't know the current page, so the client sync sets
+   aria-current after each soft-nav; the server sets it on a full load. Mirrors the old
+   bg-accent-soft / text-accent active styling. */
+.sidebar a[aria-current="page"] { background: var(--accent-soft); color: var(--accent); }
+.sidebar .folder-title:has(> a[aria-current="page"]) { background: var(--accent-soft); }
+.sidebar .folder-title > a[aria-current="page"] { background: transparent; }
+/* The morph outlet is transparent so the page's <main> + ToC <aside> fill columns 2–3 of the
+   shell's grid while the sidebar (column 1) persists across navigation. */
+[data-june-outlet] { display: contents; }
 /* Sidebar folder chevron: a right-pointing caret that rotates down when open (sits after the label). */
 .folder-title { list-style: none; }
 .folder-title::-webkit-details-marker { display: none; }
