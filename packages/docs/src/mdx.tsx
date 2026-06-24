@@ -106,9 +106,9 @@ async function getHighlighter(): Promise<Highlighter> {
 const cache = new Map<string, string>();
 
 /** Compile a doc to a static HTML string (curated components rendered). Cached.
- *  `format`: "mdx" (default) parses JS expressions `{…}` and JSX `<Tag/>`; "md" treats the source as
- *  plain CommonMark, so `{…}`/`<…>` are literal text — opt into it (markdown: "commonmark") for
- *  prose-only docs that don't use the curated components, to avoid MDX's expression footgun. */
+ *  `format`: "mdx" (default) parses JS expressions `{…}` and JSX `<Tag/>`; "md" is plain CommonMark
+ *  with no MDX/JSX parsing, so a literal `{…}` is text (a literal `<tag>` is still raw HTML — escape
+ *  it). Opt in (markdown: "commonmark") for prose-only docs, to avoid MDX's expression footgun. */
 export async function mdxToHtml(
   source: string,
   components: Record<string, unknown> = mdxComponents,
