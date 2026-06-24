@@ -31,5 +31,8 @@
     "type": "git",
     "url": "git+https://github.com/kurajs/kura.git",
     "directory": "packages/create-kura"
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types --test test/*.test.ts"
   }
 }
