@@ -134,9 +134,12 @@ const SIDEBAR_SYNC_JS = `(function(){
       document.querySelectorAll('[data-tabbar] a').forEach(function(a){
         if(a.getAttribute('data-tab-key')===tab)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');});
     }
-    // expand the folder holding the active page (auto-expand on nav into a closed folder)
-    var cur=document.querySelector('.sidebar a[aria-current="page"]');
-    if(cur){var d=cur.closest('details.folder');while(d){d.open=true;d=d.parentElement&&d.parentElement.closest('details.folder');}}
+    // expand the folder(s) holding the active page. Iterate EVERY aria-current sidebar link, not
+    // just the first: a folder-as-page link lives in a <details>, but the mobile tab-bar link (also
+    // in .sidebar, earlier in the DOM) has no folder ancestor — querySelector would pick that one
+    // and expand nothing. forEach opens each link's folder chain; tab links are harmless no-ops.
+    document.querySelectorAll('.sidebar a[aria-current="page"]').forEach(function(cur){
+      var d=cur.closest('details.folder');while(d){d.open=true;d=d.parentElement&&d.parentElement.closest('details.folder');}});
     // rewrite the locale-switch links to THIS page's equivalent path (swap the locale prefix)
     var ll=document.querySelectorAll('[data-locale-home]');
     if(ll.length){var lc=document.querySelector('[data-locale-home][data-locale-active]'),cp=lc?lc.getAttribute('data-locale-home'):'/';cp=cp==='/'?'':cp;
