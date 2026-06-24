@@ -92,7 +92,7 @@
     }
   },
   "devDependencies": {
-    "@junejs/core": "^0.0.38",
+    "@junejs/core": "^0.0.44",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "react": "^19.2.0",
