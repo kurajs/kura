@@ -60,7 +60,7 @@ export interface KuraConfig {
    * JS expression — which avoids MDX's footgun where a stray `{x}` fails the whole page. (CommonMark
    * still treats a `<tag>` as raw HTML, so escape literal `<`/`>` or use a code span.) Choose it for
    * prose-only docs that don't use the curated components. Override per build with
-   * `kura build --commonmark`; make a failed MDX page fail the build with `--strict`.
+   * `kura build --commonmark`; make a failed page fail the build (in either mode) with `--strict`.
    */
   markdown?: "mdx" | "commonmark";
   /** Deploy target passed to June (target, worker/function name, custom domain). */

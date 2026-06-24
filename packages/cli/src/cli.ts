@@ -258,7 +258,8 @@ async function cmdIndex(): Promise<void> {
 // owns the dev watch supervisor. Users only ever type `kura`.
 const flag = (name: string): boolean => process.argv.includes(`--${name}`);
 
-// Forward extra args to june, dropping the kura-only flags (--no-embed, --model <v>).
+// Forward extra args to june, dropping the kura-only flags (--no-embed, --model <v>, --strict,
+// --commonmark) — june wouldn't understand them.
 function passthrough(): string[] {
   const out: string[] = [];
   const a = process.argv.slice(3);
