@@ -5,13 +5,19 @@
 #      request scope, so currentLocale() set in one copy is invisible to the other — the i18n
 #      nav-prefix bug we chased. Version skew (a narrow range pulling an older core) is the cause;
 #      this catches it from the resolved tree, not from a symptom.
-#   2. Every published package lints clean (publint) and resolves types correctly across module
-#      systems (attw). The packages are ESM-only by design (node-free June runtime), so the
-#      CJS-resolves-to-ESM and node10 no-resolution problems are expected and ignored — attw still
-#      catches the real failures (broken subpath types, internal resolution errors, missing types).
+#   2. publint (package.json / exports / files correctness) on EVERY published package, including
+#      the bins (@kurajs/cli, create-kura).
+#   3. attw (type resolution across module systems) on the TYPED libraries only — the bins export
+#      no types, which attw would correctly report as "no types", but that's by design here. The
+#      libraries are ESM-only (node-free June runtime), so the expected CJS-resolves-to-ESM and
+#      node10 no-resolution problems are ignored; attw still catches real failures (broken subpath
+#      types, internal resolution errors, missing types on a library entry).
 set -euo pipefail
 
-PUBLISHED=(kura search tokenizers ctrlk kura-transformers docs cli)
+# Published to npm (release.yml publishes every non-private packages/*). publint runs on all of them.
+PUBLISHED=(kura search tokenizers ctrlk kura-transformers docs cli create-kura)
+# The subset that ships type declarations — attw only makes sense for these.
+TYPED=(kura search tokenizers ctrlk kura-transformers docs)
 
 echo "→ exactly one physical @junejs/core"
 # Search EVERY workspace node_modules (root + per-package dirs the isolated linker creates), then
@@ -26,14 +32,18 @@ if [ "$n" != "1" ]; then
 fi
 echo "  ✓ single @junejs/core"
 
-echo "→ publint + attw per published package"
 # Invoke the root-pinned tools from the repo root (passing the package path) so bunx resolves the
 # lockfile-pinned versions rather than downloading a per-package copy — reproducibility matters more
 # under the isolated linker, where a package dir may not see the root devDependency.
+echo "→ publint (all published packages)"
 for p in "${PUBLISHED[@]}"; do
-  name=$(node -p "require('./packages/$p/package.json').name")
-  echo "  → $name"
+  echo "  → $(node -p "require('./packages/$p/package.json').name")"
   bunx publint "packages/$p"
+done
+
+echo "→ attw (typed libraries)"
+for p in "${TYPED[@]}"; do
+  echo "  → $(node -p "require('./packages/$p/package.json').name")"
   bunx @arethetypeswrong/cli --pack "packages/$p" --ignore-rules cjs-resolves-to-esm no-resolution
 done
 
