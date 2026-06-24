@@ -33,21 +33,27 @@ jobs:
           node-version: 22
           registry-url: https://registry.npmjs.org
 
-      # Trusted publishing needs a recent npm (>= 11.5).
+      # Trusted publishing needs a recent npm (>= 11.5). Node + npm stay only for the publish step
+      # below — `npm publish --provenance` (bun has no provenance support yet).
       - run: npm install -g npm@latest
 
-      # --ignore-scripts skips sharp's native build (image-only, unused here).
-      - run: npm ci --ignore-scripts
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      # bun.lock replaced package-lock.json, so `npm ci` no longer works. sharp installs via its
+      # prebuilt binaries under Bun (no source build), so no --ignore-scripts dance is needed.
+      - run: bun install --frozen-lockfile
 
       # Build in dependency order (core → … → ctrlk → docs → cli). ctrlk before docs:
       # @kurajs/docs/client imports @kurajs/ctrlk, so its dist/types must exist first.
-      - run: npm run build -w @kurajs/core
-      - run: npm run build -w @kurajs/search
-      - run: npm run build -w @kurajs/tokenizers
-      - run: npm run build -w @kurajs/ctrlk
-      - run: npm run build -w @kurajs/transformers
-      - run: npm run build -w @kurajs/docs
-      - run: npm run build -w @kurajs/cli
+      - run: bun run --filter @kurajs/core build
+      - run: bun run --filter @kurajs/search build
+      - run: bun run --filter @kurajs/tokenizers build
+      - run: bun run --filter @kurajs/ctrlk build
+      - run: bun run --filter @kurajs/transformers build
+      - run: bun run --filter @kurajs/docs build
+      - run: bun run --filter @kurajs/cli build
 
       - name: Publish changed packages
         run: |
@@ -64,7 +70,14 @@ jobs:
             else
               echo "publish $name@$version"
               # Don't let one package's failure skip the rest — collect and fail at the end.
-              if ( cd "$dir" && npm publish --access public --provenance ); then
+              # bun pm pack rewrites workspace:* to real versions (npm pack/publish does NOT); npm
+              # then publishes that tarball with provenance. The grep guards against a leaked
+              # workspace:/catalog: protocol reaching a published package's dependencies.
+              if ( cd "$dir" \
+                && bun pm pack --quiet \
+                && meta=$(tar -xzOf ./*.tgz package/package.json) \
+                && ! grep -qE '": *"(workspace|catalog):' <<<"$meta" \
+                && npm publish ./*.tgz --access public --provenance ); then
                 echo "ok $name@$version"
               else
                 echo "FAILED $name@$version"
