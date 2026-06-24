@@ -11,7 +11,7 @@ import { createNav, treeOf, flattenTree, processHtml, topFolderOf, activeTabInde
 import { mergeMeta, type MetaMap, type TabConfig } from "./meta.ts";
 import { createSearch, type SearchHit } from "./search.ts";
 import { docsActions } from "./actions.ts";
-import { DocsPage, DocsShell, DocsLayoutShell, DocBody, SearchResults, type SiteInfo, type SidebarGroup, type SidebarNode, type DocView, type Href, type LocaleLink, type TabLink, type NavTab } from "./ui.tsx";
+import { DocsLayoutShell, DocBody, SearchResults, type SiteInfo, type SidebarGroup, type SidebarNode, type DocView, type Href, type LocaleLink, type TabLink, type NavTab } from "./ui.tsx";
 import type { KuraConfig } from "./config.ts";
 import { resolveLabels, pickLabel, type Labels } from "./labels.ts";
 import { localeHref, type I18nConfig } from "@junejs/core/i18n";
