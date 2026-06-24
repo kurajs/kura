@@ -37,13 +37,15 @@ echo "  ✓ single @junejs/core"
 # under the isolated linker, where a package dir may not see the root devDependency.
 echo "→ publint (all published packages)"
 for p in "${PUBLISHED[@]}"; do
-  echo "  → $(bun -p "require('./packages/$p/package.json').name")"
+  name=$(bun -p "require('./packages/$p/package.json').name")
+  echo "  → $name"
   bunx publint "packages/$p"
 done
 
 echo "→ attw (typed libraries)"
 for p in "${TYPED[@]}"; do
-  echo "  → $(bun -p "require('./packages/$p/package.json').name")"
+  name=$(bun -p "require('./packages/$p/package.json').name")
+  echo "  → $name"
   bunx @arethetypeswrong/cli --pack "packages/$p" --ignore-rules cjs-resolves-to-esm no-resolution
 done
 
