@@ -1,7 +1,7 @@
 import type { Embedder } from "@kurajs/core";
 import { pipeline, env } from "@huggingface/transformers";
 import { rm } from "node:fs/promises";
-import { join } from "node:path";
+import { resolve, sep } from "node:path";
 
 // A truncated/incomplete model download (Transformers.js caches partial downloads as if complete, so
 // every later build then fails on the same corrupt cache) surfaces as an ONNX parse/deserialize error
@@ -46,15 +46,19 @@ export function transformers(opts: TransformersOptions = {}): Embedder {
       return await build();
     } catch (err) {
       if (!isCorruptModel(err)) throw err;
-      const cached = join(env.cacheDir ?? ".cache", ...model.split("/"));
-      await rm(cached, { recursive: true, force: true }).catch(() => {});
+      const cacheRoot = resolve(env.cacheDir ?? ".cache");
+      const cached = resolve(cacheRoot, ...model.split("/"));
+      // Refuse to delete outside the cache dir: a model id containing `..` would otherwise traverse
+      // out via path normalization into arbitrary recursive deletion. If it escapes, rethrow as-is.
+      if (cached === cacheRoot || !cached.startsWith(cacheRoot + sep)) throw err;
+      await rm(cached, { recursive: true, force: true }); // surface permission/IO errors (not swallowed)
       try {
         return await build();
       } catch (err2) {
         throw new Error(
           `kura-transformers: "${model}" (${dtype}) failed to load even after clearing its cache and ` +
-            `re-downloading — the model download looks incomplete (bge-m3 q8 is ~543MB). Check network ` +
-            `and free disk space, then retry. Underlying error: ${(err2 as Error).message}`,
+            `re-downloading — the model download looks incomplete. Check network and free disk space, ` +
+            `then retry. Underlying error: ${(err2 as Error).message}`,
         );
       }
     }
