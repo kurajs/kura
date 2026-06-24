@@ -162,8 +162,13 @@ async function cmdIndex(): Promise<void> {
     // Read the setting as TEXT, not by importing kura.config.ts — so `kura index` never executes user
     // config code (no side effects, no heavy imports) on any run, including ones that short-circuit.
     const cfgPath = path.join(cwd, "kura.config.ts");
-    if (fs.existsSync(cfgPath) && /\bmarkdown\s*:\s*["']commonmark["']/.test(fs.readFileSync(cfgPath, "utf8"))) {
-      commonmark = true;
+    if (fs.existsSync(cfgPath)) {
+      // Strip comments before matching so a commented-out `markdown: "commonmark"` can't flip the
+      // renderer. Only treat `//` as a comment at start-of-line/after-whitespace, so URLs survive.
+      const txt = fs.readFileSync(cfgPath, "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/(^|\s)\/\/.*$/gm, "$1");
+      if (/\bmarkdown\s*:\s*["']commonmark["']/.test(txt)) commonmark = true;
     }
   }
   const format = commonmark ? "md" : "mdx";
