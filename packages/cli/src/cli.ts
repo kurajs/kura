@@ -292,6 +292,7 @@ function writeIfChanged(filePath: string, content: string): void {
 // Lives in .june/ (June's own artifact dir, already gitignored):
 //   .june/config.ts       — June site/deploy/agent config (via kuraJuneConfig)
 //   .june/routes/_kura.ts — createDocs() barrel (not a route, used by routes below)
+//   .june/routes/layout.tsx           — persistent docs shell (segment boundary)
 //   .june/routes/page.tsx              — home route
 //   .june/routes/docs/[[...slug]]/page.tsx — docs route
 //   .june/routes/search/page.tsx       — search route
@@ -339,6 +340,15 @@ function generateJuneConfig(cwd: string): void {
     "});\n",
   );
 
+  // .june/routes/layout.tsx — the PERSISTENT docs shell (segment boundary). Soft navigation morphs
+  // only the <JuneOutlet> content inside it, so the sidebar (and its open folders) never re-render.
+  writeIfChanged(path.join(routesDir, "layout.tsx"),
+    HEADER +
+    'import { kura } from "./_kura";\n' +
+    "export const segmentBoundary = true;\n" +
+    "export default kura.layout;\n",
+  );
+
   // .june/routes/page.tsx — home
   writeIfChanged(path.join(routesDir, "page.tsx"),
     HEADER +
@@ -378,10 +388,15 @@ function generateJuneConfig(cwd: string): void {
     "export default kura.ogRoute;\n",
   );
 
-  // .june/routes/_client.ts — island client entry (⌘K search palette)
+  // .june/routes/_client.ts — island client entry. startJuneClient wires island hydration AND the
+  // morph router (when clientRouter is on) — without it the router never starts. initSearch then
+  // lights up the ⌘K palette. (Calling only initSearch silently disables the router + islands.)
   writeIfChanged(path.join(routesDir, "_client.ts"),
     HEADER +
+    'import { startJuneClient } from "@junejs/core/islands-client";\n' +
     'import { initSearch } from "@kurajs/docs/client";\n' +
+    'import { ISLAND_LOADERS } from "../../app/_islands.gen";\n' +
+    "\nstartJuneClient({ loaders: ISLAND_LOADERS });\n" +
     "initSearch();\n",
   );
 }
