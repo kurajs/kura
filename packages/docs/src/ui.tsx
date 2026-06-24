@@ -312,6 +312,11 @@ const SIDEBAR_SYNC_JS = `(function(){
     // expand the folder holding the active page (auto-expand on nav into a closed folder)
     var cur=document.querySelector('.sidebar a[aria-current="page"]');
     if(cur){var d=cur.closest('details.folder');while(d){d.open=true;d=d.parentElement&&d.parentElement.closest('details.folder');}}
+    // rewrite the locale-switch links to THIS page's equivalent path (swap the locale prefix)
+    var ll=document.querySelectorAll('[data-locale-home]');
+    if(ll.length){var lc=document.querySelector('[data-locale-home][data-locale-active]'),cp=lc?lc.getAttribute('data-locale-home'):'/';cp=cp==='/'?'':cp;
+      var rest=location.pathname;if(cp&&rest.indexOf(cp)===0)rest=rest.slice(cp.length)||'/';
+      ll.forEach(function(a){var h=a.getAttribute('data-locale-home'),p=h==='/'?'':h;a.setAttribute('href',rest==='/'?(p||'/'):(p+rest));});}
   }
   sync();
   var outlet=document.querySelector('[data-june-outlet]');
@@ -345,8 +350,10 @@ export function DocsLayoutShell({ site, navTabs, basePath = "/docs", labels = DE
                 {/* Locale switch crosses shells (different-locale sidebar) but shares one layout file
                     (one shell key), so a soft-nav would wrongly keep this locale's sidebar — opt out
                     of the router to force a full load. */}
+                {/* href is the locale's home (the layout can't know the page); the client rewrites
+                    it to the CURRENT page's equivalent path per locale via data-locale-home. */}
                 {localeSwitch.map((l) => (
-                  <a key={l.locale} data-june-no-router className={"px-2 py-1.5 rounded-md text-[.85rem] whitespace-nowrap " + (l.active ? "text-accent font-semibold" : "text-fg-soft hover:bg-hover hover:text-fg")} href={l.href} hrefLang={l.locale}>{l.name}</a>
+                  <a key={l.locale} data-june-no-router data-locale-home={l.href} data-locale-active={l.active ? "" : undefined} className={"px-2 py-1.5 rounded-md text-[.85rem] whitespace-nowrap " + (l.active ? "text-accent font-semibold" : "text-fg-soft hover:bg-hover hover:text-fg")} href={l.href} hrefLang={l.locale}>{l.name}</a>
                 ))}
               </div>
             </details>
