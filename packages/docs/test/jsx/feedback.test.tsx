@@ -50,6 +50,18 @@ test("renderMdxBuckets: per-locale buckets each collect their own failures", asy
   expect(failures).toEqual([expect.objectContaining({ bucket: "ja-JP", slug: "p" })]);
 });
 
+// ── commonmark mode (markdown: "commonmark" / --commonmark): the literal {…} footgun is disarmed ──
+test("renderMdxBuckets format='md': a literal {…} renders as text instead of failing the page", async () => {
+  // The exact shape from the feedback — MDX reads {…} as a JS expression (`cli is not defined`).
+  const entries = [{ slug: "bad", body: "machine-readable output ({cli, profile, account, path})" }];
+  const mdx = await renderMdxBuckets([{ bucket: "default", entries }], undefined, "mdx");
+  expect(mdx.failures).toHaveLength(1); // mdx: dropped
+  expect(mdx.map.default!.bad).toBeUndefined();
+  const md = await renderMdxBuckets([{ bucket: "default", entries }], undefined, "md");
+  expect(md.failures).toHaveLength(0); // commonmark: rendered, no drop
+  expect(md.map.default!.bad).toContain("{cli, profile, account, path}"); // literal text, not evaluated
+});
+
 // ── i18n: sidebar/pager links must route through `href` (the current-locale localeHref) ──────────
 const PFX = "/ja-JP";
 const prefixed: Href = (p) => PFX + p; // stand-in for hrefFor("ja-JP") = localeHref(i18n, p, "ja-JP")

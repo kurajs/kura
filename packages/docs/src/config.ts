@@ -53,6 +53,15 @@ export interface KuraConfig {
    * bundle. Defaults to `https://esm.sh/mermaid@11`; override to pin a version or self-host.
    */
   mermaidCdn?: string;
+  /**
+   * Content format. "mdx" (default) parses MDX, so `{…}` is a JS expression and `<Tag/>` is JSX and
+   * the curated components (Callout, Tabs, Steps, Card) work inside your `.md` files. "commonmark"
+   * renders plain CommonMark instead — `{…}` and `<…>` are literal text — which avoids MDX's
+   * expression footgun (a stray `{x}` otherwise fails the whole page). Choose it for prose-only docs
+   * that don't use the curated components. Override per build with `kura build --commonmark`; make a
+   * failed MDX page fail the build (instead of falling back to plain markdown) with `--strict`.
+   */
+  markdown?: "mdx" | "commonmark";
   /** Deploy target passed to June (target, worker/function name, custom domain). */
   deploy?: { target?: "workers" | "vercel" | "deno"; name?: string; domain?: string };
   /**

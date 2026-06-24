@@ -196,12 +196,25 @@ async function cmdIndex(): Promise<void> {
   // renderMdxBuckets collects per-page failures instead of throwing (the silent-drop guard lives in
   // @kurajs/docs so it's unit-tested there).
   const { renderMdxBuckets } = await import("@kurajs/docs/mdx");
+  // Content format: kura.config.ts `markdown` (default "mdx"), overridable per run with --commonmark.
+  // "commonmark" renders plain CommonMark, so a literal {…}/<…> is text and can't fail a page.
+  let commonmark = process.argv.includes("--commonmark");
+  if (!commonmark) {
+    try {
+      const cfgPath = path.join(cwd, "kura.config.ts");
+      if (fs.existsSync(cfgPath)) {
+        const cfg = (await import(pathToFileURL(cfgPath).href)).default as { markdown?: string } | undefined;
+        if (cfg?.markdown === "commonmark") commonmark = true;
+      }
+    } catch { /* unreadable config → keep the mdx default */ }
+  }
+  const format = commonmark ? "md" : "mdx";
   const byLocale = new Map<string, Entry[]>();
   for (const e of variants) byLocale.set(e.locale!, [...(byLocale.get(e.locale!) ?? []), e]);
   const { map, failures } = await renderMdxBuckets([
     { bucket: "default", entries: DOCS },
     ...[...byLocale].map(([bucket, entries]) => ({ bucket, entries })),
-  ]);
+  ], undefined, format);
   fs.writeFileSync(
     mdxTs,
     stamp +
@@ -211,14 +224,20 @@ async function cmdIndex(): Promise<void> {
   // LOUD per-page failures: a page that fails MDX is silently dropped to plain-markdown html, so the
   // author never learns it broke unless we say so. Print slug + the first error line — NEVER swallow.
   for (const f of failures) {
-    console.error(`kura index: ⚠ MDX failed for "${f.slug}"${f.bucket !== "default" ? ` [${f.bucket}]` : ""} — ${f.error.split("\n")[0]} (renders as plain markdown; wrap any literal {…}/<…> in backticks)`);
+    console.error(`kura index: ⚠ MDX failed for "${f.slug}"${f.bucket !== "default" ? ` [${f.bucket}]` : ""} — ${f.error.split("\n")[0]} (renders as plain markdown; wrap any literal {…}/<…> in backticks, or set markdown: "commonmark")`);
   }
   // Count ATTEMPTS (not map size): a dropped page isn't in the map, so map size == ok and the ratio
   // would always read N/N — hiding the fallbacks and disagreeing with the "(N docs)" up-to-date line.
   const total = DOCS.length + variants.length;
   const ok = total - failures.length;
   const tag = locales.size ? ` across ${locales.size + 1} locales` : "";
-  console.log(`kura index: rendered ${ok}/${total} docs via MDX${tag} -> app/_mdx.ts` + (failures.length ? ` (${failures.length} fell back — see warnings above)` : ""));
+  console.log(`kura index: rendered ${ok}/${total} docs via ${commonmark ? "CommonMark" : "MDX"}${tag} -> app/_mdx.ts` + (failures.length ? ` (${failures.length} fell back — see warnings above)` : ""));
+  // --strict: a silently-dropped page is a content bug. Fail the build instead of shipping the
+  // plain-markdown fallback, so CI catches it (the author never finds out otherwise).
+  if (failures.length && process.argv.includes("--strict")) {
+    console.error(`kura index: --strict — ${failures.length} page(s) failed to render; failing the build.`);
+    process.exit(1);
+  }
 }
 
 // One Kura surface over June: dev / build / deploy each freeze content (june gen) + the search
@@ -232,6 +251,7 @@ function passthrough(): string[] {
   const a = process.argv.slice(3);
   for (let i = 0; i < a.length; i++) {
     if (a[i] === "--no-embed") continue;
+    if (a[i] === "--strict" || a[i] === "--commonmark") continue; // kura index-only
     if (a[i] === "--model") { i++; continue; }
     out.push(a[i]!);
   }

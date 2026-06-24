@@ -105,13 +105,22 @@ async function getHighlighter(): Promise<Highlighter> {
 
 const cache = new Map<string, string>();
 
-/** Compile MDX source to a static HTML string (curated components rendered). Cached. */
-export async function mdxToHtml(source: string, components: Record<string, unknown> = mdxComponents): Promise<string> {
-  const hit = cache.get(source);
+/** Compile a doc to a static HTML string (curated components rendered). Cached.
+ *  `format`: "mdx" (default) parses JS expressions `{…}` and JSX `<Tag/>`; "md" treats the source as
+ *  plain CommonMark, so `{…}`/`<…>` are literal text — opt into it (markdown: "commonmark") for
+ *  prose-only docs that don't use the curated components, to avoid MDX's expression footgun. */
+export async function mdxToHtml(
+  source: string,
+  components: Record<string, unknown> = mdxComponents,
+  format: "mdx" | "md" = "mdx",
+): Promise<string> {
+  const key = `${format}\0${source}`;
+  const hit = cache.get(key);
   if (hit !== undefined) return hit;
   const highlighter = await getHighlighter();
   const mod = await evaluate(source, {
     ...(runtime as Record<string, unknown>),
+    format,
     remarkPlugins: [remarkGfm],
     rehypePlugins: [[rehypeShikiFromHighlighter, highlighter, {
       themes: { light: "github-light", dark: "github-dark-default" },
@@ -123,7 +132,7 @@ export async function mdxToHtml(source: string, components: Record<string, unkno
   } as never);
   const Content = (mod as { default: (props: { components?: unknown }) => unknown }).default;
   const html = renderToStaticMarkup(createElement(Content as never, { components }) as never);
-  cache.set(source, html);
+  cache.set(key, html);
   return html;
 }
 
@@ -139,6 +148,7 @@ export type MdxFailure = { bucket: string; slug: string; error: string };
 export async function renderMdxBuckets(
   buckets: { bucket: string; entries: { slug: string; body: string }[] }[],
   components: Record<string, unknown> = mdxComponents,
+  format: "mdx" | "md" = "mdx",
 ): Promise<{ map: Record<string, Record<string, string>>; failures: MdxFailure[] }> {
   const map: Record<string, Record<string, string>> = {};
   const failures: MdxFailure[] = [];
@@ -146,7 +156,7 @@ export async function renderMdxBuckets(
     map[bucket] ??= {};
     for (const e of entries) {
       try {
-        map[bucket]![e.slug] = await mdxToHtml(e.body, components);
+        map[bucket]![e.slug] = await mdxToHtml(e.body, components, format);
       } catch (err) {
         failures.push({ bucket, slug: e.slug, error: (err as Error).message });
       }
