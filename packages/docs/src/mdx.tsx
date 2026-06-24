@@ -105,18 +105,22 @@ async function getHighlighter(): Promise<Highlighter> {
 
 const cache = new Map<string, string>();
 
-/** Compile a doc to a static HTML string (curated components rendered). Cached.
- *  `format`: "mdx" (default) parses JS expressions `{…}` and JSX `<Tag/>`; "md" is plain CommonMark
- *  with no MDX/JSX parsing, so a literal `{…}` is text (a literal `<tag>` is still raw HTML — escape
- *  it). Opt in (markdown: "commonmark") for prose-only docs, to avoid MDX's expression footgun. */
+/** Compile a doc to a static HTML string. Cached (default components only — see below).
+ *  `format`: "mdx" (default) parses JS expressions `{…}` and JSX `<Tag/>`, so the curated components
+ *  (Callout/Tabs/…) render; "md" is plain CommonMark with no MDX/JSX parsing, so a literal `{…}` is
+ *  text (a literal `<tag>` is still raw HTML — escape it) and the curated JSX components do NOT
+ *  render. Opt in (markdown: "commonmark") for prose-only docs, to avoid MDX's expression footgun. */
 export async function mdxToHtml(
   source: string,
   components: Record<string, unknown> = mdxComponents,
   format: "mdx" | "md" = "mdx",
 ): Promise<string> {
+  // The cache key is format+source — it can't capture the `components` mapping identity, so only use
+  // the cache for the default components (the only mapping any caller passes in practice). Custom
+  // components bypass the cache to stay correct.
+  const cacheable = components === mdxComponents;
   const key = `${format}\0${source}`;
-  const hit = cache.get(key);
-  if (hit !== undefined) return hit;
+  if (cacheable) { const hit = cache.get(key); if (hit !== undefined) return hit; }
   const highlighter = await getHighlighter();
   const mod = await evaluate(source, {
     ...(runtime as Record<string, unknown>),
@@ -132,7 +136,7 @@ export async function mdxToHtml(
   } as never);
   const Content = (mod as { default: (props: { components?: unknown }) => unknown }).default;
   const html = renderToStaticMarkup(createElement(Content as never, { components }) as never);
-  cache.set(key, html);
+  if (cacheable) cache.set(key, html);
   return html;
 }
 
