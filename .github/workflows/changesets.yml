@@ -1,0 +1,42 @@
+name: changesets
+
+# Opens (and keeps updated) a "Version Packages" PR that consumes the accumulated changesets —
+# bumping each changed package's version, cascading internal dependents only when needed, and
+# writing CHANGELOGs. Merging that PR lands the version bumps on main.
+#
+# Publishing is intentionally NOT done here: it stays with the tag-triggered release.yml (idempotent
+# OIDC trusted publishing). After the Version Packages PR merges, push a v* tag to release. This
+# keeps the proven publish flow untouched.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: changesets
+  cancel-in-progress: false
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - run: bun install --frozen-lockfile
+
+      - uses: changesets/action@v1
+        with:
+          # `bun run version` = `changeset version && bun install` (bumps + refreshes bun.lock).
+          version: bun run version
+          commit: "chore(release): version packages"
+          title: "chore(release): version packages"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
