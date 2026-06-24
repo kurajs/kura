@@ -8,8 +8,13 @@
     "examples/*"
   ],
   "scripts": {
-    "test": "bun run --filter \"*\" test"
+    "test": "bun run --filter \"*\" test",
+    "check": "bash scripts/check-packages.sh"
   },
   "license": "MIT",
-  "packageManager": "bun@1.3.14"
+  "packageManager": "bun@1.3.14",
+  "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.1",
+    "publint": "^0.3.21"
+  }
 }

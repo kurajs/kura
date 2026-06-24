@@ -1,0 +1,43 @@
+name: ci
+
+# Build, test, and package-correctness checks on every PR and push to main. Kura had no PR CI
+# before this — only the release workflow ran (on tags), so nothing caught build/test/packaging
+# regressions until publish time.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - run: bun install --frozen-lockfile
+
+      # Build the published packages in dependency order (ctrlk before docs: @kurajs/docs/client
+      # imports @kurajs/ctrlk's dist/types). The examples are intentionally NOT built here — they
+      # need content + a kura index, and are exercised by their own deploys, not CI. publint/attw
+      # in the check step below need the built dist.
+      - run: bun run --filter @kurajs/core build
+      - run: bun run --filter @kurajs/search build
+      - run: bun run --filter @kurajs/tokenizers build
+      - run: bun run --filter @kurajs/ctrlk build
+      - run: bun run --filter @kurajs/transformers build
+      - run: bun run --filter @kurajs/docs build
+      - run: bun run --filter @kurajs/cli build
+
+      - run: bun run --filter "*" test
+
+      # single @junejs/core (no forked-singleton i18n bug) + publint + attw per published package
+      - run: bash scripts/check-packages.sh
