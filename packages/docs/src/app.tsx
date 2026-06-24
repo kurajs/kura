@@ -52,7 +52,11 @@ export function createDocs<T extends DocLike>(opts: {
   const { DOCS, doc, docs } = opts.content;
   // embedder is OPTIONAL: with one, search is semantic (over the frozen index); without one,
   // createSearch degrades to a lexical scan — so a site deploys + searches on Workers with no AI.
-  const i18n = opts.i18n;
+  // i18n drives every internal link's locale prefix (hrefFor → localeHref). Accept it either as a
+  // top-level option OR (the common path) read it from `config.i18n` — the generated .june/routes
+  // barrel passes only `config`, so requiring the top-level form silently dropped the locale prefix
+  // from sidebar/pager links on every zero-boilerplate site (currentLocale worked; hrefFor didn't).
+  const i18n = opts.i18n ?? opts.config.i18n;
   const defaultLocale = i18n?.defaultLocale;
   // URL prefix for doc pages ("/docs" default, "" = site root). All generated doc links go through
   // docPath(basePath, …); the app mounts its route files to match.

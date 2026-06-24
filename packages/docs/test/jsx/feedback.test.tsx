@@ -5,6 +5,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import { renderMdxBuckets } from "../../src/mdx.tsx";
 import { SidebarItems, DocBody, type SidebarNode, type DocView, type Href } from "../../src/ui.tsx";
+import { createDocs } from "../../src/app.tsx";
+import { DOCS as FIXTURE_DOCS } from "../fixtures.ts";
 
 // ── MDX silent-drop (the most dangerous item: an unfenced {…} dropped the whole page, no error) ──
 test("renderMdxBuckets: an unfenced {…} is SURFACED as a failure, not silently dropped", async () => {
@@ -62,6 +64,24 @@ test("SidebarItems: every doc link carries the locale prefix (none drop back to 
   const hrefs = docHrefs(html);
   expect(hrefs.length).toBeGreaterThan(0);
   for (const h of hrefs) expect(h.startsWith(`${PFX}/docs/`)).toBe(true);
+});
+
+test("createDocs: reads i18n from config.i18n alone (the generated .june/routes shape) → links keep the locale prefix", () => {
+  // The cli barrel calls createDocs({ content, config, ... }) with NO top-level `i18n` — config
+  // carries it. Requiring the top-level form made hrefFor a no-op, dropping /ja off every link
+  // (currentLocale still worked, so the bug was invisible to component-level tests).
+  const finder = (slug: string) => FIXTURE_DOCS.find((d) => d.slug === slug) ?? null;
+  const kura = createDocs({
+    content: { DOCS: FIXTURE_DOCS, doc: finder as never },
+    config: {
+      site: { name: "T" },
+      i18n: { defaultLocale: "en", locales: { en: {}, "ja-JP": { path: "/ja" } } },
+    } as never,
+  });
+  const d = kura.docRoute.loader({ params: { slug: "getting-started/introduction" }, locale: "ja-JP" } as never);
+  const html = renderToStaticMarkup(kura.docRoute.View(d));
+  expect(html).toMatch(/href="\/ja\/docs\//); // at least one localized in-page link
+  expect(html).not.toMatch(/href="\/docs\/getting-started/); // none drop back to the default prefix
 });
 
 test("DocBody pager: prev/next links carry the locale prefix", () => {
