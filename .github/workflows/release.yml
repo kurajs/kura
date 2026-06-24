@@ -39,10 +39,12 @@ jobs:
       # --ignore-scripts skips sharp's native build (image-only, unused here).
       - run: npm ci --ignore-scripts
 
-      # Build in dependency order (core → transformers → docs → cli).
+      # Build in dependency order (core → … → ctrlk → docs → cli). ctrlk before docs:
+      # @kurajs/docs/client imports @kurajs/ctrlk, so its dist/types must exist first.
       - run: npm run build -w @kurajs/core
       - run: npm run build -w @kurajs/search
       - run: npm run build -w @kurajs/tokenizers
+      - run: npm run build -w @kurajs/ctrlk
       - run: npm run build -w @kurajs/transformers
       - run: npm run build -w @kurajs/docs
       - run: npm run build -w @kurajs/cli
