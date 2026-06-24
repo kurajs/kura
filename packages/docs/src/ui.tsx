@@ -317,6 +317,10 @@ const SIDEBAR_SYNC_JS = `(function(){
     if(ll.length){var lc=document.querySelector('[data-locale-home][data-locale-active]'),cp=lc?lc.getAttribute('data-locale-home'):'/';cp=cp==='/'?'':cp;
       var rest=location.pathname;if(cp&&rest.indexOf(cp)===0)rest=rest.slice(cp.length)||'/';
       ll.forEach(function(a){var h=a.getAttribute('data-locale-home'),p=h==='/'?'':h;a.setAttribute('href',rest==='/'?(p||'/'):(p+rest));});}
+    // mobile nav-context: "Active tab / Page title" (the shell can't know the page server-side)
+    var nc=document.querySelector('[data-nav-context]');
+    if(nc){var at=document.querySelector('[data-tabbar] a[aria-current="page"]'),h1=document.querySelector('main h1');
+      nc.textContent=[at&&at.textContent.trim(),h1&&h1.textContent.trim()].filter(Boolean).join(' / ');}
   }
   sync();
   var outlet=document.querySelector('[data-june-outlet]');
@@ -372,6 +376,8 @@ export function DocsLayoutShell({ site, navTabs, basePath = "/docs", labels = DE
       <button className="hidden max-md:flex items-center gap-2.5 w-full px-4 py-2.5 bg-bg border-0 border-b border-border text-fg-soft text-[.9rem] text-left cursor-pointer focus-visible:outline-none focus-visible:bg-hover" data-drawer-open aria-controls="docs-nav" aria-expanded="false">
         <span className="text-[1.05rem] leading-none" aria-hidden="true">☰</span>
         <span className="font-semibold text-fg flex-none">{labels.navigation}</span>
+        {/* Filled by the sync script — the shell can't know the page; shows "Tab / Page". */}
+        <span className="nav-bar-context text-muted flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap" data-nav-context />
       </button>
       <div className="drawer-backdrop" data-drawer-close aria-hidden="true" />
       <div className={`grid grid-cols-[248px_minmax(0,1fr)_220px] max-lg:grid-cols-[248px_minmax(0,1fr)] max-md:grid-cols-1 items-start max-w-[1280px] mx-auto${hasTabs ? " has-tabs" : ""}`}>
