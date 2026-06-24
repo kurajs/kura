@@ -11,8 +11,8 @@
 import { createElement } from "react";
 import { ImageResponse, loadGoogleFont, hasCJK, OG_HEADERS } from "@junejs/og";
 import type { OgFont } from "@junejs/og";
-import type { DocLike } from "./nav";
-import type { KuraConfig } from "./config";
+import type { DocLike } from "./nav.ts";
+import type { KuraConfig } from "./config.ts";
 
 const W = 1200;
 const H = 630;
