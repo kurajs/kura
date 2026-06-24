@@ -9,7 +9,7 @@
     "deploy": "kura deploy --no-embed"
   },
   "dependencies": {
-    "@kurajs/docs": "^0.0.24",
+    "@kurajs/docs": "^0.0.25",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "workers-og": "^0.0.27"
