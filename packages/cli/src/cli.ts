@@ -280,26 +280,110 @@ function runKuraIndex(cwd: string): Promise<number> {
   });
 }
 
-// Generate .june/config.ts from kura.config.ts so June can boot.
-// Lives in .june/ (June's own artifact dir, already gitignored) — never in the
-// app root, so the user never sees any june-related file. June's loadJuneConfig
-// checks .june/config.ts as a fallback after june.config.ts (framework-generated slot).
+// Write `content` to `filePath` only when it differs (idempotent, avoids
+// mtime bumps that would trigger unnecessary dev-server restarts).
+function writeIfChanged(filePath: string, content: string): void {
+  if (!fs.existsSync(filePath) || fs.readFileSync(filePath, "utf8") !== content) {
+    fs.writeFileSync(filePath, content);
+  }
+}
+
+// Generate all kura framework files into .june/ so the user never manages boilerplate.
+// Lives in .june/ (June's own artifact dir, already gitignored):
+//   .june/config.ts       — June site/deploy/agent config (via kuraJuneConfig)
+//   .june/routes/_kura.ts — createDocs() barrel (not a route, used by routes below)
+//   .june/routes/page.tsx              — home route
+//   .june/routes/docs/[[...slug]]/page.tsx — docs route
+//   .june/routes/search/page.tsx       — search route
+//   .june/routes/og/[slug]/route.ts    — OG image route
+//   .june/routes/_client.ts            — island client entry (⌘K search)
+// June v0.0.44+ scans .june/routes/ alongside app/; app/ takes priority (override slot).
 function generateJuneConfig(cwd: string): void {
   const kuraConfigPath = path.join(cwd, "kura.config.ts");
   if (!fs.existsSync(kuraConfigPath)) return; // not a kura app, skip
+
   const juneDir = path.join(cwd, ".june");
-  fs.mkdirSync(juneDir, { recursive: true });
-  const juneConfigPath = path.join(juneDir, "config.ts");
-  const contents =
-    "// @kura-generated — do not edit. Configure your site in kura.config.ts instead.\n" +
+  const routesDir = path.join(juneDir, "routes");
+  const docsDir = path.join(routesDir, "docs", "[[...slug]]");
+  const ogDir = path.join(routesDir, "og", "[slug]");
+  const searchDir = path.join(routesDir, "search");
+  for (const d of [juneDir, routesDir, docsDir, ogDir, searchDir]) {
+    fs.mkdirSync(d, { recursive: true });
+  }
+
+  const HEADER = "// @kura-generated — do not edit. Configure your site in kura.config.ts instead.\n";
+
+  // .june/config.ts
+  writeIfChanged(path.join(juneDir, "config.ts"),
+    HEADER +
     'import { kuraJuneConfig } from "@kurajs/docs";\n' +
     'import kuraConfig from "../kura.config.ts";\n' +
     'import { DOCS } from "../app/_content";\n' +
-    "\n" +
-    "export default kuraJuneConfig(kuraConfig, { DOCS });\n";
-  if (!fs.existsSync(juneConfigPath) || fs.readFileSync(juneConfigPath, "utf8") !== contents) {
-    fs.writeFileSync(juneConfigPath, contents);
-  }
+    "\nexport default kuraJuneConfig(kuraConfig, { DOCS });\n",
+  );
+
+  // .june/routes/_kura.ts — createDocs() singleton; imported by every route below.
+  writeIfChanged(path.join(routesDir, "_kura.ts"),
+    HEADER +
+    'import { createDocs } from "@kurajs/docs";\n' +
+    'import kuraConfig from "../../kura.config.ts";\n' +
+    'import { DOCS, doc, docs } from "../../app/_content";\n' +
+    'import { MDX } from "../../app/_mdx";\n' +
+    'import { META, META_LOCALES } from "../../app/_meta";\n' +
+    "\nexport const kura = createDocs({\n" +
+    "  content: { DOCS, doc, docs },\n" +
+    "  mdxHtml: MDX,\n" +
+    "  meta: META,\n" +
+    "  metaLocales: META_LOCALES,\n" +
+    "  config: kuraConfig,\n" +
+    "});\n",
+  );
+
+  // .june/routes/page.tsx — home
+  writeIfChanged(path.join(routesDir, "page.tsx"),
+    HEADER +
+    'import { kura } from "./_kura";\n' +
+    "export const loader = kura.home.loader;\n" +
+    "export const md = kura.home.md;\n" +
+    "export const json = kura.home.json;\n" +
+    "export const metadata = kura.home.metadata;\n" +
+    "export default kura.home.View;\n",
+  );
+
+  // .june/routes/docs/[[...slug]]/page.tsx — docs
+  writeIfChanged(path.join(docsDir, "page.tsx"),
+    HEADER +
+    'import { kura } from "../../_kura";\n' +
+    "export const loader = kura.docRoute.loader;\n" +
+    "export const md = kura.docRoute.md;\n" +
+    "export const json = kura.docRoute.json;\n" +
+    "export const metadata = kura.docRoute.metadata;\n" +
+    "export default kura.docRoute.View;\n",
+  );
+
+  // .june/routes/search/page.tsx — search
+  writeIfChanged(path.join(searchDir, "page.tsx"),
+    HEADER +
+    'import { kura } from "../_kura";\n' +
+    "export const loader = kura.searchRoute.loader;\n" +
+    "export const json = kura.searchRoute.json;\n" +
+    "export const metadata = kura.searchRoute.metadata;\n" +
+    "export default kura.searchRoute.View;\n",
+  );
+
+  // .june/routes/og/[slug]/route.ts — OG image
+  writeIfChanged(path.join(ogDir, "route.ts"),
+    HEADER +
+    'import { kura } from "../../_kura";\n' +
+    "export default kura.ogRoute;\n",
+  );
+
+  // .june/routes/_client.ts — island client entry (⌘K search palette)
+  writeIfChanged(path.join(routesDir, "_client.ts"),
+    HEADER +
+    'import { initSearch } from "@kurajs/docs/client";\n' +
+    "initSearch();\n",
+  );
 }
 
 async function freeze(cwd: string): Promise<void> {
