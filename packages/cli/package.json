@@ -15,7 +15,7 @@
   "license": "MIT",
   "dependencies": {
     "@junejs/cli": ">=0.0.38 <0.1.0",
-    "@kurajs/core": "^0.0.1"
+    "@kurajs/core": "workspace:*"
   },
   "peerDependencies": {
     "@kurajs/docs": ">=0.0.24 <0.1.0",
@@ -27,7 +27,7 @@
     }
   },
   "devDependencies": {
-    "@kurajs/transformers": "*",
+    "@kurajs/transformers": "workspace:*",
     "typescript": "^5.7.0"
   },
   "author": "Lawrence Lin",

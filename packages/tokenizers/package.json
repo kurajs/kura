@@ -28,7 +28,7 @@
   "homepage": "https://kura.build",
   "license": "MIT",
   "dependencies": {
-    "@kurajs/search": "^0.0.1"
+    "@kurajs/search": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.7.0"

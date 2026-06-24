@@ -9,14 +9,14 @@
     "deploy": "kura deploy"
   },
   "dependencies": {
-    "@kurajs/docs": "*",
-    "@kurajs/transformers": "^0.0.1",
+    "@kurajs/docs": "workspace:*",
+    "@kurajs/transformers": "workspace:*",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
     "@huggingface/transformers": "3.8.1",
-    "@kurajs/cli": "^0.0.9",
+    "@kurajs/cli": "workspace:*",
     "@tailwindcss/node": "^4.3.1",
     "@tailwindcss/oxide": "^4.3.1",
     "@tailwindcss/typography": "^0.5.20",

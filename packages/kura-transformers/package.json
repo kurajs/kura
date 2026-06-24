@@ -29,7 +29,7 @@
     "@huggingface/transformers": ">=3"
   },
   "devDependencies": {
-    "@kurajs/core": "*",
+    "@kurajs/core": "workspace:*",
     "@huggingface/transformers": "3.8.1",
     "typescript": "^5.7.0"
   },
