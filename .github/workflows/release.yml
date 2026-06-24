@@ -70,14 +70,13 @@ jobs:
             else
               echo "publish $name@$version"
               # Don't let one package's failure skip the rest — collect and fail at the end.
-              # bun pm pack rewrites workspace:* to real versions (npm pack/publish does NOT); npm
-              # then publishes that tarball with provenance. The grep guards against a leaked
-              # workspace:/catalog: protocol reaching a published package's dependencies.
+              # Internal @kurajs deps are explicit >=X <0.1.0 ranges (not workspace:*), so npm packs
+              # them verbatim — which keeps --provenance working (it does NOT on a pre-built bun
+              # tarball). The grep is a safety net: refuse to publish if a workspace:/catalog:
+              # protocol ever sneaks into a dependency value (npm would ship it literally).
               if ( cd "$dir" \
-                && bun pm pack --quiet \
-                && meta=$(tar -xzOf ./*.tgz package/package.json) \
-                && ! grep -qE '": *"(workspace|catalog):' <<<"$meta" \
-                && npm publish ./*.tgz --access public --provenance ); then
+                && ! grep -qE '": *"(workspace|catalog):' package.json \
+                && npm publish --access public --provenance ); then
                 echo "ok $name@$version"
               else
                 echo "FAILED $name@$version"
