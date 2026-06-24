@@ -11,7 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { spawn } from "node:child_process";
-import { pathToFileURL } from "node:url";
+import { pathToFileURL, fileURLToPath } from "node:url";
 
 function arg(name: string, def?: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -251,7 +251,11 @@ function findBin(cwd: string, bin: string): string | null {
     dir = parent;
   }
 }
-const findJuneBin = (cwd: string) => findBin(cwd, "june");
+// Second search root: this CLI module's own directory. Under Bun's isolated linker the transitive
+// `june` bin isn't hoisted to the app root — it lives in @kurajs/cli's own node_modules/.bin — so
+// also walk up from here. (Under the hoisted linker / npm, the cwd walk above already finds it.)
+const SELF_DIR = path.dirname(fileURLToPath(import.meta.url));
+const findJuneBin = (cwd: string) => findBin(cwd, "june") ?? findBin(SELF_DIR, "june");
 
 // Run the app's `june` bin (it handles TS loading + the dev watcher); resolve with its exit code.
 function runJune(cwd: string, args: string[]): Promise<number> {
