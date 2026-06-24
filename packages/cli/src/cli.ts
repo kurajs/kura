@@ -153,9 +153,25 @@ async function cmdIndex(): Promise<void> {
   // (e.g. a Cloudflare Workers deploy without Workers AI).
   const noEmbed = process.argv.includes("--no-embed");
 
+  // Content format: kura.config.ts `markdown` (default "mdx"), overridable per run with --commonmark.
+  // "commonmark" renders via MDX format:'md' — no MDX/JSX parsing, so a literal {…} can't be read as
+  // a JS expression and drop the page. Resolved BEFORE the hash so a format switch forces a rebuild
+  // (otherwise the same content short-circuits and leaves _mdx.ts in the previous format).
+  let commonmark = process.argv.includes("--commonmark");
+  if (!commonmark) {
+    try {
+      const cfgPath = path.join(cwd, "kura.config.ts");
+      if (fs.existsSync(cfgPath)) {
+        const cfg = (await import(pathToFileURL(cfgPath).href)).default as { markdown?: string } | undefined;
+        if (cfg?.markdown === "commonmark") commonmark = true;
+      }
+    } catch { /* unreadable config → keep the mdx default */ }
+  }
+  const format = commonmark ? "md" : "mdx";
+
   // Content hash — skip rebuilds when nothing changed, so `kura index` is cheap to run before
-  // every dev/build. Covers the mode + model + locale/slug/body of every entry.
-  const hashInput = JSON.stringify([model, noEmbed, allEntries.map((e) => [e.locale ?? "", e.slug, e.body])]);
+  // every dev/build. Covers the mode + format + model + locale/slug/body of every entry.
+  const hashInput = JSON.stringify([model, noEmbed, format, allEntries.map((e) => [e.locale ?? "", e.slug, e.body])]);
   const contentHash = crypto.createHash("sha256").update(hashInput).digest("hex").slice(0, 16);
   const stamp = `// content-hash: ${contentHash}\n`;
   const hashOf = (f: string) => (fs.existsSync(f) ? fs.readFileSync(f, "utf8").match(/content-hash: (\S+)/)?.[1] : undefined);
@@ -196,19 +212,6 @@ async function cmdIndex(): Promise<void> {
   // renderMdxBuckets collects per-page failures instead of throwing (the silent-drop guard lives in
   // @kurajs/docs so it's unit-tested there).
   const { renderMdxBuckets } = await import("@kurajs/docs/mdx");
-  // Content format: kura.config.ts `markdown` (default "mdx"), overridable per run with --commonmark.
-  // "commonmark" renders plain CommonMark, so a literal {…}/<…> is text and can't fail a page.
-  let commonmark = process.argv.includes("--commonmark");
-  if (!commonmark) {
-    try {
-      const cfgPath = path.join(cwd, "kura.config.ts");
-      if (fs.existsSync(cfgPath)) {
-        const cfg = (await import(pathToFileURL(cfgPath).href)).default as { markdown?: string } | undefined;
-        if (cfg?.markdown === "commonmark") commonmark = true;
-      }
-    } catch { /* unreadable config → keep the mdx default */ }
-  }
-  const format = commonmark ? "md" : "mdx";
   const byLocale = new Map<string, Entry[]>();
   for (const e of variants) byLocale.set(e.locale!, [...(byLocale.get(e.locale!) ?? []), e]);
   const { map, failures } = await renderMdxBuckets([
@@ -315,6 +318,8 @@ function runWrangler(distDir: string, args: string[]): Promise<number> {
 function runKuraIndex(cwd: string): Promise<number> {
   const args = [process.argv[1]!, "index"];
   if (flag("no-embed")) args.push("--no-embed");
+  if (flag("strict")) args.push("--strict"); // forward to the index child so `kura build --strict` works
+  if (flag("commonmark")) args.push("--commonmark");
   const model = arg("model");
   if (model) args.push("--model", model);
   return new Promise((resolve) => {
