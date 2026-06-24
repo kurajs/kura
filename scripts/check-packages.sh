@@ -14,22 +14,27 @@ set -euo pipefail
 PUBLISHED=(kura search tokenizers ctrlk kura-transformers docs cli)
 
 echo "→ exactly one physical @junejs/core"
-cores=$(find node_modules -path '*@junejs/core/package.json' 2>/dev/null \
+# Search EVERY workspace node_modules (root + per-package dirs the isolated linker creates), then
+# dedup by real path so symlinks into the .bun store collapse onto the physical copies they target.
+cores=$(find . -path '*/node_modules/@junejs/core/package.json' 2>/dev/null \
           | while read -r f; do (cd "$(dirname "$f")" && pwd -P); done | sort -u)
 n=$(printf '%s\n' "$cores" | grep -c . || true)
 if [ "$n" != "1" ]; then
   echo "✘ expected exactly 1 @junejs/core, found $n (version skew → forked module singletons):"
-  printf '    %s\n' $cores
+  printf '%s\n' "$cores" | sed 's/^/    /'
   exit 1
 fi
 echo "  ✓ single @junejs/core"
 
 echo "→ publint + attw per published package"
+# Invoke the root-pinned tools from the repo root (passing the package path) so bunx resolves the
+# lockfile-pinned versions rather than downloading a per-package copy — reproducibility matters more
+# under the isolated linker, where a package dir may not see the root devDependency.
 for p in "${PUBLISHED[@]}"; do
   name=$(node -p "require('./packages/$p/package.json').name")
   echo "  → $name"
-  ( cd "packages/$p" && bunx publint )
-  ( cd "packages/$p" && bunx @arethetypeswrong/cli --pack . --ignore-rules cjs-resolves-to-esm no-resolution )
+  bunx publint "packages/$p"
+  bunx @arethetypeswrong/cli --pack "packages/$p" --ignore-rules cjs-resolves-to-esm no-resolution
 done
 
 echo "✓ all package checks passed"
