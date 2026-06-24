@@ -8,15 +8,15 @@
     "build": "kura build"
   },
   "dependencies": {
-    "@junejs/server": "^0.0.39",
-    "@kurajs/docs": "^0.0.14",
-    "@kurajs/transformers": "^0.0.1",
+    "@junejs/server": ">=0.0.45 <0.1.0",
+    "@kurajs/docs": "workspace:*",
+    "@kurajs/transformers": "workspace:*",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
     "@huggingface/transformers": "3.8.1",
-    "@kurajs/cli": "^0.0.9",
+    "@kurajs/cli": "workspace:*",
     "@types/react": "^19.2.0",
     "typescript": "^5.9.0"
   }
