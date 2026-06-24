@@ -9,13 +9,13 @@
     "deploy": "kura deploy --no-embed"
   },
   "dependencies": {
-    "@kurajs/docs": "^0.0.23",
+    "@kurajs/docs": "^0.0.24",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "workers-og": "^0.0.27"
   },
   "devDependencies": {
-    "@kurajs/cli": "^0.0.14",
+    "@kurajs/cli": "^0.0.15",
     "@tailwindcss/node": "^4.3.1",
     "@tailwindcss/oxide": "^4.3.1",
     "@tailwindcss/typography": "^0.5.20",

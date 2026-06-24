@@ -18,7 +18,7 @@
     "@kurajs/core": "^0.0.1"
   },
   "peerDependencies": {
-    "@kurajs/docs": ">=0.0.7 <0.1.0",
+    "@kurajs/docs": ">=0.0.24 <0.1.0",
     "@kurajs/transformers": "^0.0.1"
   },
   "peerDependenciesMeta": {
