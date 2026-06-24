@@ -159,15 +159,15 @@ async function cmdIndex(): Promise<void> {
   // (otherwise the same content short-circuits and leaves _mdx.ts in the previous format).
   let commonmark = process.argv.includes("--commonmark");
   if (!commonmark) {
-    try {
-      const cfgPath = path.join(cwd, "kura.config.ts");
-      if (fs.existsSync(cfgPath)) {
-        const cfg = (await import(pathToFileURL(cfgPath).href)).default as { markdown?: string } | undefined;
-        if (cfg?.markdown === "commonmark") commonmark = true;
-      }
-    } catch { /* unreadable config → keep the mdx default */ }
+    // Read the setting as TEXT, not by importing kura.config.ts — so `kura index` never executes user
+    // config code (no side effects, no heavy imports) on any run, including ones that short-circuit.
+    const cfgPath = path.join(cwd, "kura.config.ts");
+    if (fs.existsSync(cfgPath) && /\bmarkdown\s*:\s*["']commonmark["']/.test(fs.readFileSync(cfgPath, "utf8"))) {
+      commonmark = true;
+    }
   }
   const format = commonmark ? "md" : "mdx";
+  const strict = process.argv.includes("--strict");
 
   // Content hash — skip rebuilds when nothing changed, so `kura index` is cheap to run before
   // every dev/build. Covers the mode + format + model + locale/slug/body of every entry.
@@ -175,7 +175,9 @@ async function cmdIndex(): Promise<void> {
   const contentHash = crypto.createHash("sha256").update(hashInput).digest("hex").slice(0, 16);
   const stamp = `// content-hash: ${contentHash}\n`;
   const hashOf = (f: string) => (fs.existsSync(f) ? fs.readFileSync(f, "utf8").match(/content-hash: (\S+)/)?.[1] : undefined);
-  const upToDate = noEmbed ? hashOf(mdxTs) === contentHash : hashOf(indexTs) === contentHash && fs.existsSync(mdxTs);
+  // --strict must re-check failures every run, so it never short-circuits — a cached _mdx.ts from a
+  // prior non-strict run could otherwise hide failures and let `kura build --strict` pass wrongly.
+  const upToDate = !strict && (noEmbed ? hashOf(mdxTs) === contentHash : hashOf(indexTs) === contentHash && fs.existsSync(mdxTs));
   if (upToDate) {
     console.log(`kura index: up to date (${allEntries.length} docs, hash ${contentHash}) — skipped`);
     return;
@@ -240,7 +242,7 @@ async function cmdIndex(): Promise<void> {
   console.log(`kura index: rendered ${ok}/${total} docs via ${commonmark ? "CommonMark" : "MDX"}${tag} -> app/_mdx.ts` + (failures.length ? ` (${failures.length} fell back — see warnings above)` : ""));
   // --strict: a silently-dropped page is a content bug. Fail the build instead of shipping the
   // plain-markdown fallback, so CI catches it (the author never finds out otherwise).
-  if (failures.length && process.argv.includes("--strict")) {
+  if (failures.length && strict) {
     console.error(`kura index: --strict — ${failures.length} page(s) failed to render; failing the build.`);
     process.exit(1);
   }
