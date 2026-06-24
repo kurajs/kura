@@ -24,6 +24,10 @@
       "types": "./dist/search.d.ts",
       "import": "./dist/search.js"
     },
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "import": "./dist/client.js"
+    },
     "./agent": {
       "types": "./dist/agent.d.ts",
       "import": "./dist/agent.js"
@@ -63,6 +67,7 @@
   "dependencies": {
     "@junejs/og": "^0.0.4",
     "@kurajs/core": "^0.0.1",
+    "@kurajs/ctrlk": "^0.0.1",
     "@kurajs/search": "^0.0.1",
     "@kurajs/tokenizers": "^0.0.1",
     "@mdx-js/mdx": "^3.1.0",
