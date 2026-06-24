@@ -9,6 +9,7 @@
     "deploy": "kura deploy"
   },
   "dependencies": {
+    "@junejs/server": ">=0.0.45 <0.1.0",
     "@kurajs/docs": "workspace:*",
     "@kurajs/transformers": "workspace:*",
     "react": "^19.2.0",
