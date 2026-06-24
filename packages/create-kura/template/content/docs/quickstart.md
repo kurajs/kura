@@ -9,6 +9,9 @@ order: 2
 
 Put Markdown files in `content/docs/` with frontmatter, then run the dev server.
 
+> **Prerequisite:** `kura dev`/`build`/`deploy` run on [Bun](https://bun.sh). Install it once —
+> `curl -fsSL https://bun.sh/install | bash` — then use `npm` as usual for everything else.
+
 ## Add a page
 
 Create `content/docs/my-page.md`:
@@ -28,9 +31,9 @@ The `section` groups it in the sidebar; `order` sorts within a section.
 ## Run
 
 ```bash
-npm run gen    # generate content + build the search index
 npm run dev    # http://localhost:3000
 ```
 
-`npm run gen` runs `june gen` (freezes your Markdown) and `kura index` (embeds it for
-semantic search). The search index powers `/search` and the `search_docs` MCP tool.
+`npm run dev` freezes your Markdown (`june gen`) and builds the search index (`kura index`)
+before it starts the dev server — there's no separate step. The index powers `/search` and
+the `search_docs` MCP tool.
