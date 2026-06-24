@@ -9,12 +9,38 @@
 // The correct ImageResponse backend is selected at BUILD TIME via @junejs/og export conditions:
 //   workerd (Cloudflare) → workers-og, edge-light (Vercel) → @vercel/og, default → satori+resvg-js
 import { createElement } from "react";
-import { ImageResponse, loadDefaultFonts, OG_HEADERS } from "@junejs/og";
+import { ImageResponse, loadGoogleFont, hasCJK, OG_HEADERS } from "@junejs/og";
+import type { OgFont } from "@junejs/og";
 import type { DocLike } from "./nav";
 import type { KuraConfig } from "./config";
 
 const W = 1200;
 const H = 630;
+
+/**
+ * Load Inter (+ Noto Sans TC when the text has CJK) at the weights kuraOgCard actually renders:
+ * 600 for the section tag, 700 for the title and brand name. The shared loadDefaultFonts() only
+ * subsets weight 600, so 700 text would fall back to SemiBold — visibly lighter than intended.
+ * Each weight is a tiny per-text subset and is cached, so loading both is cheap.
+ */
+async function loadCardFonts(text: string): Promise<OgFont[]> {
+  const families = ["Inter", ...(hasCJK(text) ? ["Noto Sans TC"] : [])];
+  const weights = [600, 700] as const;
+  return Promise.all(
+    families.flatMap((name) =>
+      weights.map(async (weight) => ({
+        name,
+        data: await loadGoogleFont(name, weight, text),
+        weight,
+        style: "normal" as const,
+      })),
+    ),
+  );
+}
+
+// Brand domain shown bottom-right. Kept as a constant (not an inline literal) so the font-subset
+// computation in createOgRoute can include its glyphs — otherwise '.', 'b', 'l' render as tofu.
+const BRAND_DOMAIN = "kura.build";
 
 export interface KuraOgCardOptions {
   title: string;
@@ -67,9 +93,11 @@ export function kuraOgCard({ title, section, siteName = "Kura" }: KuraOgCardOpti
                 fontWeight: 600,
                 color: "#4f46e5",
                 letterSpacing: "0.04em",
-                textTransform: "uppercase",
               },
-            }, section)
+              // Uppercase in JS rather than via CSS text-transform: the font is subset to only the
+              // glyphs in the source text, so a CSS transform would request glyphs (the uppercased
+              // letters) that were never downloaded → tofu. Render exactly what we subset.
+            }, section.toUpperCase())
           : createElement("div", {
               style: { display: "flex", fontSize: "24px", color: "#9ca3af" },
             }, siteName),
@@ -111,7 +139,7 @@ export function kuraOgCard({ title, section, siteName = "Kura" }: KuraOgCardOpti
         section
           ? createElement("div", {
               style: { display: "flex", fontSize: "22px", color: "#9ca3af" },
-            }, "kura.build")
+            }, BRAND_DOMAIN)
           : null,
       ),
     ),
@@ -134,9 +162,12 @@ export function createOgRoute<T extends DocLike>(
 
     const title = doc ? String(doc.data.title ?? slug) : siteName;
     const section = doc ? String(doc.data.section ?? "") : "";
-    const allText = `${title}${section}${siteName}`;
+    // The font is subset to exactly these glyphs, so this MUST include every character the card
+    // rasterizes: the title, the section tag uppercased (kuraOgCard uppercases it), the site name,
+    // and the brand domain. Anything rendered but omitted here shows up as a tofu box.
+    const allText = `${title} ${section.toUpperCase()} ${siteName} ${BRAND_DOMAIN}`;
 
-    const fonts = await loadDefaultFonts(allText);
+    const fonts = await loadCardFonts(allText);
 
     return new ImageResponse(
       kuraOgCard({ title, section: section || undefined, siteName }) as never,
