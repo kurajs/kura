@@ -125,3 +125,17 @@ test("pruneStaleDocsRoutes: prunes a nested stale prefix back to routesDir, keep
 test("pruneStaleDocsRoutes: a missing routesDir is a no-op", () => {
   assert.doesNotThrow(() => pruneStaleDocsRoutes(path.join(os.tmpdir(), "kura-does-not-exist-xyz"), "x"));
 });
+
+test("pruneStaleDocsRoutes: never deletes the OG catch-all (og/[[...slug]] is not a docs route)", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "kura-routes-"));
+  const routesDir = path.join(root, "routes");
+  const docs = path.join(routesDir, "[[...slug]]"); // docs at site root (basePath "")
+  const og = path.join(routesDir, "og", "[[...slug]]"); // OG catch-all — must survive
+  for (const d of [docs, og]) fs.mkdirSync(d, { recursive: true });
+
+  pruneStaleDocsRoutes(routesDir, docs);
+
+  assert.equal(fs.existsSync(og), true, "og/[[...slug]] is left intact");
+  assert.equal(fs.existsSync(docs), true, "the docs route survives");
+  fs.rmSync(root, { recursive: true, force: true });
+});

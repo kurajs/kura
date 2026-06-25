@@ -1,6 +1,6 @@
 // OG image route factory for kura docs. Designed to be used as a June resource route:
 //
-//   // app/og/[slug]/route.ts
+//   // app/og/[[...slug]]/route.ts
 //   import { createOgRoute } from "@kurajs/docs/og";
 //   import kuraConfig from "../../kura.config";
 //   import { DOCS } from "../../_content";
@@ -11,7 +11,7 @@
 import { createElement } from "react";
 import { ImageResponse, loadGoogleFont, hasCJK, OG_HEADERS } from "@junejs/og";
 import type { OgFont } from "@junejs/og";
-import type { DocLike } from "./nav.ts";
+import { normalizeOgSlug, type DocLike } from "./nav.ts";
 import type { KuraConfig } from "./config.ts";
 
 const W = 1200;
@@ -148,7 +148,8 @@ export function kuraOgCard({ title, section, siteName = "Kura" }: KuraOgCardOpti
 
 /**
  * Create a June resource route handler that serves per-page OG images.
- * Mount it at `app/og/[slug]/route.ts` and it will handle `/og/<slug>.png`.
+ * Mount it at `app/og/[[...slug]]/route.ts` (a catch-all, so nested slugs like
+ * `/og/getting-started/sdk.png` resolve — not just single-segment `/og/sdk.png`).
  */
 export function createOgRoute<T extends DocLike>(
   content: { DOCS: readonly T[] },
@@ -157,7 +158,7 @@ export function createOgRoute<T extends DocLike>(
   const siteName = config?.site?.name ?? "Kura";
 
   return async (_req, ctx) => {
-    const slug = String(ctx.params.slug ?? "").replace(/\.png$/, "");
+    const slug = normalizeOgSlug(ctx.params.slug);
     const doc = content.DOCS.find((d) => d.slug === slug);
 
     const title = doc ? String(doc.data.title ?? slug) : siteName;

@@ -48,9 +48,11 @@ export function docsRoute(routesDir: string, segments: string[]): { docsDir: str
 // Remove a docs catch-all that a basePath change left behind. .june/routes is fully kura-owned
 // (gitignored artifact), so any "[[...slug]]" dir other than `keep` is stale — without this,
 // switching basePath would leave the old route live and June would keep serving the old URLs.
-// Empty ancestor dirs are pruned back up to routesDir so no orphan folders remain.
+// Empty ancestor dirs are pruned back up to routesDir so no orphan folders remain. The og route is
+// also a "[[...slug]]" catch-all but is NOT a docs route, so its subtree is skipped.
 export function pruneStaleDocsRoutes(routesDir: string, keep: string): void {
   if (!fs.existsSync(routesDir)) return;
+  const ogDir = path.join(routesDir, "og"); // og/[[...slug]] is the OG route, not a stale docs route
   const pruneEmptyUp = (dir: string): void => {
     let cur = dir;
     while (cur !== routesDir && cur.startsWith(routesDir) && fs.existsSync(cur) && fs.readdirSync(cur).length === 0) {
@@ -62,6 +64,7 @@ export function pruneStaleDocsRoutes(routesDir: string, keep: string): void {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
       if (!e.isDirectory()) continue;
       const full = path.join(dir, e.name);
+      if (full === ogDir) continue; // leave the OG catch-all alone
       if (e.name === "[[...slug]]") {
         if (full !== keep) {
           fs.rmSync(full, { recursive: true, force: true });
