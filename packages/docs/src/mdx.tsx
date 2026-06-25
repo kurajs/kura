@@ -125,22 +125,25 @@ const tagCodeLanguage = (html: string, lang: string): string =>
     return cls ? tag.replace(cls[0], ` class="${cls[1]} language-${lang}"`) : `<code${attrs} class="language-${lang}">`;
   });
 
-function highlightCommonmark(html: string, highlighter: Highlighter, loaded: Set<string>): string {
+function highlightCommonmark(html: string, highlighter: Highlighter): string {
+  // CSS vars (--shiki-light/dark) — matches the MDX path's theme switching via [data-theme="dark"].
+  const opts = { themes: { light: "github-light", dark: "github-dark-default" }, defaultColor: false } as const;
   return html.replace(CODE_BLOCK, (whole, lang: string | undefined, body: string) => {
     const code = unescapeHtml(body).replace(/\n$/, ""); // drop sparkdown's trailing newline inside <code>
-    const useLang = lang && loaded.has(lang) ? lang : "text"; // unknown/absent language → render as plain text
     let out: string;
     try {
-      out = highlighter.codeToHtml(code, {
-        lang: useLang,
-        themes: { light: "github-light", dark: "github-dark-default" },
-        defaultColor: false, // CSS vars (--shiki-light/dark) — matches the MDX path's theme switching
-      });
+      // Try the AUTHORED language and let shiki resolve aliases (ts→typescript, yml→yaml, …) — shiki is
+      // the authority on what it can highlight, so don't second-guess it with a loaded-set pre-check.
+      out = highlighter.codeToHtml(code, { lang: lang || "text", ...opts });
     } catch {
-      return whole; // any shiki failure → keep the plain (escaped) block rather than drop highlighting
+      try {
+        out = highlighter.codeToHtml(code, { lang: "text", ...opts }); // unknown language → plain text, never drop
+      } catch {
+        return whole; // shiki unavailable entirely → keep the plain (escaped) block
+      }
     }
-    // Parity with the MDX path's addLanguageClass: tag <code> with the AUTHORED language (even if it fell
-    // back to "text" for highlighting), so language-specific styling/tooling still sees it.
+    // Parity with the MDX path's addLanguageClass: tag <code> with the AUTHORED language so
+    // language-specific styling/tooling still sees it.
     return lang ? tagCodeLanguage(out, lang) : out;
   });
 }
@@ -151,7 +154,7 @@ async function renderCommonmark(source: string): Promise<string> {
     sparkInited = true;
   }
   const highlighter = await getHighlighter();
-  return highlightCommonmark(commonmarkToHtmlSync(source), highlighter, new Set(highlighter.getLoadedLanguages()));
+  return highlightCommonmark(commonmarkToHtmlSync(source), highlighter);
 }
 
 /** Compile a doc to a static HTML string. Cached (default components only — see below).
