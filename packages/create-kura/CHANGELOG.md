@@ -1,5 +1,24 @@
 # create-kura
 
+## 0.0.15
+
+### Patch Changes
+
+- [#24](https://github.com/kurajs/kura/pull/24) [`2cfd435`](https://github.com/kurajs/kura/commit/2cfd4351ef8316f03ebbfcf7c3b60f95e5eb5c1f) Thanks [@linyiru](https://github.com/linyiru)! - Honor `basePath` when generating the docs route, not just the links
+
+  `basePath` drove the generated links (sidebar, pager, tabs, search, `.md`) but the CLI hardcoded the
+  docs route at `.june/routes/docs/[[...slug]]`, so any non-default `basePath` produced links that
+  pointed nowhere. Setting `basePath: ""` made every sidebar link resolve to `/getting-started` while
+  the page still lived at `/docs/getting-started` — a 404 on every internal link.
+
+  `kura dev`/`build` now read `basePath` from `kura.config.ts` (as text — your config is never executed)
+  and emit the catch-all route at the matching subtree: `""` → `.june/routes/[[...slug]]` (site root),
+  `"/docs"` → `.june/routes/docs/[[...slug]]` (unchanged default), `"/guide"` →
+  `.june/routes/guide/[[...slug]]`, nested prefixes too. A docs route left behind by a previous
+  `basePath` is pruned so the old URLs stop resolving. June ties URLs to disk layout (it has no
+  route-prefix config), so this is the level the fix belongs at. The misleading "affects links only"
+  note in the `basePath` doc and the scaffold's `kura.config.ts` comment are corrected.
+
 ## 0.0.14
 
 ### Patch Changes

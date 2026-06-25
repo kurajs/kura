@@ -1,6 +1,6 @@
 {
   "name": "create-kura",
-  "version": "0.0.14",
+  "version": "0.0.15",
   "description": "Kura — the knowledgebase for humans and agents. Scaffold a Kura docs site, built on June.",
   "type": "module",
   "bin": {
