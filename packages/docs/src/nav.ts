@@ -4,7 +4,7 @@ import type { MetaMap } from "./meta.ts";
 
 export interface DocLike {
   slug: string;
-  data: { title?: string; description?: string; section?: string; order?: string | number };
+  data: { title?: string; description?: string; section?: string; order?: string | number; lastUpdated?: string };
   html: string;
   original: string;
   body: string;

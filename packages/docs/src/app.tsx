@@ -48,6 +48,10 @@ export function createDocs<T extends DocLike>(opts: {
    *  Merged over `meta` per folder, so a locale localizes folder group titles (and order) without
    *  restating the whole tree. Frozen as `META_LOCALES` by `kura index`. */
   metaLocales?: Record<string, MetaMap>;
+  /** Per-doc last-updated ISO date (slug → date), frozen as `LAST_UPDATED` by `kura index` when
+   *  `config.lastUpdated` is on (an empty map otherwise → no dates shown). A frontmatter
+   *  `lastUpdated:` on a page overrides its entry here. */
+  lastUpdated?: Record<string, string>;
 }) {
   const { DOCS, doc, docs } = opts.content;
   // embedder is OPTIONAL: with one, search is semantic (over the frozen index); without one,
@@ -240,6 +244,9 @@ export function createDocs<T extends DocLike>(opts: {
     // A non-default locale that resolved to a non-variant entry fell back to default.
     const notTranslated = !!(locale && defaultLocale && locale !== defaultLocale && e.locale !== locale);
     const description = e.data.description ? String(e.data.description) : undefined;
+    // A frontmatter `lastUpdated:` overrides the git-derived date; both absent → no line.
+    const lastUpdated =
+      (typeof e.data.lastUpdated === "string" ? e.data.lastUpdated : undefined) ?? opts.lastUpdated?.[e.slug];
     return {
       slug: e.slug,
       title: String(e.data.title ?? e.slug),
@@ -250,6 +257,7 @@ export function createDocs<T extends DocLike>(opts: {
       prev: prev ? { slug: prev.slug, title: String(prev.data.title ?? prev.slug) } : null,
       next: next ? { slug: next.slug, title: String(next.data.title ?? next.slug) } : null,
       notTranslated,
+      ...(lastUpdated ? { lastUpdated } : {}),
     };
   };
 
@@ -274,7 +282,7 @@ export function createDocs<T extends DocLike>(opts: {
   // Content-only: the persistent shell (sidebar/topbar) lives in the segment-boundary `layout`;
   // this renders just the page body into the <JuneOutlet>, so a soft-nav swaps only this region.
   const View = (d: DocPage) => (
-    <DocBody doc={d.doc} basePath={basePath} labels={d.labels} href={hrefFor(d.locale)} mermaidCdn={opts.config.mermaidCdn} />
+    <DocBody doc={d.doc} basePath={basePath} labels={d.labels} href={hrefFor(d.locale)} mermaidCdn={opts.config.mermaidCdn} locale={d.locale} />
   );
   const md = (d: DocPage) => stripMdx(doc(d.doc.slug, d.locale)?.original ?? "");
   const json = (d: DocPage) => {

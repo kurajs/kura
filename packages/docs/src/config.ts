@@ -63,6 +63,14 @@ export interface KuraConfig {
    * `kura build --commonmark`; make a failed page fail the build (in either mode) with `--strict`.
    */
   markdown?: "mdx" | "commonmark";
+  /**
+   * Show a "Last updated on <date>" line at the foot of each doc page, from the file's last git commit
+   * date (a frontmatter `lastUpdated:` field overrides it per page). **Default off.** Requires the
+   * build to run inside a git repo WITH history — in CI set the checkout to `fetch-depth: 0`, since a
+   * shallow clone has no history and every date is then omitted. A doc with no git date (uncommitted,
+   * or shallow clone) is simply shown without the line; it never fails the build.
+   */
+  lastUpdated?: boolean;
   /** Deploy target passed to June (target, worker/function name, custom domain). */
   deploy?: { target?: "workers" | "vercel" | "deno"; name?: string; domain?: string };
   /**
