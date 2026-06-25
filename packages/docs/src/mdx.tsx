@@ -114,7 +114,16 @@ const cache = new Map<string, string>();
 let sparkInited = false;
 const unescapeHtml = (s: string): string =>
   s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&");
-const CODE_BLOCK = /<pre><code(?: class="language-([\w-]+)")?>([\s\S]*?)<\/code><\/pre>/g;
+// `language-([^"]+)` (not `[\w-]+`) so fence langs with symbols — c++, f#, objective-c++ — still match.
+const CODE_BLOCK = /<pre><code(?: class="language-([^"]+)")?>([\s\S]*?)<\/code><\/pre>/g;
+
+// Add `language-<lang>` to shiki's first <code>, merging into an existing class attribute (rather than
+// blindly injecting a second `class="…"`, which would be invalid HTML if shiki ever tags <code>).
+const tagCodeLanguage = (html: string, lang: string): string =>
+  html.replace(/<code\b([^>]*)>/, (tag, attrs: string) => {
+    const cls = attrs.match(/\sclass="([^"]*)"/);
+    return cls ? tag.replace(cls[0], ` class="${cls[1]} language-${lang}"`) : `<code${attrs} class="language-${lang}">`;
+  });
 
 function highlightCommonmark(html: string, highlighter: Highlighter, loaded: Set<string>): string {
   return html.replace(CODE_BLOCK, (whole, lang: string | undefined, body: string) => {
@@ -132,7 +141,7 @@ function highlightCommonmark(html: string, highlighter: Highlighter, loaded: Set
     }
     // Parity with the MDX path's addLanguageClass: tag <code> with the AUTHORED language (even if it fell
     // back to "text" for highlighting), so language-specific styling/tooling still sees it.
-    return lang ? out.replace("<code", `<code class="language-${lang}"`) : out;
+    return lang ? tagCodeLanguage(out, lang) : out;
   });
 }
 
