@@ -7,6 +7,7 @@
 //     A content hash short-circuits re-embedding when nothing changed (cheap to run pre-dev).
 import { buildIndex } from "@kurajs/docs/search";
 import { parseMeta, validatePages, type MetaMap } from "@kurajs/docs/meta";
+import { basePathSegments, docsRoute, pruneStaleDocsRoutes } from "./routes.js";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -429,8 +430,9 @@ function writeIfChanged(filePath: string, content: string): void {
 //   .june/routes/_kura.ts — createDocs() barrel (not a route, used by routes below)
 //   .june/routes/layout.tsx           — persistent docs shell (segment boundary)
 //   .june/routes/page.tsx              — home route
-//   .june/routes/docs/[[...slug]]/page.tsx — docs route
-//   .june/routes/search/page.tsx       — search route
+//   .june/routes/<basePath>/[[...slug]]/page.tsx — docs route (default <basePath> = docs; "" mounts
+//                                        the catch-all directly under routes/, served at site root)
+//   .june/routes/search/page.tsx       — search route (always /search, basePath-independent)
 //   .june/routes/og/[slug]/route.ts    — OG image route
 //   .june/routes/_client.ts            — island client entry (⌘K search)
 // June v0.0.44+ scans .june/routes/ alongside app/; app/ takes priority (override slot).
@@ -440,9 +442,11 @@ function generateJuneConfig(cwd: string): void {
 
   const juneDir = path.join(cwd, ".june");
   const routesDir = path.join(juneDir, "routes");
-  const docsDir = path.join(routesDir, "docs", "[[...slug]]");
+  // basePath drives the docs route location (June has no route-prefix config — URL = disk).
+  const { docsDir, kuraImport } = docsRoute(routesDir, basePathSegments(cwd));
   const ogDir = path.join(routesDir, "og", "[slug]");
   const searchDir = path.join(routesDir, "search");
+  pruneStaleDocsRoutes(routesDir, docsDir); // drop a docs route a prior basePath left behind
   for (const d of [juneDir, routesDir, docsDir, ogDir, searchDir]) {
     fs.mkdirSync(d, { recursive: true });
   }
@@ -497,10 +501,10 @@ function generateJuneConfig(cwd: string): void {
     "export default kura.home.View;\n",
   );
 
-  // .june/routes/docs/[[...slug]]/page.tsx — docs
+  // .june/routes/<basePath>/[[...slug]]/page.tsx — docs (import depth follows basePath, see above)
   writeIfChanged(path.join(docsDir, "page.tsx"),
     HEADER +
-    'import { kura } from "../../_kura";\n' +
+    `import { kura } from "${kuraImport}";\n` +
     "export const loader = kura.docRoute.loader;\n" +
     "export const md = kura.docRoute.md;\n" +
     "export const json = kura.docRoute.json;\n" +
