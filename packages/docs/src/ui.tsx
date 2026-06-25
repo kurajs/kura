@@ -80,6 +80,9 @@ export type DocView = {
   next: { slug: string; title: string } | null;
   /** True when this locale has no variant for the page and the default language is shown. */
   notTranslated?: boolean;
+  /** ISO date of the page's last git commit (or a frontmatter `lastUpdated:`), when config.lastUpdated
+   *  is on. Rendered as a localized "Last updated on …" line; absent → no line. */
+  lastUpdated?: string;
 };
 export type SearchHit = { slug: string; title: string; section: string; text: string; score: number };
 
@@ -247,10 +250,23 @@ export function DocsLayoutShell({ site, navTabs, basePath = "/docs", labels = DE
   );
 }
 
+/** Format an ISO date for display in `locale` (falls back to the raw string if unparseable). Pinned to
+ *  UTC so the rendered calendar date is stable regardless of the build/viewer timezone (otherwise a
+ *  near-midnight commit could render a day off, and SSG output would vary by build machine). */
+function formatDate(iso: string, locale?: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  try {
+    return new Intl.DateTimeFormat(locale, { dateStyle: "long", timeZone: "UTC" }).format(d);
+  } catch {
+    return iso;
+  }
+}
+
 /** The page content for the persistent-shell model — the morph-swapped region. Renders into the
  *  outlet (display:contents), so its <main> + ToC <aside> fill columns 2–3 of the shell grid. */
-export function DocBody({ doc, basePath = "/docs", labels = DEFAULT_LABELS, href = (p) => p, mermaidCdn }: {
-  doc: DocView; basePath?: string; labels?: Labels; href?: Href; mermaidCdn?: string;
+export function DocBody({ doc, basePath = "/docs", labels = DEFAULT_LABELS, href = (p) => p, mermaidCdn, locale }: {
+  doc: DocView; basePath?: string; labels?: Labels; href?: Href; mermaidCdn?: string; locale?: string;
 }) {
   const md = href(docPath(basePath, `${doc.slug}.md`));
   const prompt = encodeURIComponent(`Please read this doc and answer my questions: ${doc.title}`);
@@ -288,6 +304,9 @@ export function DocBody({ doc, basePath = "/docs", labels = DEFAULT_LABELS, href
         </div>
         {doc.notTranslated && <div className="mb-5 px-3.5 py-2.5 text-[.85rem] border border-warn-border border-l-[3px] border-l-amber-600 rounded-r-lg bg-warn-bg text-warn-fg">{labels.notTranslated}</div>}
         <article className="prose" dangerouslySetInnerHTML={{ __html: bodyHtml }} />
+        {doc.lastUpdated && (
+          <p className="mt-8 mb-0 text-[.82rem] text-muted">{labels.lastUpdated} <time dateTime={doc.lastUpdated}>{formatDate(doc.lastUpdated, locale)}</time></p>
+        )}
         <nav className="flex justify-between gap-4 mt-12 pt-6 border-t border-border">
           {doc.prev ? <a className="flex-1 px-4 py-3.5 border border-border rounded-xl hover:border-accent" href={href(docPath(basePath, doc.prev.slug))}><div className="text-muted text-[.78rem]">← {labels.previous}</div><div className="font-semibold text-accent">{doc.prev.title}</div></a> : <span />}
           {doc.next ? <a className="flex-1 px-4 py-3.5 border border-border rounded-xl hover:border-accent text-right" href={href(docPath(basePath, doc.next.slug))}><div className="text-muted text-[.78rem]">{labels.next} →</div><div className="font-semibold text-accent">{doc.next.title}</div></a> : <span />}

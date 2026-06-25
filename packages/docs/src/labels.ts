@@ -17,6 +17,8 @@ export type Labels = {
   search: string;
   noResults: string;
   notTranslated: string;
+  /** Prefix for the optional last-updated line (config.lastUpdated), e.g. "Last updated on". */
+  lastUpdated: string;
 };
 
 export const DEFAULT_LABELS: Labels = {
@@ -36,6 +38,7 @@ export const DEFAULT_LABELS: Labels = {
   search: "Search",
   noResults: "No results.",
   notTranslated: "Not yet translated — showing the default language.",
+  lastUpdated: "Last updated on",
 };
 
 export function resolveLabels(locale: string | undefined, overrides?: Record<string, Partial<Labels>>): Labels {
