@@ -265,9 +265,9 @@ export function createSearch(opts: {
   let building: Promise<Kb<SearchData>> | null = null;
   let keyword: Bm25<KeywordData> | null = null;
   const getKb = () =>
-    (building ??= opts.indexBytes
+    (building ??= opts.indexBytes?.length
       ? Promise.resolve(Kb.load<SearchData>(opts.indexBytes, { embedder }))
-      : indexKb(opts.entries, embedder));
+      : indexKb(opts.entries, embedder)); // no/empty index bytes (e.g. --no-embed) → build from entries
   const getKeyword = () => (keyword ??= buildKeywordIndex(opts.entries, tokenizer));
 
   if (opts.warm !== false) {

@@ -7,7 +7,9 @@ import { INDEX_B64 } from "./app/_index";
 import { MDX } from "./app/_mdx";
 import { META, META_LOCALES } from "./app/_meta";
 
-const indexBytes = Uint8Array.from(atob(INDEX_B64), (c) => c.charCodeAt(0));
+// Empty when built with `kura build --no-embed` (no build-time index) → undefined, so search runs
+// keyword-only or builds the index lazily at runtime instead of decoding an empty buffer.
+const indexBytes = INDEX_B64 ? Uint8Array.from(atob(INDEX_B64), (c) => c.charCodeAt(0)) : undefined;
 
 const kuraConfig = defineKura({
   site: {
