@@ -11,6 +11,7 @@ dist/
 **/app/_index.ts
 **/app/_mdx.ts
 **/app/_meta.ts
+**/app/_dates.ts
 **/app/_index.bin
 **/app/_mdx.json
 **/app/_islands.gen.ts
