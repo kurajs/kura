@@ -6,6 +6,7 @@ import { evaluate } from "@mdx-js/mdx";
 import remarkGfm from "remark-gfm";
 import rehypeShikiFromHighlighter from "@shikijs/rehype/core";
 import { createHighlighter } from "shiki";
+import { toHtmlSync as commonmarkToHtmlSync, initSync as initCommonmark } from "@momiji-rs/sparkdown/gfm";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement, Children, isValidElement, type ReactElement, type ReactNode } from "react";
 import * as runtime from "react/jsx-runtime";
@@ -105,11 +106,63 @@ async function getHighlighter(): Promise<Highlighter> {
 
 const cache = new Map<string, string>();
 
+// --- CommonMark path (markdown: "commonmark" / --commonmark): render with the sparkdown-gfm wasm
+// (fast, CommonMark-strict so a literal `{…}` is text, GFM tables/strikethrough/task-lists/autolinks),
+// then highlight code blocks with the SAME shiki highlighter the MDX path uses — so both modes get
+// identical build-time, dual-theme highlighting. sparkdown emits `<pre><code class="language-X">…escaped…
+// </code></pre>` (no class for an un-tagged fence); we swap each block for shiki's output. ---
+let sparkInited = false;
+const unescapeHtml = (s: string): string =>
+  s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&");
+// `language-([^"]+)` (not `[\w-]+`) so fence langs with symbols — c++, f#, objective-c++ — still match.
+const CODE_BLOCK = /<pre><code(?: class="language-([^"]+)")?>([\s\S]*?)<\/code><\/pre>/g;
+
+// Add `language-<lang>` to shiki's first <code>, merging into an existing class attribute (rather than
+// blindly injecting a second `class="…"`, which would be invalid HTML if shiki ever tags <code>).
+const tagCodeLanguage = (html: string, lang: string): string =>
+  html.replace(/<code\b([^>]*)>/, (tag, attrs: string) => {
+    const cls = attrs.match(/\sclass="([^"]*)"/);
+    return cls ? tag.replace(cls[0], ` class="${cls[1]} language-${lang}"`) : `<code${attrs} class="language-${lang}">`;
+  });
+
+function highlightCommonmark(html: string, highlighter: Highlighter): string {
+  // CSS vars (--shiki-light/dark) — matches the MDX path's theme switching via [data-theme="dark"].
+  const opts = { themes: { light: "github-light", dark: "github-dark-default" }, defaultColor: false } as const;
+  return html.replace(CODE_BLOCK, (whole, lang: string | undefined, body: string) => {
+    const code = unescapeHtml(body).replace(/\n$/, ""); // drop sparkdown's trailing newline inside <code>
+    let out: string;
+    try {
+      // Try the AUTHORED language and let shiki resolve aliases (ts→typescript, yml→yaml, …) — shiki is
+      // the authority on what it can highlight, so don't second-guess it with a loaded-set pre-check.
+      out = highlighter.codeToHtml(code, { lang: lang || "text", ...opts });
+    } catch {
+      try {
+        out = highlighter.codeToHtml(code, { lang: "text", ...opts }); // unknown language → plain text, never drop
+      } catch {
+        return whole; // shiki unavailable entirely → keep the plain (escaped) block
+      }
+    }
+    // Parity with the MDX path's addLanguageClass: tag <code> with the AUTHORED language so
+    // language-specific styling/tooling still sees it.
+    return lang ? tagCodeLanguage(out, lang) : out;
+  });
+}
+
+async function renderCommonmark(source: string): Promise<string> {
+  if (!sparkInited) {
+    initCommonmark(); // synchronous wasm init, idempotent, build-time only
+    sparkInited = true;
+  }
+  const highlighter = await getHighlighter();
+  return highlightCommonmark(commonmarkToHtmlSync(source), highlighter);
+}
+
 /** Compile a doc to a static HTML string. Cached (default components only — see below).
- *  `format`: "mdx" (default) parses JS expressions `{…}` and JSX `<Tag/>`, so the curated components
- *  (Callout/Tabs/…) render; "md" is plain CommonMark with no MDX/JSX parsing, so a literal `{…}` is
- *  text (a literal `<tag>` is still raw HTML — escape it) and the curated JSX components do NOT
- *  render. Opt in (markdown: "commonmark") for prose-only docs, to avoid MDX's expression footgun. */
+ *  `format`: "mdx" (default) parses JS expressions `{…}` and JSX `<Tag/>` via @mdx-js, so the curated
+ *  components (Callout/Tabs/…) render; "md" is plain CommonMark + GFM via the sparkdown-gfm wasm — no
+ *  MDX/JSX parsing, so a literal `{…}` is text (a literal `<tag>` is still raw HTML) and the curated JSX
+ *  components do NOT render. Both modes highlight code with the same shiki highlighter. Opt into "md"
+ *  (markdown: "commonmark") for prose-only docs, to avoid MDX's expression footgun (and for speed). */
 export async function mdxToHtml(
   source: string,
   components: Record<string, unknown> = mdxComponents,
@@ -121,21 +174,26 @@ export async function mdxToHtml(
   const cacheable = components === mdxComponents;
   const key = `${format}\0${source}`;
   if (cacheable) { const hit = cache.get(key); if (hit !== undefined) return hit; }
-  const highlighter = await getHighlighter();
-  const mod = await evaluate(source, {
-    ...(runtime as Record<string, unknown>),
-    format,
-    remarkPlugins: [remarkGfm],
-    rehypePlugins: [[rehypeShikiFromHighlighter, highlighter, {
-      themes: { light: "github-light", dark: "github-dark-default" },
-      // defaultColor: false → emit CSS vars (--shiki-light / --shiki-dark) instead of inline
-      // style on every span. The preset.css switches between them via [data-theme="dark"].
-      defaultColor: false,
-      addLanguageClass: true,
-    }]],
-  } as never);
-  const Content = (mod as { default: (props: { components?: unknown }) => unknown }).default;
-  const html = renderToStaticMarkup(createElement(Content as never, { components }) as never);
+  let html: string;
+  if (format === "md") {
+    html = await renderCommonmark(source); // sparkdown-gfm + shiki; components are irrelevant in CommonMark
+  } else {
+    const highlighter = await getHighlighter();
+    const mod = await evaluate(source, {
+      ...(runtime as Record<string, unknown>),
+      format,
+      remarkPlugins: [remarkGfm],
+      rehypePlugins: [[rehypeShikiFromHighlighter, highlighter, {
+        themes: { light: "github-light", dark: "github-dark-default" },
+        // defaultColor: false → emit CSS vars (--shiki-light / --shiki-dark) instead of inline
+        // style on every span. The preset.css switches between them via [data-theme="dark"].
+        defaultColor: false,
+        addLanguageClass: true,
+      }]],
+    } as never);
+    const Content = (mod as { default: (props: { components?: unknown }) => unknown }).default;
+    html = renderToStaticMarkup(createElement(Content as never, { components }) as never);
+  }
   if (cacheable) cache.set(key, html);
   return html;
 }

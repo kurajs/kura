@@ -62,6 +62,22 @@ test("renderMdxBuckets format='md': a literal {…} renders as text instead of f
   expect(md.map.default!.bad).toContain("{cli, profile, account, path}"); // literal text, not evaluated
 });
 
+test("renderMdxBuckets format='md' (sparkdown-gfm): GFM + shiki highlight, bare headings, safe fallback", async () => {
+  // CommonMark mode renders via the sparkdown-gfm wasm, then shiki-highlights code blocks (same
+  // highlighter as MDX mode). Guards: GFM renders, headings stay BARE (Kura's anchor regex needs it),
+  // code gets shiki highlighting, an unknown language falls back to text instead of throwing/dropping.
+  const body =
+    "## Section\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n```ts\nconst x: number = 1;\n```\n\n```unknownlang\nplain\n```\n";
+  const { map, failures } = await renderMdxBuckets([{ bucket: "default", entries: [{ slug: "p", body }] }], undefined, "md");
+  const h = map.default!.p!;
+  expect(failures).toHaveLength(0);
+  expect(h).toContain("<h2>Section</h2>"); // bare heading (no injected id/class)
+  expect(h).toContain("<table>"); // GFM table
+  expect(h).toContain('class="shiki'); // shiki highlighting applied to code
+  expect(h).toContain("language-ts"); // authored language tagged on <code>
+  expect(h).toContain("plain"); // unknown language → highlighted as text, not dropped
+});
+
 // ── i18n: sidebar/pager links must route through `href` (the current-locale localeHref) ──────────
 const PFX = "/ja-JP";
 const prefixed: Href = (p) => PFX + p; // stand-in for hrefFor("ja-JP") = localeHref(i18n, p, "ja-JP")
