@@ -9,10 +9,11 @@ import { kuraLlms } from "./agent.ts";
 export type KuraI18nConfig = I18nConfig;
 
 export interface KuraConfig {
-  /** URL prefix for doc pages (default `/docs`). Set `""` to mount docs at the site root. The route
-   *  files must be placed to match: `app/docs/[[...slug]]` for `/docs`, `app/[[...slug]]` for root.
-   *  Affects generated links only (sidebar, pager, tabs, search results, `.md`); search stays at
-   *  `/search`. */
+  /** URL prefix for doc pages (default `/docs`). Set `""` to mount docs at the site root, or e.g.
+   *  `"/guide"` for a custom prefix. Drives BOTH the generated links (sidebar, pager, tabs, search
+   *  results, `.md`) AND the docs route location — `kura dev`/`build` emit the catch-all route at the
+   *  matching path (`.june/routes/docs/[[...slug]]` for `/docs`, `.june/routes/[[...slug]]` for root),
+   *  so links and routes always line up. Search stays at `/search`. */
   basePath?: string;
   /** Sidebar group order (sections). */
   sections?: string[];
