@@ -147,6 +147,7 @@ test("ogImageUrl: nested slug passes through; home uses the index sentinel (neve
   assert.equal(ogImageUrl(SITE, "getting-started/sdk"), "https://kura.build/og/getting-started/sdk.png");
   assert.equal(ogImageUrl(SITE, "sdk"), "https://kura.build/og/sdk.png");
   assert.equal(ogImageUrl(SITE, ""), "https://kura.build/og/index.png"); // not /og/.png
+  assert.equal(ogImageUrl("https://kura.build/", "sdk"), "https://kura.build/og/sdk.png"); // siteUrl trailing slash → no //
 });
 
 test("normalizeOgSlug: strips .png, maps the home sentinel back, tolerates missing param", () => {
@@ -172,4 +173,5 @@ test("canonicalUrl: siteUrl + doc path, trailing slash trimmed (home stays at th
   assert.equal(canonicalUrl(SITE, "/docs", ""), "https://kura.build/docs"); // home, no trailing slash
   assert.equal(canonicalUrl(SITE, "", "guide"), "https://kura.build/guide"); // basePath "" (site root)
   assert.equal(canonicalUrl(SITE, "", ""), "https://kura.build/"); // root home → "/"
+  assert.equal(canonicalUrl("https://kura.build/", "/docs", "a/b"), "https://kura.build/docs/a/b"); // siteUrl trailing slash → no //
 });

@@ -142,8 +142,10 @@ export const docPath = (basePath: string, slug: string): string => `${basePath}/
 
 /** The OG image URL for a doc page. The home page (empty slug) uses the sentinel "index" so the URL
  *  is `/og/index.png`, never the broken `/og/.png`. The route handler reverses this via
- *  normalizeOgSlug(), so meta tags and the catch-all `og/[[...slug]]` route always agree. */
-export const ogImageUrl = (siteUrl: string, slug: string): string => `${siteUrl}/og/${slug || "index"}.png`;
+ *  normalizeOgSlug(), so meta tags and the catch-all `og/[[...slug]]` route always agree. A trailing
+ *  slash on `siteUrl` (a common config slip) is trimmed so the result never has a `//`. */
+export const ogImageUrl = (siteUrl: string, slug: string): string =>
+  `${siteUrl.replace(/\/+$/, "")}/og/${slug || "index"}.png`;
 
 /** Recover a doc slug from the OG route's catch-all param: strip the `.png` and map the home
  *  sentinel back. `"getting-started/sdk.png"` → "getting-started/sdk"; `"index.png"`/`"index"` → "".
@@ -155,9 +157,10 @@ export const normalizeOgSlug = (raw: string | undefined): string => {
 
 /** The canonical URL for a doc page: `siteUrl` + its doc path, trailing slash trimmed (root stays
  *  "/"). `canonicalUrl("https://x.dev","/docs","a/b")` → "https://x.dev/docs/a/b"; the home page →
- *  "https://x.dev/docs" (or "https://x.dev/" when basePath is ""). */
+ *  "https://x.dev/docs" (or "https://x.dev/" when basePath is ""). A trailing slash on `siteUrl` is
+ *  trimmed so the result never has a `//`. */
 export const canonicalUrl = (siteUrl: string, basePath: string, slug: string): string =>
-  siteUrl + (docPath(basePath, slug).replace(/\/$/, "") || "/");
+  siteUrl.replace(/\/+$/, "") + (docPath(basePath, slug).replace(/\/$/, "") || "/");
 
 /** The top-level folder of a slug (`features/search/x` → `features`); "" for a bare slug. */
 export const topFolderOf = (slug: string): string => slug.split("/")[0] ?? "";
