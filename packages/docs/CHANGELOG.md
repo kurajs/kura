@@ -1,5 +1,19 @@
 # @kurajs/docs
 
+## 0.0.33
+
+### Patch Changes
+
+- [#22](https://github.com/kurajs/kura/pull/22) [`6950cea`](https://github.com/kurajs/kura/commit/6950cea8c0fb65fa53b1e8f3b5cb65d39c909bf3) Thanks [@linyiru](https://github.com/linyiru)! - Render `--commonmark` mode with sparkdown-gfm (wasm) + shiki
+
+  CommonMark mode (`markdown: "commonmark"` / `kura build --commonmark`) now renders via the
+  `@momiji-rs/sparkdown/gfm` WebAssembly parser instead of `@mdx-js` `format:"md"`, then highlights code
+  blocks with the same shiki highlighter the MDX path uses — so both modes get identical build-time,
+  dual-theme highlighting. CommonMark-strict by construction: a literal `{…}` stays text (no MDX
+  expression footgun, and zero compile failures → no silent page drops), GFM (tables/strikethrough/
+  task-lists/autolinks) renders, headings stay bare (Kura's anchor post-processor depends on this), and
+  an unknown code language falls back to plain text instead of throwing. MDX mode is unchanged.
+
 ## 0.0.32
 
 ### Patch Changes

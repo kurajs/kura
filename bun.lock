@@ -13,7 +13,7 @@
     },
     "examples/docs": {
       "name": "@kurajs/example-docs",
-      "version": "0.0.4",
+      "version": "0.0.5",
       "dependencies": {
         "@junejs/server": ">=0.0.45 <0.1.0",
         "@kurajs/docs": "workspace:*",
@@ -34,7 +34,7 @@
     },
     "examples/docs-cjk": {
       "name": "@kurajs/example-docs-cjk",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "dependencies": {
         "@junejs/server": ">=0.0.45 <0.1.0",
         "@kurajs/docs": "workspace:*",
@@ -56,7 +56,7 @@
     },
     "examples/search": {
       "name": "@kurajs/example-search",
-      "version": "0.0.4",
+      "version": "0.0.5",
       "dependencies": {
         "@junejs/server": ">=0.0.45 <0.1.0",
         "@kurajs/docs": "workspace:*",
@@ -96,7 +96,7 @@
     },
     "packages/create-kura": {
       "name": "create-kura",
-      "version": "0.0.13",
+      "version": "0.0.14",
       "bin": {
         "create-kura": "index.js",
       },
@@ -110,7 +110,7 @@
     },
     "packages/docs": {
       "name": "@kurajs/docs",
-      "version": "0.0.32",
+      "version": "0.0.33",
       "dependencies": {
         "@junejs/og": "^0.0.4",
         "@kurajs/core": ">=0.0.1 <0.1.0",
