@@ -91,7 +91,10 @@ function collectMeta(cwd: string): { meta: MetaMap; metaLocales: Record<string, 
 // degrades to "no date" rather than failing the build.
 function gitDateOf(file: string, cwd: string): string | null {
   try {
-    const out = execFileSync("git", ["log", "-1", "--format=%cI", "--", file], {
+    // A cwd-relative, POSIX-slashed pathspec — unambiguous and portable (an absolute or backslashed
+    // path is not a reliable git pathspec across platforms).
+    const rel = path.relative(cwd, file).split(path.sep).join("/");
+    const out = execFileSync("git", ["log", "-1", "--format=%cI", "--", rel], {
       cwd,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],

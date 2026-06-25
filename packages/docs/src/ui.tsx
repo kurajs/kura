@@ -250,8 +250,6 @@ export function DocsLayoutShell({ site, navTabs, basePath = "/docs", labels = DE
   );
 }
 
-/** The page content for the persistent-shell model — the morph-swapped region. Renders into the
- *  outlet (display:contents), so its <main> + ToC <aside> fill columns 2–3 of the shell grid. */
 /** Format an ISO date for display in `locale` (falls back to the raw string if unparseable). Pinned to
  *  UTC so the rendered calendar date is stable regardless of the build/viewer timezone (otherwise a
  *  near-midnight commit could render a day off, and SSG output would vary by build machine). */
@@ -265,6 +263,8 @@ function formatDate(iso: string, locale?: string): string {
   }
 }
 
+/** The page content for the persistent-shell model — the morph-swapped region. Renders into the
+ *  outlet (display:contents), so its <main> + ToC <aside> fill columns 2–3 of the shell grid. */
 export function DocBody({ doc, basePath = "/docs", labels = DEFAULT_LABELS, href = (p) => p, mermaidCdn, locale }: {
   doc: DocView; basePath?: string; labels?: Labels; href?: Href; mermaidCdn?: string; locale?: string;
 }) {
