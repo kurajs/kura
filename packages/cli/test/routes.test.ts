@@ -40,6 +40,23 @@ test("parseBasePath: a https:// in a string is not mistaken for a line comment",
   assert.deepEqual(parseBasePath('{ siteUrl: "https://x.dev", basePath: "/guide" }'), ["guide"]);
 });
 
+test("parseBasePath: traversal/separator segments are rejected (no escaping .june/routes)", () => {
+  assert.throws(() => parseBasePath('{ basePath: "../../.." }'), /Invalid basePath.*"\.\."/);
+  assert.throws(() => parseBasePath('{ basePath: "docs/../../etc" }'), /Invalid basePath/);
+  assert.throws(() => parseBasePath('{ basePath: "." }'), /Invalid basePath/);
+  assert.throws(() => parseBasePath('{ basePath: "a\\\\b" }'), /Invalid basePath/); // backslash segment
+});
+
+test("docsRoute: validated segments stay within routesDir", () => {
+  // With parseBasePath rejecting "..", every real segment list keeps docsDir under routesDir.
+  const routesDir = "/p/.june/routes";
+  for (const raw of ["", "/docs", "/guide", "/a/b"]) {
+    const { docsDir } = docsRoute(routesDir, parseBasePath(`{ basePath: ${JSON.stringify(raw)} }`));
+    const rel = path.relative(routesDir, docsDir);
+    assert.ok(!rel.startsWith(".."), `${raw} → ${docsDir} escapes ${routesDir}`);
+  }
+});
+
 test("docsRoute: dir + import depth follow the segments", () => {
   const R = "/p/.june/routes";
   assert.deepEqual(docsRoute(R, ["docs"]), { docsDir: path.join(R, "docs", "[[...slug]]"), kuraImport: "../../_kura" });

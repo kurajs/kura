@@ -16,7 +16,16 @@ export function parseBasePath(configText: string): string[] {
     .replace(/(^|\s)\/\/.*$/gm, "$1");
   const m = txt.match(/\bbasePath\s*:\s*["']([^"']*)["']/);
   if (!m) return ["docs"]; // key absent → default "/docs"
-  return m[1]!.split("/").filter(Boolean); // trims leading/trailing/dup slashes; "" → []
+  const segments = m[1]!.split("/").filter(Boolean); // trims leading/trailing/dup slashes; "" → []
+  // Reject traversal/separator segments: "." / ".." / a backslash are meaningless in a URL prefix
+  // and, joined into routesDir, would let the docs route escape .june/routes (a confusing config
+  // mistake). Fail fast with the offending value so the user fixes basePath, not silently misplace files.
+  for (const s of segments) {
+    if (s === "." || s === ".." || s.includes("\\")) {
+      throw new Error(`Invalid basePath ${JSON.stringify(m[1])}: segment ${JSON.stringify(s)} is not a valid URL path segment.`);
+    }
+  }
+  return segments;
 }
 
 // `basePath` segments for the app at `cwd` (no kura.config.ts → default "/docs").
