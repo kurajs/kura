@@ -182,7 +182,11 @@ async function cmdIndex(): Promise<void> {
   const hashOf = (f: string) => (fs.existsSync(f) ? fs.readFileSync(f, "utf8").match(/content-hash: (\S+)/)?.[1] : undefined);
   // --strict must re-check failures every run, so it never short-circuits — a cached _mdx.ts from a
   // prior non-strict run could otherwise hide failures and let `kura build --strict` pass wrongly.
-  const upToDate = !strict && (noEmbed ? hashOf(mdxTs) === contentHash : hashOf(indexTs) === contentHash && fs.existsSync(mdxTs));
+  // --no-embed also requires the index STUB to exist: otherwise a content-unchanged run short-circuits
+  // and never writes it, and a missing app/_index.ts breaks `import { INDEX_B64 }` in the config.
+  const upToDate = !strict && (noEmbed
+    ? hashOf(mdxTs) === contentHash && fs.existsSync(indexTs)
+    : hashOf(indexTs) === contentHash && fs.existsSync(mdxTs));
   if (upToDate) {
     console.log(`kura index: up to date (${allEntries.length} docs, hash ${contentHash}) — skipped`);
     return;

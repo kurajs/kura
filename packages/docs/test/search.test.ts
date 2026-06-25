@@ -52,6 +52,20 @@ test("a custom per-locale tokenizer override is honored", async () => {
   assert.ok(called, "the provided tokenizer resolver should be used");
 });
 
+test("empty indexBytes (the --no-embed stub) builds from entries, not Kb.load(empty)", async () => {
+  // `kura build --no-embed` writes INDEX_B64 = "" → a 0-length Uint8Array. It must be treated as
+  // "no index" (build the KB from entries), NOT passed to Kb.load — which throws on empty bytes and
+  // was the original --no-embed failure mode (empty behaving differently than undefined).
+  const search = createSearch({ entries, indexBytes: new Uint8Array(0), embedder: fakeEmbedder(["索引"]) });
+  const kb = await search.getKb(); // resolves (built from entries) instead of throwing on empty bytes
+  assert.ok(kb, "getKb should build from entries when index bytes are empty");
+  assert.deepEqual(
+    await createSearch({ entries, indexBytes: undefined, embedder: fakeEmbedder(["索引"]) }).getKb() !== null,
+    kb !== null,
+    "empty index bytes behave the same as undefined",
+  );
+});
+
 test("keyword snippet aligns with BM25 tokenization for punctuated queries", async () => {
   // Body padded so a naive (start-of-doc) snippet would miss the match. BM25 tokenizes
   // "react/redux" → ["react","redux"]; the snippet must use the same tokenization (not a
