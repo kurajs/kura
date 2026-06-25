@@ -185,7 +185,8 @@ async function cmdIndex(): Promise<void> {
   // --no-embed also requires app/_index.ts to actually export INDEX_B64 — not merely exist: a missing,
   // corrupt, or hand-edited stub would otherwise short-circuit and leave a broken `import { INDEX_B64 }`
   // in the config. (The embed path is already covered by its content-hash stamp.)
-  const exportsIndexB64 = (f: string) => fs.existsSync(f) && fs.readFileSync(f, "utf8").includes("INDEX_B64");
+  const exportsIndexB64 = (f: string) =>
+    fs.existsSync(f) && /export\s+const\s+INDEX_B64\b/.test(fs.readFileSync(f, "utf8"));
   const upToDate = !strict && (noEmbed
     ? hashOf(mdxTs) === contentHash && exportsIndexB64(indexTs)
     : hashOf(indexTs) === contentHash && fs.existsSync(mdxTs));
