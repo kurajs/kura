@@ -47,6 +47,16 @@ test("parseBasePath: traversal/separator segments are rejected (no escaping .jun
   assert.throws(() => parseBasePath('{ basePath: "a\\\\b" }'), /Invalid basePath/); // backslash segment
 });
 
+test("parseBasePath: a basePath starting with a reserved route segment is rejected", () => {
+  // og/[[...slug]] and search/ are kura-owned routes; docs there would collide with them.
+  assert.throws(() => parseBasePath('{ basePath: "/og" }'), /reserved route segment/);
+  assert.throws(() => parseBasePath('{ basePath: "og" }'), /reserved/);
+  assert.throws(() => parseBasePath('{ basePath: "/og/x" }'), /reserved/); // first segment still "og"
+  assert.throws(() => parseBasePath('{ basePath: "/search" }'), /reserved/);
+  // A non-reserved prefix that merely contains the word is fine.
+  assert.deepEqual(parseBasePath('{ basePath: "/blog" }'), ["blog"]);
+});
+
 test("docsRoute: validated segments stay within routesDir", () => {
   // With parseBasePath rejecting "..", every real segment list keeps docsDir under routesDir.
   const routesDir = "/p/.june/routes";
@@ -124,4 +134,18 @@ test("pruneStaleDocsRoutes: prunes a nested stale prefix back to routesDir, keep
 
 test("pruneStaleDocsRoutes: a missing routesDir is a no-op", () => {
   assert.doesNotThrow(() => pruneStaleDocsRoutes(path.join(os.tmpdir(), "kura-does-not-exist-xyz"), "x"));
+});
+
+test("pruneStaleDocsRoutes: never deletes the OG catch-all (og/[[...slug]] is not a docs route)", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "kura-routes-"));
+  const routesDir = path.join(root, "routes");
+  const docs = path.join(routesDir, "[[...slug]]"); // docs at site root (basePath "")
+  const og = path.join(routesDir, "og", "[[...slug]]"); // OG catch-all — must survive
+  for (const d of [docs, og]) fs.mkdirSync(d, { recursive: true });
+
+  pruneStaleDocsRoutes(routesDir, docs);
+
+  assert.equal(fs.existsSync(og), true, "og/[[...slug]] is left intact");
+  assert.equal(fs.existsSync(docs), true, "the docs route survives");
+  fs.rmSync(root, { recursive: true, force: true });
 });

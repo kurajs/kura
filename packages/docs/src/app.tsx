@@ -7,7 +7,7 @@
 // every per-locale helper collapses to the single default collection (zero overhead).
 // With `i18n`, June resolves ctx.locale before routing; the loaders thread it into the
 // content finders (variant → default fallback), the nav, the labels, and the MDX bucket.
-import { createNav, treeOf, flattenTree, processHtml, topFolderOf, activeTabIndex, normalizeBasePath, docPath, type DocLike, type Nav, type NavNode } from "./nav.ts";
+import { createNav, treeOf, flattenTree, processHtml, topFolderOf, activeTabIndex, normalizeBasePath, docPath, ogImageUrl, canonicalUrl, type DocLike, type Nav, type NavNode } from "./nav.ts";
 import { mergeMeta, type MetaMap, type TabConfig } from "./meta.ts";
 import { createSearch, type SearchHit } from "./search.ts";
 import { docsActions } from "./actions.ts";
@@ -293,10 +293,13 @@ export function createDocs<T extends DocLike>(opts: {
   const siteDesc = opts.config.site?.description;
   const metadata = (d: DocPage) => {
     const desc = d.doc.description ?? siteDesc;
-    const ogImage = siteUrl ? `${siteUrl}/og/${d.doc.slug}.png` : undefined;
+    // Empty slug (home) → /og/index.png, not the broken /og/.png; nested slugs pass through and the
+    // catch-all OG route resolves them. canonical needs siteUrl, so both are gated on it.
+    const ogImage = siteUrl ? ogImageUrl(siteUrl, d.doc.slug) : undefined;
     return {
       title: d.doc.title,
       ...(desc ? { description: desc } : {}),
+      ...(siteUrl ? { canonical: canonicalUrl(siteUrl, basePath, d.doc.slug) } : {}),
       openGraph: {
         title: d.doc.title,
         ...(desc ? { description: desc } : {}),
@@ -344,8 +347,8 @@ export function createDocs<T extends DocLike>(opts: {
     metadata: { title: "Search" },
   };
 
-  // OG image route — /og/[slug].png → kura-branded card for each doc page.
-  // Add app/og/[slug]/route.ts with `export default kura.ogRoute` to enable.
+  // OG image route — /og/<slug>.png → kura-branded card for each doc page (nested slugs included).
+  // Add app/og/[[...slug]]/route.ts with `export default kura.ogRoute` to enable.
   // Override by calling createOgRoute() directly with a custom card renderer.
   const ogRoute = createOgRoute({ DOCS }, opts.config);
 

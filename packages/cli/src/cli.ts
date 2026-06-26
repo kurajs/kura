@@ -433,7 +433,7 @@ function writeIfChanged(filePath: string, content: string): void {
 //   .june/routes/<basePath>/[[...slug]]/page.tsx — docs route (default <basePath> = docs; "" mounts
 //                                        the catch-all directly under routes/, served at site root)
 //   .june/routes/search/page.tsx       — search route (always /search, basePath-independent)
-//   .june/routes/og/[slug]/route.ts    — OG image route
+//   .june/routes/og/[[...slug]]/route.ts — OG image route (catch-all: nested slugs resolve)
 //   .june/routes/_client.ts            — island client entry (⌘K search)
 // June v0.0.44+ scans .june/routes/ alongside app/; app/ takes priority (override slot).
 function generateJuneConfig(cwd: string): void {
@@ -444,9 +444,14 @@ function generateJuneConfig(cwd: string): void {
   const routesDir = path.join(juneDir, "routes");
   // basePath drives the docs route location (June has no route-prefix config — URL = disk).
   const { docsDir, kuraImport } = docsRoute(routesDir, basePathSegments(cwd));
-  const ogDir = path.join(routesDir, "og", "[slug]");
+  // Catch-all so nested doc slugs (/og/getting-started/sdk.png) resolve, not just /og/sdk.png.
+  const ogDir = path.join(routesDir, "og", "[[...slug]]");
   const searchDir = path.join(routesDir, "search");
   pruneStaleDocsRoutes(routesDir, docsDir); // drop a docs route a prior basePath left behind
+  // Drop ONLY the old single-segment og/[slug] from a prior version (a leftover [slug] would win for
+  // single-segment OG URLs). Targeted, not a wholesale rm of routes/og, so writeIfChanged keeps the
+  // og/[[...slug]] route's mtime stable across runs.
+  fs.rmSync(path.join(routesDir, "og", "[slug]"), { recursive: true, force: true });
   for (const d of [juneDir, routesDir, docsDir, ogDir, searchDir]) {
     fs.mkdirSync(d, { recursive: true });
   }
@@ -522,7 +527,7 @@ function generateJuneConfig(cwd: string): void {
     "export default kura.searchRoute.View;\n",
   );
 
-  // .june/routes/og/[slug]/route.ts — OG image
+  // .june/routes/og/[[...slug]]/route.ts — OG image (catch-all → nested slugs resolve)
   writeIfChanged(path.join(ogDir, "route.ts"),
     HEADER +
     'import { kura } from "../../_kura";\n' +

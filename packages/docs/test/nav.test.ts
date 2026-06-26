@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { treeOf, flattenTree, createNav, slugify, topFolderOf, activeTabIndex, normalizeBasePath, docPath, type NavNode, type DocLike } from "../src/nav.ts";
+import { treeOf, flattenTree, createNav, slugify, topFolderOf, activeTabIndex, normalizeBasePath, docPath, ogImageUrl, normalizeOgSlug, resolveOgSlug, canonicalUrl, type NavNode, type DocLike } from "../src/nav.ts";
 import { doc, DOCS, META } from "./fixtures.ts";
 
 // Tiny readers over the discriminated NavNode union.
@@ -139,4 +139,47 @@ test("activeTabIndex: the tab owning the slug's top folder; first tab as fallbac
   assert.equal(activeTabIndex(tabs, "advanced"), 1);
   assert.equal(activeTabIndex(tabs, "unknown/page"), 0); // fallback → first tab
   assert.equal(activeTabIndex(tabs, ""), 0);
+});
+
+const SITE = "https://kura.build";
+
+test("ogImageUrl: nested slug passes through; home uses the index sentinel (never /og/.png)", () => {
+  assert.equal(ogImageUrl(SITE, "getting-started/sdk"), "https://kura.build/og/getting-started/sdk.png");
+  assert.equal(ogImageUrl(SITE, "sdk"), "https://kura.build/og/sdk.png");
+  assert.equal(ogImageUrl(SITE, ""), "https://kura.build/og/index.png"); // not /og/.png
+  assert.equal(ogImageUrl("https://kura.build/", "sdk"), "https://kura.build/og/sdk.png"); // siteUrl trailing slash → no //
+});
+
+test("normalizeOgSlug: strips .png, maps the home sentinel back, tolerates missing param", () => {
+  assert.equal(normalizeOgSlug("getting-started/sdk.png"), "getting-started/sdk"); // joined catch-all
+  assert.equal(normalizeOgSlug("sdk.png"), "sdk");
+  assert.equal(normalizeOgSlug("index.png"), "");
+  assert.equal(normalizeOgSlug("index"), "");
+  assert.equal(normalizeOgSlug(""), "");
+  assert.equal(normalizeOgSlug(undefined), "");
+});
+
+test("resolveOgSlug: a real doc named 'index' wins over the home sentinel; else falls back to home", () => {
+  assert.equal(resolveOgSlug(new Set(["index"]), "index.png"), "index"); // literal doc wins → its own card
+  assert.equal(resolveOgSlug(new Set([""]), "index.png"), ""); // no 'index' doc → home sentinel
+  assert.equal(resolveOgSlug(new Set(["getting-started/sdk"]), "getting-started/sdk.png"), "getting-started/sdk");
+  assert.equal(resolveOgSlug(new Set(["sdk"]), "sdk.png"), "sdk");
+  assert.equal(resolveOgSlug(new Set([]), undefined), ""); // /og with no segment → home
+});
+
+test("contract: the OG meta URL round-trips back to the doc slug through the route handler", () => {
+  // What the meta tag emits and what the og/[[...slug]] handler receives must agree, or the image
+  // 404s (the reported bug). June delivers the path after /og/ as the joined catch-all param.
+  for (const slug of ["getting-started/sdk", "sdk", ""]) {
+    const param = ogImageUrl(SITE, slug).slice(`${SITE}/og/`.length); // e.g. "getting-started/sdk.png"
+    assert.equal(normalizeOgSlug(param), slug, `slug=${JSON.stringify(slug)}`);
+  }
+});
+
+test("canonicalUrl: siteUrl + doc path, trailing slash trimmed (home stays at the base root)", () => {
+  assert.equal(canonicalUrl(SITE, "/docs", "getting-started/sdk"), "https://kura.build/docs/getting-started/sdk");
+  assert.equal(canonicalUrl(SITE, "/docs", ""), "https://kura.build/docs"); // home, no trailing slash
+  assert.equal(canonicalUrl(SITE, "", "guide"), "https://kura.build/guide"); // basePath "" (site root)
+  assert.equal(canonicalUrl(SITE, "", ""), "https://kura.build/"); // root home → "/"
+  assert.equal(canonicalUrl("https://kura.build/", "/docs", "a/b"), "https://kura.build/docs/a/b"); // siteUrl trailing slash → no //
 });
