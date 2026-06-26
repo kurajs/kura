@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createSearch, splitByHeadings } from "../src/search.ts";
+import { processHtml } from "../src/nav.ts";
 import type { DocLike } from "../src/nav.ts";
 import type { Embedder } from "@kurajs/core";
 
@@ -140,6 +141,16 @@ test("splitByHeadings splits on ##/###, keeps an intro section, and ignores fenc
   assert.ok(secs[1]!.text.includes("not a heading"), "fenced ## stays in its section, not split out");
   // empty body → a single intro section (never zero), so every doc indexes at least once
   assert.deepEqual(splitByHeadings("").map((s) => s.headingId), [""]);
+});
+
+test("splitByHeadings: splits h4 and de-dups repeats, matching processHtml's anchor ids exactly", () => {
+  const body = ["## Setup", "a", "### Setup", "b", "#### Details", "c"].join("\n");
+  const ids = splitByHeadings(body).map((s) => s.headingId);
+  assert.deepEqual(ids, ["setup", "setup-1", "details"]); // h4 split + de-dup
+  // The cross-module invariant search.ts relies on: the same headings rendered to HTML get the SAME
+  // ids (incl. de-dup), so a search hit's `#id` always resolves to the right rendered anchor.
+  const { toc } = processHtml("<h2>Setup</h2><h3>Setup</h3><h4>Details</h4>");
+  assert.deepEqual(toc.map((h) => h.id), ids);
 });
 
 test("keyword search returns the matching heading's anchor for deep-linking", async () => {

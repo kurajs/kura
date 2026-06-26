@@ -159,6 +159,11 @@ test("processHtml: de-dups repeated heading slugs (-1, -2) so anchors stay uniqu
   assert.match(html, /<h2 id="setup">Setup<\/h2><h2 id="setup-1">Setup<\/h2><h3 id="setup-2">Setup<\/h3>/);
 });
 
+test("processHtml: a heading that slugifies to empty (emoji/punctuation) falls back to a usable id", () => {
+  const { toc } = processHtml("<h2>🚀</h2><h2>!!!</h2>");
+  assert.deepEqual(toc.map((h) => h.id), ["section", "section-1"]); // never id=""
+});
+
 const SITE = "https://kura.build";
 
 test("ogImageUrl: nested slug passes through; home uses the index sentinel (never /og/.png)", () => {

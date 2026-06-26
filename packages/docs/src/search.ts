@@ -6,7 +6,7 @@ import { Bm25, rrfScored, latinTokenizer } from "@kurajs/search";
 import type { Tokenizer, TokenizerResolver } from "@kurajs/search";
 import { cjkSegmenter } from "@kurajs/tokenizers";
 import type { DocLike } from "./nav.ts";
-import { slugify } from "./nav.ts";
+import { createSlugger } from "./nav.ts";
 import { stripMdx } from "./util.ts";
 
 // Default per-locale keyword tokenizer policy: CJK locales get native word
@@ -28,9 +28,9 @@ export function defaultTokenizer(): TokenizerResolver {
   };
 }
 
-// `headingId` aligns with nav's slugify(), so a hit deep-links to the exact rendered anchor
-// (#heading); `heading` is the section's heading text (the page title still travels in `title`).
-// The intro section (text before the first h2/h3) has an empty headingId → links to the page top.
+// `headingId` aligns with nav's createSlugger() (same de-dup), so a hit deep-links to the exact
+// rendered anchor (#heading); `heading` is the section's heading text (the page title still travels
+// in `title`). The intro section (text before the first h2–h4) has an empty headingId → page top.
 export type SearchData = { slug: string; title: string; section: string; text: string; locale?: string; headingId?: string; heading?: string };
 export type SearchHit = { slug: string; title: string; section: string; text: string; score: number; locale?: string; headingId?: string; heading?: string };
 
@@ -46,25 +46,27 @@ export function chunk(text: string, size = 500, overlap = 80): string[] {
 export interface Section { headingId: string; heading: string; text: string }
 
 /**
- * Split a markdown body into heading-anchored sections at `##`/`###` (the levels nav's
+ * Split a markdown body into heading-anchored sections at `##`–`####` (the levels nav's
  * processHtml anchors), so each section can be indexed and deep-linked to its own `#id`.
- * `headingId` uses the same {@link slugify} as the renderer, guaranteeing the anchor exists.
- * Text before the first heading is the intro section (empty headingId = page top). ATX markers
- * inside fenced code blocks are ignored, matching what actually becomes a rendered heading.
+ * `headingId` uses the same {@link createSlugger} as the renderer — same heading set, same order —
+ * so the ids match exactly, including the -1/-2 de-dup for repeated headings. Text before the first
+ * heading is the intro section (empty headingId = page top). ATX markers inside fenced code blocks
+ * are ignored, matching what actually becomes a rendered heading.
  */
 export function splitByHeadings(body: string): Section[] {
   const lines = body.replace(/\r/g, "").split("\n");
   const sections: Section[] = [];
+  const slugId = createSlugger(); // one per body → ids align with processHtml's (incl. de-dup)
   let cur: Section = { headingId: "", heading: "", text: "" };
   let inFence = false;
   const flush = () => { const t = cur.text.trim(); if (t || cur.heading) sections.push({ ...cur, text: t }); };
   for (const line of lines) {
     if (/^\s*(```|~~~)/.test(line)) inFence = !inFence;
-    const m = !inFence && /^(#{2,3})\s+(.+?)\s*#*$/.exec(line);
+    const m = !inFence && /^(#{2,4})\s+(.+?)\s*#*$/.exec(line);
     if (m) {
       flush();
       const heading = m[2]!.replace(/[`*_~]/g, "").trim();
-      cur = { headingId: slugify(heading), heading, text: "" };
+      cur = { headingId: slugId(heading), heading, text: "" };
     } else {
       cur.text += line + "\n";
     }

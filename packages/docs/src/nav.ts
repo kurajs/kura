@@ -186,18 +186,29 @@ export function slugify(text: string): string {
   return text.trim().toLowerCase().replace(/[`*_~]/g, "").replace(/\s+/g, "-").replace(/[^\p{L}\p{N}-]/gu, "");
 }
 
+/** A stateful heading-id generator for ONE document. Slugifies the heading text, falls back to
+ *  "section" when slugify yields "" (a punctuation/emoji-only heading would otherwise get id=""),
+ *  and de-dups repeats github-slugger style: the first use keeps the bare slug, later ones get -1,
+ *  -2, …. Use one slugger per document so the renderer (processHtml) and the search indexer
+ *  (splitByHeadings) walk the same headings in order and assign IDENTICAL ids — search deep-links
+ *  (`#id`) must match the rendered anchors, including for repeated and h4 headings. */
+export function createSlugger(): (text: string) => string {
+  const seen = new Map<string, number>();
+  return (text: string) => {
+    const base = slugify(text) || "section";
+    const n = seen.get(base) ?? 0;
+    seen.set(base, n + 1);
+    return n === 0 ? base : `${base}-${n}`;
+  };
+}
+
 /** Inject ids into h2–h4 of rendered HTML and extract the table of contents. */
 export function processHtml(html: string): { html: string; toc: Toc } {
   const toc: Toc = [];
-  const seen = new Map<string, number>(); // base slug → uses, for de-duping repeated heading ids
+  const slugId = createSlugger();
   const out = html.replace(/<h([2-4])>([\s\S]*?)<\/h\1>/g, (_m, lvl: string, inner: string) => {
     const text = inner.replace(/<[^>]+>/g, "").trim();
-    const base = slugify(text);
-    // De-dup like github-slugger: the first use keeps the bare slug, later ones get -1, -2, … so two
-    // headings with the same text still get unique ids (otherwise their anchors and scroll-spy collide).
-    const n = seen.get(base) ?? 0;
-    seen.set(base, n + 1);
-    const id = n === 0 ? base : `${base}-${n}`;
+    const id = slugId(text);
     toc.push({ level: Number(lvl), text, id });
     return `<h${lvl} id="${id}">${inner}</h${lvl}>`;
   });
