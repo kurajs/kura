@@ -25,8 +25,17 @@ export function parseBasePath(configText: string): string[] {
       throw new Error(`Invalid basePath ${JSON.stringify(m[1])}: segment ${JSON.stringify(s)} is not a valid URL path segment.`);
     }
   }
+  // Reject a basePath that starts with a route segment kura already owns: docs at routes/og/[[...slug]]
+  // would land on the OG route's own directory (page.tsx shadows route.ts → OG breaks), and /search is
+  // the search route. Fail fast rather than silently clobber one of them.
+  if (segments.length && RESERVED_ROOT_SEGMENTS.has(segments[0]!)) {
+    throw new Error(`Invalid basePath ${JSON.stringify(m[1])}: ${JSON.stringify(segments[0])} is a reserved route segment (kura serves the OG image and search routes there). Choose a different basePath.`);
+  }
   return segments;
 }
+
+// First-segment basePath values that would collide with a route kura generates under .june/routes.
+const RESERVED_ROOT_SEGMENTS = new Set(["og", "search"]);
 
 // `basePath` segments for the app at `cwd` (no kura.config.ts → default "/docs").
 export function basePathSegments(cwd: string): string[] {

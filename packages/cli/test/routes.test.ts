@@ -47,6 +47,16 @@ test("parseBasePath: traversal/separator segments are rejected (no escaping .jun
   assert.throws(() => parseBasePath('{ basePath: "a\\\\b" }'), /Invalid basePath/); // backslash segment
 });
 
+test("parseBasePath: a basePath starting with a reserved route segment is rejected", () => {
+  // og/[[...slug]] and search/ are kura-owned routes; docs there would collide with them.
+  assert.throws(() => parseBasePath('{ basePath: "/og" }'), /reserved route segment/);
+  assert.throws(() => parseBasePath('{ basePath: "og" }'), /reserved/);
+  assert.throws(() => parseBasePath('{ basePath: "/og/x" }'), /reserved/); // first segment still "og"
+  assert.throws(() => parseBasePath('{ basePath: "/search" }'), /reserved/);
+  // A non-reserved prefix that merely contains the word is fine.
+  assert.deepEqual(parseBasePath('{ basePath: "/blog" }'), ["blog"]);
+});
+
 test("docsRoute: validated segments stay within routesDir", () => {
   // With parseBasePath rejecting "..", every real segment list keeps docsDir under routesDir.
   const routesDir = "/p/.june/routes";

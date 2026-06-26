@@ -448,9 +448,10 @@ function generateJuneConfig(cwd: string): void {
   const ogDir = path.join(routesDir, "og", "[[...slug]]");
   const searchDir = path.join(routesDir, "search");
   pruneStaleDocsRoutes(routesDir, docsDir); // drop a docs route a prior basePath left behind
-  // Rebuild routes/og so the old single-segment og/[slug] from a prior version is replaced by the
-  // catch-all og/[[...slug]] (a leftover [slug] would otherwise win for single-segment OG URLs).
-  fs.rmSync(path.join(routesDir, "og"), { recursive: true, force: true });
+  // Drop ONLY the old single-segment og/[slug] from a prior version (a leftover [slug] would win for
+  // single-segment OG URLs). Targeted, not a wholesale rm of routes/og, so writeIfChanged keeps the
+  // og/[[...slug]] route's mtime stable across runs.
+  fs.rmSync(path.join(routesDir, "og", "[slug]"), { recursive: true, force: true });
   for (const d of [juneDir, routesDir, docsDir, ogDir, searchDir]) {
     fs.mkdirSync(d, { recursive: true });
   }

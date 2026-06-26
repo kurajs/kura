@@ -155,6 +155,15 @@ export const normalizeOgSlug = (raw: string | undefined): string => {
   return s === "index" ? "" : s;
 };
 
+/** Resolve the doc slug an OG route param refers to. Prefers a literal doc match so a page actually
+ *  named "index" (from `index/index.md`) wins over the home sentinel — otherwise it would render the
+ *  home card. Falls back to normalizeOgSlug() (mapping the "index" sentinel → home "") when no doc
+ *  owns the literal slug. */
+export const resolveOgSlug = (docSlugs: ReadonlySet<string>, raw: string | undefined): string => {
+  const literal = String(raw ?? "").replace(/\.png$/, "");
+  return docSlugs.has(literal) ? literal : normalizeOgSlug(raw);
+};
+
 /** The canonical URL for a doc page: `siteUrl` + its doc path, trailing slash trimmed (root stays
  *  "/"). `canonicalUrl("https://x.dev","/docs","a/b")` → "https://x.dev/docs/a/b"; the home page →
  *  "https://x.dev/docs" (or "https://x.dev/" when basePath is ""). A trailing slash on `siteUrl` is

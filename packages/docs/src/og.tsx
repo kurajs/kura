@@ -11,7 +11,7 @@
 import { createElement } from "react";
 import { ImageResponse, loadGoogleFont, hasCJK, OG_HEADERS } from "@junejs/og";
 import type { OgFont } from "@junejs/og";
-import { normalizeOgSlug, type DocLike } from "./nav.ts";
+import { resolveOgSlug, type DocLike } from "./nav.ts";
 import type { KuraConfig } from "./config.ts";
 
 const W = 1200;
@@ -154,11 +154,15 @@ export function kuraOgCard({ title, section, siteName = "Kura" }: KuraOgCardOpti
 export function createOgRoute<T extends DocLike>(
   content: { DOCS: readonly T[] },
   config?: Pick<KuraConfig, "site">,
-): (request: Request, ctx: { params: Record<string, string> }) => Promise<Response> {
+): (request: Request, ctx: { params: Record<string, string | undefined> }) => Promise<Response> {
+  // Record<string, string | undefined>: the route mounts at the OPTIONAL catch-all og/[[...slug]], so
+  // June calls with params.slug missing for /og itself — resolveOgSlug tolerates undefined.
   const siteName = config?.site?.name ?? "Kura";
+  // Built once, not per request: lets resolveOgSlug prefer a real doc literally named "index".
+  const docSlugs = new Set(content.DOCS.map((d) => d.slug));
 
   return async (_req, ctx) => {
-    const slug = normalizeOgSlug(ctx.params.slug);
+    const slug = resolveOgSlug(docSlugs, ctx.params.slug);
     const doc = content.DOCS.find((d) => d.slug === slug);
 
     const title = doc ? String(doc.data.title ?? slug) : siteName;

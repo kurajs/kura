@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { treeOf, flattenTree, createNav, slugify, topFolderOf, activeTabIndex, normalizeBasePath, docPath, ogImageUrl, normalizeOgSlug, canonicalUrl, type NavNode, type DocLike } from "../src/nav.ts";
+import { treeOf, flattenTree, createNav, slugify, topFolderOf, activeTabIndex, normalizeBasePath, docPath, ogImageUrl, normalizeOgSlug, resolveOgSlug, canonicalUrl, type NavNode, type DocLike } from "../src/nav.ts";
 import { doc, DOCS, META } from "./fixtures.ts";
 
 // Tiny readers over the discriminated NavNode union.
@@ -157,6 +157,14 @@ test("normalizeOgSlug: strips .png, maps the home sentinel back, tolerates missi
   assert.equal(normalizeOgSlug("index"), "");
   assert.equal(normalizeOgSlug(""), "");
   assert.equal(normalizeOgSlug(undefined), "");
+});
+
+test("resolveOgSlug: a real doc named 'index' wins over the home sentinel; else falls back to home", () => {
+  assert.equal(resolveOgSlug(new Set(["index"]), "index.png"), "index"); // literal doc wins → its own card
+  assert.equal(resolveOgSlug(new Set([""]), "index.png"), ""); // no 'index' doc → home sentinel
+  assert.equal(resolveOgSlug(new Set(["getting-started/sdk"]), "getting-started/sdk.png"), "getting-started/sdk");
+  assert.equal(resolveOgSlug(new Set(["sdk"]), "sdk.png"), "sdk");
+  assert.equal(resolveOgSlug(new Set([]), undefined), ""); // /og with no segment → home
 });
 
 test("contract: the OG meta URL round-trips back to the doc slug through the route handler", () => {
