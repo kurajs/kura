@@ -193,12 +193,20 @@ export function slugify(text: string): string {
  *  (splitByHeadings) walk the same headings in order and assign IDENTICAL ids — search deep-links
  *  (`#id`) must match the rendered anchors, including for repeated and h4 headings. */
 export function createSlugger(): (text: string) => string {
-  const seen = new Map<string, number>();
+  const taken = new Map<string, number>(); // every emitted id → its next suffix counter
   return (text: string) => {
     const base = slugify(text) || "section";
-    const n = seen.get(base) ?? 0;
-    seen.set(base, n + 1);
-    return n === 0 ? base : `${base}-${n}`;
+    let id = base;
+    // Re-check the candidate against ALL emitted ids, not just the base count: a suffixed id like
+    // "setup-1" can also be the NATURAL slug of a different heading ("Setup 1"), so keep incrementing
+    // until the id is genuinely free (github-slugger's algorithm).
+    while (taken.has(id)) {
+      const n = (taken.get(base) ?? 0) + 1;
+      taken.set(base, n);
+      id = `${base}-${n}`;
+    }
+    taken.set(id, taken.get(id) ?? 0);
+    return id;
   };
 }
 

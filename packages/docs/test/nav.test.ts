@@ -164,6 +164,13 @@ test("processHtml: a heading that slugifies to empty (emoji/punctuation) falls b
   assert.deepEqual(toc.map((h) => h.id), ["section", "section-1"]); // never id=""
 });
 
+test("processHtml: an auto-suffix never collides with another heading's natural slug", () => {
+  // "Setup 1" naturally slugifies to "setup-1"; the 2nd "Setup" must skip it, not reuse it.
+  const { toc } = processHtml("<h2>Setup</h2><h3>Setup 1</h3><h2>Setup</h2>");
+  assert.deepEqual(toc.map((h) => h.id), ["setup", "setup-1", "setup-2"]);
+  assert.equal(new Set(toc.map((h) => h.id)).size, toc.length, "all heading ids are unique");
+});
+
 const SITE = "https://kura.build";
 
 test("ogImageUrl: nested slug passes through; home uses the index sentinel (never /og/.png)", () => {
