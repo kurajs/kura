@@ -1,5 +1,29 @@
 # @kurajs/docs
 
+## 0.0.36
+
+### Patch Changes
+
+- [#28](https://github.com/kurajs/kura/pull/28) [`f251e41`](https://github.com/kurajs/kura/commit/f251e4192937cb9780da85e538bf83c3a651ca1b) Thanks [@linyiru](https://github.com/linyiru)! - Bump @momiji-rs/sparkdown to ^0.0.6
+
+  Picks up sparkdown's wasm input-decode perf work (str::from_utf8 fast-path, TextEncoder.encodeInto
+  straight into wasm memory) on the shared entry the CommonMark (`markdown: "commonmark"` / `--commonmark`)
+  render path uses. v0.0.6's headline `/mdast` subpath is not used by Kura. Verified the `/gfm` `toHtmlSync`
+  HTML output is byte-for-byte identical to 0.0.4 across a headings/lists/tasklists/tables/code-fence/
+  autolink/escaping corpus, so rendered docs are unchanged.
+
+- [#29](https://github.com/kurajs/kura/pull/29) [`caecbcf`](https://github.com/kurajs/kura/commit/caecbcf1ccb0a39357478e24c0cf55398858fc72) Thanks [@linyiru](https://github.com/linyiru)! - TOC: include h4 and de-duplicate repeated heading anchors
+
+  `processHtml` now injects ids into and lists `h4` headings (previously only h2/h3), and de-duplicates
+  repeated heading slugs github-slugger style — the first use keeps the bare slug, later ones get `-1`,
+  `-2`, …. Before this, two headings with the same text produced the same `id`, so in-page anchor links
+  and scroll-spy collided on the first one. A heading that slugifies to empty (emoji/punctuation only)
+  now falls back to `section` instead of `id=""`. The right-hand TOC indents h4 one level deeper than h3.
+
+  The id logic is extracted into a shared `createSlugger()` used by both the renderer (`processHtml`) and
+  the search indexer (`splitByHeadings`), which now also splits on h4 — so search deep-links resolve to
+  the exact rendered anchor, including for repeated headings and h4 sections.
+
 ## 0.0.35
 
 ### Patch Changes
