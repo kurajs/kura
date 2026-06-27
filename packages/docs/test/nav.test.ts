@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { treeOf, flattenTree, createNav, slugify, topFolderOf, activeTabIndex, normalizeBasePath, docPath, ogImageUrl, normalizeOgSlug, resolveOgSlug, canonicalUrl, type NavNode, type DocLike } from "../src/nav.ts";
+import { treeOf, flattenTree, createNav, slugify, topFolderOf, activeTabIndex, normalizeBasePath, docPath, ogImageUrl, normalizeOgSlug, resolveOgSlug, canonicalUrl, processHtml, type NavNode, type DocLike } from "../src/nav.ts";
 import { doc, DOCS, META } from "./fixtures.ts";
 
 // Tiny readers over the discriminated NavNode union.
@@ -139,6 +139,36 @@ test("activeTabIndex: the tab owning the slug's top folder; first tab as fallbac
   assert.equal(activeTabIndex(tabs, "advanced"), 1);
   assert.equal(activeTabIndex(tabs, "unknown/page"), 0); // fallback → first tab
   assert.equal(activeTabIndex(tabs, ""), 0);
+});
+
+test("processHtml: extracts h2–h4, injects ids, and strips inline markup from the toc text", () => {
+  const { html, toc } = processHtml('<h2>Intro</h2><p>x</p><h3>Use <code>foo()</code></h3><h4>Edge</h4><h5>Skipped</h5>');
+  assert.deepEqual(toc, [
+    { level: 2, text: "Intro", id: "intro" },
+    { level: 3, text: "Use foo()", id: "use-foo" }, // inline <code> stripped for text; () dropped by slugify
+    { level: 4, text: "Edge", id: "edge" },
+  ]);
+  assert.match(html, /<h2 id="intro">Intro<\/h2>/);
+  assert.match(html, /<h4 id="edge">Edge<\/h4>/);
+  assert.match(html, /<h5>Skipped<\/h5>/); // h5 untouched (no id, not in toc)
+});
+
+test("processHtml: de-dups repeated heading slugs (-1, -2) so anchors stay unique", () => {
+  const { html, toc } = processHtml("<h2>Setup</h2><h2>Setup</h2><h3>Setup</h3>");
+  assert.deepEqual(toc.map((h) => h.id), ["setup", "setup-1", "setup-2"]);
+  assert.match(html, /<h2 id="setup">Setup<\/h2><h2 id="setup-1">Setup<\/h2><h3 id="setup-2">Setup<\/h3>/);
+});
+
+test("processHtml: a heading that slugifies to empty (emoji/punctuation) falls back to a usable id", () => {
+  const { toc } = processHtml("<h2>🚀</h2><h2>!!!</h2>");
+  assert.deepEqual(toc.map((h) => h.id), ["section", "section-1"]); // never id=""
+});
+
+test("processHtml: an auto-suffix never collides with another heading's natural slug", () => {
+  // "Setup 1" naturally slugifies to "setup-1"; the 2nd "Setup" must skip it, not reuse it.
+  const { toc } = processHtml("<h2>Setup</h2><h3>Setup 1</h3><h2>Setup</h2>");
+  assert.deepEqual(toc.map((h) => h.id), ["setup", "setup-1", "setup-2"]);
+  assert.equal(new Set(toc.map((h) => h.id)).size, toc.length, "all heading ids are unique");
 });
 
 const SITE = "https://kura.build";

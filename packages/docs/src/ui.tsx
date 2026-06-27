@@ -282,7 +282,7 @@ export function DocBody({ doc, basePath = "/docs", labels = DEFAULT_LABELS, href
           <details className="hidden max-lg:block mb-5 border border-border rounded-xl overflow-hidden">
             <summary className="chevron flex justify-between items-center cursor-pointer px-3.5 py-2.5 text-[.85rem] font-semibold text-fg-soft">{labels.onThisPage}</summary>
             <div className="flex flex-col px-3.5 pt-1 pb-2.5 border-t border-border">
-              {toc.map((h) => (<a key={h.id} className={"py-1.5 text-muted text-[.85rem] hover:text-accent" + (h.level === 3 ? " pl-3.5" : "")} href={`#${encodeURIComponent(h.id)}`}>{h.text}</a>))}
+              {toc.map((h) => (<a key={h.id} className={"py-1.5 text-muted text-[.85rem] hover:text-accent" + (h.level >= 4 ? " pl-7" : h.level === 3 ? " pl-3.5" : "")} href={`#${encodeURIComponent(h.id)}`}>{h.text}</a>))}
             </div>
           </details>
         )}
@@ -317,7 +317,7 @@ export function DocBody({ doc, basePath = "/docs", labels = DEFAULT_LABELS, href
         {toc && toc.length > 0 && (
           <>
             <p className="text-[.72rem] font-bold tracking-wider uppercase text-muted mb-2.5">{labels.onThisPage}</p>
-            {toc.map((h) => (<a key={h.id} className={"block py-1 text-muted text-[.85rem] hover:text-accent" + (h.level === 3 ? " pl-3 text-[.82rem]" : "")} href={`#${encodeURIComponent(h.id)}`}>{h.text}</a>))}
+            {toc.map((h) => (<a key={h.id} className={"block py-1 text-muted text-[.85rem] hover:text-accent" + (h.level >= 4 ? " pl-6 text-[.82rem]" : h.level === 3 ? " pl-3 text-[.82rem]" : "")} href={`#${encodeURIComponent(h.id)}`}>{h.text}</a>))}
           </>
         )}
       </aside>

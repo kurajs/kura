@@ -186,12 +186,37 @@ export function slugify(text: string): string {
   return text.trim().toLowerCase().replace(/[`*_~]/g, "").replace(/\s+/g, "-").replace(/[^\p{L}\p{N}-]/gu, "");
 }
 
-/** Inject ids into h2/h3 of rendered HTML and extract the table of contents. */
+/** A stateful heading-id generator for ONE document. Slugifies the heading text, falls back to
+ *  "section" when slugify yields "" (a punctuation/emoji-only heading would otherwise get id=""),
+ *  and de-dups repeats github-slugger style: the first use keeps the bare slug, later ones get -1,
+ *  -2, …. Use one slugger per document so the renderer (processHtml) and the search indexer
+ *  (splitByHeadings) walk the same headings in order and assign IDENTICAL ids — search deep-links
+ *  (`#id`) must match the rendered anchors, including for repeated and h4 headings. */
+export function createSlugger(): (text: string) => string {
+  const taken = new Map<string, number>(); // every emitted id → its next suffix counter
+  return (text: string) => {
+    const base = slugify(text) || "section";
+    let id = base;
+    // Re-check the candidate against ALL emitted ids, not just the base count: a suffixed id like
+    // "setup-1" can also be the NATURAL slug of a different heading ("Setup 1"), so keep incrementing
+    // until the id is genuinely free (github-slugger's algorithm).
+    while (taken.has(id)) {
+      const n = (taken.get(base) ?? 0) + 1;
+      taken.set(base, n);
+      id = `${base}-${n}`;
+    }
+    taken.set(id, taken.get(id) ?? 0);
+    return id;
+  };
+}
+
+/** Inject ids into h2–h4 of rendered HTML and extract the table of contents. */
 export function processHtml(html: string): { html: string; toc: Toc } {
   const toc: Toc = [];
-  const out = html.replace(/<h([23])>([\s\S]*?)<\/h\1>/g, (_m, lvl: string, inner: string) => {
+  const slugId = createSlugger();
+  const out = html.replace(/<h([2-4])>([\s\S]*?)<\/h\1>/g, (_m, lvl: string, inner: string) => {
     const text = inner.replace(/<[^>]+>/g, "").trim();
-    const id = slugify(text);
+    const id = slugId(text);
     toc.push({ level: Number(lvl), text, id });
     return `<h${lvl} id="${id}">${inner}</h${lvl}>`;
   });
