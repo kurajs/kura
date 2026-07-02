@@ -1,7 +1,4 @@
 {
   "extends": "@kurajs/docs/tsconfig.kura.json",
-  "compilerOptions": {
-    "jsxImportSource": "@junejs/core"
-  },
   "include": ["app", "kura.config.ts", "june.config.ts"]
 }
