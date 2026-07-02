@@ -77,7 +77,8 @@ function setup(opts: InitSearchOptions): void {
       if (isStatic) {
         const h = await getHandle();
         // prefix: match the last (still-being-typed) token as a prefix, so "feis" finds "feishu".
-        const hits = await h.search(query, { topK: 12, mode: "keyword", prefix: true, locale });
+        // navBoost: lift pages/sections whose NAME starts with that prefix (navigation typeahead).
+        const hits = await h.search(query, { topK: 12, mode: "keyword", prefix: true, navBoost: true, locale });
         tokens = h.tokensOf(query, locale);
         return (hits as SearchHitJSON[]).map(toItem(docBase));
       }
