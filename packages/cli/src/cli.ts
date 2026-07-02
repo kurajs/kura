@@ -6,105 +6,18 @@
 //     and never reads the filesystem (Workers-safe; mirrors June's app/_content.ts freeze).
 //     A content hash short-circuits re-embedding when nothing changed (cheap to run pre-dev).
 import { buildIndex } from "@kurajs/docs/search";
-import { parseMeta, validatePages, type MetaMap } from "@kurajs/docs/meta";
 import { basePathSegments, docsRoute, pruneStaleDocsRoutes } from "./routes.js";
-import { stripConfigComments, isCommonmark, parseHighlightLangs } from "./config-read.js";
+import { stripConfigComments, isCommonmark, parseHighlightLangs, parseContentSources } from "./config-read.js";
+import { collectMeta, collectLastUpdated, discoverLocales } from "./content-walk.js";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
-import { spawn, execFileSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { pathToFileURL, fileURLToPath } from "node:url";
 
 function arg(name: string, def?: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
   return i >= 0 ? process.argv[i + 1] : def;
-}
-
-const LOCALE_DIR = /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/;
-
-// Walk one meta tree (default OR a single locale's mirror) → a folder-path-keyed MetaMap, STRICTLY
-// validated. `skipTopLocales` excludes top-level locale buckets (true for the default tree, false
-// inside a locale's own mirror). `wherePrefix` prefixes error locations (e.g. "ja-JP/") so a bad
-// locale meta is unambiguous. Folder paths are keyed RELATIVE to the tree root, so a locale's keys
-// line up 1:1 with the default's for per-folder overriding.
-function walkMetaTree(rootDir: string, skipTopLocales: boolean, wherePrefix = ""): { meta: MetaMap; errors: string[] } {
-  const meta: MetaMap = {};
-  const errors: string[] = [];
-  if (!fs.existsSync(rootDir)) return { meta, errors };
-  const skipped = (rel: string, name: string) => skipTopLocales && rel === "" && LOCALE_DIR.test(name);
-  const walk = (dir: string, rel: string) => {
-    const ents = fs.readdirSync(dir, { withFileTypes: true });
-    if (ents.some((e) => !e.isDirectory() && e.name === "meta.json")) {
-      const where = `${wherePrefix}${rel || "."}/meta.json`;
-      let raw: unknown;
-      try {
-        raw = JSON.parse(fs.readFileSync(path.join(dir, "meta.json"), "utf8"));
-      } catch (e) {
-        errors.push(`${where}: invalid JSON — ${(e as Error).message}`);
-        raw = {};
-      }
-      const parsed = parseMeta(raw, where);
-      errors.push(...parsed.errors);
-      const children = new Set<string>();
-      for (const c of ents) {
-        if (c.isDirectory() && !skipped(rel, c.name)) children.add(c.name);
-        else if (/\.mdx?$/.test(c.name)) children.add(c.name.replace(/\.mdx?$/, ""));
-      }
-      errors.push(...validatePages(parsed.meta, children, where));
-      // Root-only: every tab's pages must reference a real top-level folder.
-      if (rel === "" && parsed.meta.tabs) {
-        for (const t of parsed.meta.tabs)
-          for (const p of t.pages)
-            if (!children.has(p)) errors.push(`${where}: tab "${t.title}" lists "${p}", which is not a top-level folder (have: ${[...children].sort().join(", ") || "none"})`);
-      }
-      meta[rel] = parsed.meta;
-    }
-    for (const e of ents) {
-      if (e.isDirectory() && !skipped(rel, e.name)) walk(path.join(dir, e.name), rel ? `${rel}/${e.name}` : e.name);
-    }
-  };
-  walk(rootDir, "");
-  return { meta, errors };
-}
-
-// Collect the default nav metadata PLUS every locale mirror's overrides. The default tree skips
-// top-level locale buckets; each `content/docs/<locale>/` is then walked as its own tree, so a
-// locale's meta.json keys match the default's by folder path (createDocs merges them per-locale).
-// A locale typically overrides only `title` (folder group label); omitted fields fall back.
-function collectMeta(cwd: string): { meta: MetaMap; metaLocales: Record<string, MetaMap>; errors: string[] } {
-  const root = path.join(cwd, "content", "docs");
-  const errors: string[] = [];
-  const { meta, errors: e0 } = walkMetaTree(root, true);
-  errors.push(...e0);
-  const metaLocales: Record<string, MetaMap> = {};
-  if (fs.existsSync(root)) {
-    for (const ent of fs.readdirSync(root, { withFileTypes: true })) {
-      if (!ent.isDirectory() || !LOCALE_DIR.test(ent.name)) continue;
-      const { meta: lm, errors: le } = walkMetaTree(path.join(root, ent.name), false, `${ent.name}/`);
-      errors.push(...le);
-      if (Object.keys(lm).length) metaLocales[ent.name] = lm;
-    }
-  }
-  return { meta, metaLocales, errors };
-}
-
-// Last git commit (committer) date for a file as ISO-8601, or null when there's no history
-// (uncommitted, or a shallow CI clone) or git is unavailable. Never throws — the lastUpdated feature
-// degrades to "no date" rather than failing the build.
-function gitDateOf(file: string, cwd: string): string | null {
-  try {
-    // A cwd-relative, POSIX-slashed pathspec — unambiguous and portable (an absolute or backslashed
-    // path is not a reliable git pathspec across platforms).
-    const rel = path.relative(cwd, file).split(path.sep).join("/");
-    const out = execFileSync("git", ["log", "-1", "--format=%cI", "--", rel], {
-      cwd,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    }).trim();
-    return out || null;
-  } catch {
-    return null;
-  }
 }
 
 async function cmdIndex(): Promise<void> {
@@ -119,9 +32,19 @@ async function cmdIndex(): Promise<void> {
   const mdxTs = path.join(cwd, "app", "_mdx.ts");
   const metaTs = path.join(cwd, "app", "_meta.ts");
 
+  // Read kura.config.ts as TEXT, not by importing it — so `kura index` never executes user config
+  // code (no side effects, no heavy imports) on any run, including ones that short-circuit. The pure
+  // parsers live in config-read.ts (unit-tested there); comments are stripped once, up front.
+  const cfgPath = path.join(cwd, "kura.config.ts");
+  const cfgText = fs.existsSync(cfgPath) ? stripConfigComments(fs.readFileSync(cfgPath, "utf8")) : "";
+  // Docs-as-code sources (`content: { sources: [...] }`): June already merged their ENTRIES into
+  // app/_content.ts at `june gen` (kuraJuneConfig forwards them); here they extend Kura's own
+  // walks — meta.json nav, lastUpdated dates, locale discovery — over the same external trees.
+  const contentSources = parseContentSources(cfgText);
+
   // Nav metadata (meta.json) — validated and frozen first, so a bad meta fails fast and cheap.
   // META is the default tree; META_LOCALES holds each locale mirror's per-folder overrides.
-  const { meta, metaLocales, errors: metaErrors } = collectMeta(cwd);
+  const { meta, metaLocales, errors: metaErrors } = collectMeta(cwd, contentSources);
   if (metaErrors.length) {
     console.error("kura index: meta.json validation failed —\n  " + metaErrors.join("\n  "));
     process.exit(1);
@@ -151,54 +74,23 @@ async function cmdIndex(): Promise<void> {
     process.exit(1);
   }
 
-  // Discover locales from content/<col>/<locale>/ subdirs, then collect each locale's actual
-  // variants (entry.locale === locale; fallbacks stay in the default set). Both the search
-  // index and the MDX precompile cover default + every variant → cross-lingual by construction.
-  const LOCALE_DIR = /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/;
-  const contentRoot = path.join(cwd, "content");
-  const locales = new Set<string>();
-  if (mod.docs && fs.existsSync(contentRoot)) {
-    for (const col of fs.readdirSync(contentRoot, { withFileTypes: true })) {
-      if (!col.isDirectory()) continue;
-      for (const sub of fs.readdirSync(path.join(contentRoot, col.name), { withFileTypes: true })) {
-        if (sub.isDirectory() && LOCALE_DIR.test(sub.name)) locales.add(sub.name);
-      }
-    }
-  }
+  // Discover locales from content/<col>/<locale>/ subdirs (and each configured source's own
+  // locale mirrors), then collect each locale's actual variants (entry.locale === locale;
+  // fallbacks stay in the default set). Both the search index and the MDX precompile cover
+  // default + every variant → cross-lingual by construction.
+  const locales = mod.docs ? discoverLocales(cwd, contentSources) : new Set<string>();
   const variants: Entry[] = [];
   for (const locale of locales) for (const e of mod.docs!(locale)) if (e.locale === locale) variants.push(e);
   const allEntries = [...DOCS, ...variants];
 
-  // Optional "Last updated on …" dates (config.lastUpdated). Read the flag as TEXT (never execute user
-  // config — same as `markdown` below). Default OFF. We ALWAYS write app/_dates.ts (empty when off) so
-  // the generated _kura.ts imports it unconditionally — same reason --no-embed writes a stub, not a
+  // Optional "Last updated on …" dates (config.lastUpdated). Read as TEXT off cfgText (never
+  // execute user config). Default OFF. We ALWAYS write app/_dates.ts (empty when off) so the
+  // generated _kura.ts imports it unconditionally — same reason --no-embed writes a stub, not a
   // delete. Frozen before the up-to-date short-circuit so the file always exists.
   const datesTs = path.join(cwd, "app", "_dates.ts");
-  let lastUpdatedOn = false;
-  {
-    const cfgPath = path.join(cwd, "kura.config.ts");
-    if (fs.existsSync(cfgPath)) {
-      const txt = fs.readFileSync(cfgPath, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|\s)\/\/.*$/gm, "$1");
-      if (/\blastUpdated\s*:\s*true\b/.test(txt)) lastUpdatedOn = true;
-    }
-  }
-  const lastUpdated: Record<string, string> = {};
+  const lastUpdatedOn = /\blastUpdated\s*:\s*true\b/.test(cfgText);
+  const lastUpdated: Record<string, string> = lastUpdatedOn ? collectLastUpdated(cwd, contentSources) : {};
   if (lastUpdatedOn) {
-    const docsRoot = path.join(cwd, "content", "docs");
-    const walkDates = (dir: string, rel: string) => {
-      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-        const childRel = rel ? `${rel}/${e.name}` : e.name;
-        if (e.isDirectory()) {
-          if (!rel && LOCALE_DIR.test(e.name)) continue; // top-level <locale>/ dirs are variants, not default docs
-          walkDates(path.join(dir, e.name), childRel);
-        } else if (/\.(md|mdx)$/.test(e.name)) {
-          const slug = childRel.replace(/\.(md|mdx)$/, "").replace(/(^|\/)(index|README)$/i, ""); // mirrors June's slugOf
-          const iso = gitDateOf(path.join(dir, e.name), cwd);
-          if (iso) lastUpdated[slug] = iso;
-        }
-      }
-    };
-    if (fs.existsSync(docsRoot)) walkDates(docsRoot, "");
     const missing = DOCS.filter((d) => !(d.slug in lastUpdated)).map((d) => d.slug);
     console.log(`kura index: lastUpdated — ${Object.keys(lastUpdated).length} git date(s), ${DOCS.length - missing.length}/${DOCS.length} docs covered`);
     if (missing.length) {
@@ -222,11 +114,6 @@ async function cmdIndex(): Promise<void> {
   // "commonmark" renders via MDX format:'md' — no MDX/JSX parsing, so a literal {…} can't be read as
   // a JS expression and drop the page. Resolved BEFORE the hash so a format switch forces a rebuild
   // (otherwise the same content short-circuits and leaves _mdx.ts in the previous format).
-  // Read kura.config.ts as TEXT, not by importing it — so `kura index` never executes user config
-  // code (no side effects, no heavy imports) on any run, including ones that short-circuit. The pure
-  // parsers live in config-read.ts (unit-tested there); comments are stripped once, up front.
-  const cfgPath = path.join(cwd, "kura.config.ts");
-  const cfgText = fs.existsSync(cfgPath) ? stripConfigComments(fs.readFileSync(cfgPath, "utf8")) : "";
   const commonmark = process.argv.includes("--commonmark") || isCommonmark(cfgText);
   const format = commonmark ? "md" : "mdx";
   const strict = process.argv.includes("--strict");
@@ -236,7 +123,7 @@ async function cmdIndex(): Promise<void> {
 
   // Content hash — skip rebuilds when nothing changed, so `kura index` is cheap to run before
   // every dev/build. Covers the mode + format + model + locale/slug/body of every entry.
-  const hashInput = JSON.stringify([model, noEmbed, format, highlightLangs, allEntries.map((e) => [e.locale ?? "", e.slug, e.body])]);
+  const hashInput = JSON.stringify([model, noEmbed, format, highlightLangs, contentSources, allEntries.map((e) => [e.locale ?? "", e.slug, e.body])]);
   const contentHash = crypto.createHash("sha256").update(hashInput).digest("hex").slice(0, 16);
   const stamp = `// content-hash: ${contentHash}\n`;
   const hashOf = (f: string) => (fs.existsSync(f) ? fs.readFileSync(f, "utf8").match(/content-hash: (\S+)/)?.[1] : undefined);
