@@ -1,5 +1,26 @@
 # @kurajs/cli
 
+## 0.0.24
+
+### Patch Changes
+
+- [#39](https://github.com/kurajs/kura/pull/39) [`fb3f5a6`](https://github.com/kurajs/kura/commit/fb3f5a650ad954954ffee98a1d2cb81d9048e740) Thanks [@linyiru](https://github.com/linyiru)! - Add a GitHub Pages (static) deploy target.
+
+  Set `deploy: { target: "github-pages", basePath: "/<project>" }` in `kura.config.ts`
+  to build a fully prerendered static site into `dist/static/` — no server, deployable
+  to GitHub Pages or any file host.
+
+  - Maps to June's built-in static target; the deploy subpath becomes June's `basePath`
+    so assets + links resolve under a project subpath.
+  - `docRoute.staticPaths` enumerates every doc page (× locale) so the dynamic docs
+    route prerenders to one HTML file each; sidebar/pager/tab/search links carry the
+    deploy subpath.
+  - On a static target the dynamic OG image route is omitted and `og:image` is dropped
+    (no server to render it). Requires `@junejs/core` ≥ 0.0.49 / `@junejs/server` ≥ 0.0.54.
+
+- Updated dependencies [[`fb3f5a6`](https://github.com/kurajs/kura/commit/fb3f5a650ad954954ffee98a1d2cb81d9048e740)]:
+  - @kurajs/docs@0.0.38
+
 ## 0.0.23
 
 ### Patch Changes
