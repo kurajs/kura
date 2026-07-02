@@ -40,6 +40,14 @@ export interface Bm25SearchOptions {
   topK?: number;
   /** Language tag for the query; selects a tokenizer when a resolver is configured. */
   lang?: string;
+  /** Typeahead: treat the LAST query token as a PREFIX — match every indexed term starting with it
+   *  (so "feis" hits "feishu" before it's fully typed). Earlier tokens stay exact. Off by default;
+   *  turn on for per-keystroke keyword search. Needs the prefix ≥ `minPrefix` chars. */
+  prefixLast?: boolean;
+  /** Minimum length for a prefix to expand (guards a 1-char prefix matching the whole vocab). Default 2. */
+  minPrefix?: number;
+  /** Cap on how many indexed terms one prefix expands to (bounds the per-keystroke cost). Default 128. */
+  maxExpand?: number;
 }
 
 /**
@@ -122,23 +130,48 @@ export class Bm25<M = unknown> {
   search(query: string, opts: Bm25SearchOptions = {}): Bm25Hit<M>[] {
     const n = this.ids.length;
     if (!n) return [];
-    const terms = [...new Set(this.tokenizerFor(opts.lang)(query))];
-    if (!terms.length) return [];
+    const tokens = this.tokenizerFor(opts.lang)(query);
+    if (!tokens.length) return [];
 
     const avgdl = this.totalLen / n;
     const scores = new Map<number, number>();
-    for (const t of terms) {
-      const p = this.postings.get(t);
-      if (!p) continue;
+    // One term's BM25 contribution to each doc it appears in, handed to `accumulate`.
+    const eachDoc = (p: number[], accumulate: (docId: number, s: number) => void) => {
       const df = p.length / 2;
       const idf = Math.log((n - df + 0.5) / (df + 0.5) + 1);
       for (let i = 0; i < p.length; i += 2) {
-        const docId = p[i];
-        const freq = p[i + 1];
-        const dl = this.docLen[docId];
-        const score = idf * (freq * (this.k1 + 1)) / (freq + this.k1 * (1 - this.b + this.b * dl / avgdl));
-        scores.set(docId, (scores.get(docId) ?? 0) + score);
+        const docId = p[i]!;
+        const dl = this.docLen[docId]!;
+        const score = idf * (p[i + 1]! * (this.k1 + 1)) / (p[i + 1]! + this.k1 * (1 - this.b + this.b * dl / avgdl));
+        accumulate(docId, score);
       }
+    };
+
+    // Typeahead: the LAST token is the word being typed → match it as a prefix; earlier tokens are
+    // complete words → exact. Guarded by minPrefix so a 1-char prefix can't pull in the whole vocab.
+    const last = tokens[tokens.length - 1]!;
+    const usePrefix = !!opts.prefixLast && last.length >= (opts.minPrefix ?? 2);
+    const exact = new Set(usePrefix ? tokens.slice(0, -1) : tokens);
+
+    for (const t of exact) {
+      const p = this.postings.get(t);
+      if (p) eachDoc(p, (docId, s) => scores.set(docId, (scores.get(docId) ?? 0) + s));
+    }
+
+    if (usePrefix) {
+      // Expand the prefix to every indexed term that starts with it, and score the group as an OR:
+      // each doc takes its BEST expansion (max), so a page matching the intended word ("feishu")
+      // isn't out-ranked by one that happens to contain several other fei* terms. maxExpand bounds
+      // the scan/score cost; a very large vocab would instead want a sorted-term / trie lookup.
+      const group = new Map<number, number>();
+      let expanded = 0;
+      const cap = opts.maxExpand ?? 128;
+      for (const [term, p] of this.postings) {
+        if (!term.startsWith(last)) continue;
+        eachDoc(p, (docId, s) => { const c = group.get(docId); if (c === undefined || s > c) group.set(docId, s); });
+        if (++expanded >= cap) break;
+      }
+      for (const [docId, s] of group) scores.set(docId, (scores.get(docId) ?? 0) + s);
     }
 
     // Normalize topK to a non-negative integer; a negative/float value would hit slice()'s

@@ -123,6 +123,12 @@ export interface SearchOptions {
   mode?: "keyword" | "hybrid";
   /** Max hits per page (slug) in the result. Default 3. */
   maxPerPage?: number;
+  /** Typeahead: match the last query token as a PREFIX (so "feis" finds "feishu" mid-type). Only
+   *  affects keyword mode; the hybrid/submit path always uses exact terms. */
+  prefix?: boolean;
+  /** Boost hits whose page/section NAME starts with the typed prefix (navigation typeahead) above
+   *  body-only matches. Needs `prefix`; keyword mode only. */
+  navBoost?: boolean;
 }
 
 export interface SearchHandle {
@@ -181,7 +187,7 @@ function snippetAround(body: string, tokens: string[]): string {
   return body.slice(start, start + 160).trim();
 }
 
-function keywordSearch(index: Bm25<KeywordData>, query: string, limit: number, fetchK = limit * 4, locale?: string): SearchHit[] {
+function keywordSearch(index: Bm25<KeywordData>, query: string, limit: number, fetchK = limit * 4, locale?: string, prefixLast?: boolean, navBoost?: boolean): SearchHit[] {
   // Collapse a slug's locale variants (DOCS carries every locale) into one hit — otherwise
   // RRF, which fuses by slug, would see the same slug at several ranks and over-boost it.
   // Keep the highest-BM25 variant, breaking ties toward the reader's `locale` so the snippet
@@ -189,8 +195,26 @@ function keywordSearch(index: Bm25<KeywordData>, query: string, limit: number, f
   // dedup headroom; a caller that already over-fetched passes fetchK = limit). `locale` also
   // tokenizes the query per-locale (CJK), matching how each doc was indexed.
   const queryTokens = index.tokensOf(query, locale); // the exact terms BM25 matches on
+  // Field-prefix nav boost (typeahead): when the page/section NAME starts with the word being typed,
+  // that's a strong "go here" signal — lift it over body-only matches (title/slug tier > heading tier
+  // > body). Additive constants far above the BM25 range (~0–15) form clean tiers; BM25 orders within
+  // a tier. Fires ONLY when the query is a SINGLE word — navigation is typing one name; once you've
+  // typed multiple words it's a content query, so we leave it to pure BM25 (a benchmark showed the
+  // any-last-token version hijacking content queries whose trailing word happened to name a section).
+  // And only the FIRST word of the field counts, so "…guide" doesn't boost every "Guide" page.
+  const navPrefix = navBoost && prefixLast && queryTokens.length === 1 && queryTokens[0]!.length >= 2
+    ? queryTokens[0]! : null;
+  const firstTok = (text?: string): string => { const t = index.tokensOf(text ?? "", locale); return t[0] ?? ""; };
+  const boostOf = (d: KeywordData): number => {
+    if (!navPrefix) return 0;
+    const slugHead = d.slug.split(/[/-]/)[0] ?? "";
+    if (slugHead.startsWith(navPrefix) || firstTok(d.title).startsWith(navPrefix)) return 1000; // page name
+    if (d.heading && firstTok(d.heading).startsWith(navPrefix)) return 500; // section heading
+    return 0;
+  };
   const best = new Map<string, { hit: SearchHit; score: number }>();
-  for (const h of index.search(query, { topK: fetchK, lang: locale })) {
+  for (const h of index.search(query, { topK: fetchK, lang: locale, prefixLast })) {
+    const rank = h.score + boostOf(h.data); // ranking score (BM25 + nav boost); hit.score stays BM25
     const hit: SearchHit = {
       slug: h.data.slug,
       title: h.data.title,
@@ -204,9 +228,9 @@ function keywordSearch(index: Bm25<KeywordData>, query: string, limit: number, f
     // as separate hits; locale variants of the SAME section still collapse to the best one.
     const key = `${h.data.slug}#${h.data.headingId ?? ""}`;
     const prev = best.get(key);
-    if (!prev) { best.set(key, { hit, score: h.score }); continue; }
-    const prefer = h.score > prev.score || (!!locale && h.data.locale === locale && prev.hit.locale !== locale && h.score >= prev.score);
-    if (prefer) best.set(key, { hit, score: h.score });
+    if (!prev) { best.set(key, { hit, score: rank }); continue; }
+    const prefer = rank > prev.score || (!!locale && h.data.locale === locale && prev.hit.locale !== locale && rank >= prev.score);
+    if (prefer) best.set(key, { hit, score: rank });
   }
   return [...best.values()].sort((a, b) => b.score - a.score).slice(0, limit).map((e) => e.hit);
 }
@@ -257,7 +281,7 @@ export function createSearch(opts: {
       search: async (query, o) => {
         const topK = o?.topK ?? 8;
         // Over-fetch sections, cap per page so one doc can't crowd the list, then take topK.
-        const hits = keywordSearch(idx(), query, topK * 3, undefined, o?.locale);
+        const hits = keywordSearch(idx(), query, topK * 3, undefined, o?.locale, o?.prefix, o?.navBoost);
         return capPerPage(hits, o?.maxPerPage ?? 3).slice(0, topK);
       },
       tokensOf: (query, locale) => idx().tokensOf(query, locale),
@@ -290,7 +314,7 @@ export function createSearch(opts: {
     const depth = topK * 4; // over-fetch from each side so RRF has rank signal to fuse
     // Keyword-only fast path (typeahead): BM25 alone, no embed (~200ms) on the request thread.
     if (o?.mode === "keyword") {
-      const hits = keywordSearch(getKeyword(), query, topK * 3, depth, o?.locale);
+      const hits = keywordSearch(getKeyword(), query, topK * 3, depth, o?.locale, o?.prefix, o?.navBoost);
       return capPerPage(hits, maxPerPage).slice(0, topK);
     }
     const kb = await getKb();

@@ -69,11 +69,16 @@ function setup(opts: InitSearchOptions): void {
 
   let tokens: string[] = []; // the engine's matched terms, for exact (CJK-correct) highlight
   const ctrl = createCtrlk<SearchHitJSON>({
-    debounce: 120,
+    // Static search is in-memory (~1ms), no server to protect — a small debounce just coalesces
+    // fast keystrokes / bounds the prefix vocab scan. The server path debounces harder (each key = a
+    // network round-trip).
+    debounce: isStatic ? 30 : 120,
     async search(query, signal) {
       if (isStatic) {
         const h = await getHandle();
-        const hits = await h.search(query, { topK: 12, mode: "keyword", locale });
+        // prefix: match the last (still-being-typed) token as a prefix, so "feis" finds "feishu".
+        // navBoost: lift pages/sections whose NAME starts with that prefix (navigation typeahead).
+        const hits = await h.search(query, { topK: 12, mode: "keyword", prefix: true, navBoost: true, locale });
         tokens = h.tokensOf(query, locale);
         return (hits as SearchHitJSON[]).map(toItem(docBase));
       }

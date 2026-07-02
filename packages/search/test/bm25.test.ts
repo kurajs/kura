@@ -84,3 +84,40 @@ test("a custom tokenizer is honored", () => {
   ], { tokenize: bigram });
   assert.equal(bm.search("搜尋")[0]?.id, "a");
 });
+
+// Typeahead prefix expansion (prefixLast): the last query token matches as a prefix, so a partial
+// word finds the full term. Earlier tokens stay exact; a too-short prefix doesn't expand.
+test("prefixLast: a partial last token matches terms that start with it", () => {
+  const bm = Bm25.from([
+    { id: "feishu", text: "feishu lark messaging setup" },
+    { id: "discord", text: "discord bot webhook setup" },
+    { id: "feature", text: "feature flags configuration" },
+  ]);
+  // exact: a partial word finds nothing
+  assert.equal(bm.search("feish").length, 0);
+  // prefix: every stage from "fe" onward surfaces feishu, and it's the top hit by "feis"
+  for (const q of ["fei", "feis", "feish"]) {
+    const hits = bm.search(q, { prefixLast: true });
+    assert.equal(hits[0]?.id, "feishu", `"${q}" should rank feishu first`);
+  }
+});
+
+test("prefixLast: earlier tokens are exact, the prefix is the last — matches are OR-fused, best on top", () => {
+  const bm = Bm25.from([
+    { id: "a", text: "webhook secret setup" }, // webhook (exact) + secret (sec prefix) → both
+    { id: "b", text: "webhook token rotation" }, // webhook only
+    { id: "c", text: "polling secret store" }, // secret only (sec prefix)
+  ]);
+  // "webhook sec" → "webhook" exact + "sec" prefix. BM25 is OR-based, so c (secret) still matches,
+  // but a (both terms) outranks it; b lacking any "sec*" term still matches on "webhook".
+  const hits = bm.search("webhook sec", { prefixLast: true });
+  assert.equal(hits[0]?.id, "a", "the doc with both terms ranks first");
+  const rank = (id: string) => hits.findIndex((h) => h.id === id);
+  assert.ok(rank("a") < rank("c"), "a (webhook + secret) outranks c (secret only)");
+});
+
+test("prefixLast: minPrefix guards a too-short prefix from expanding the whole vocab", () => {
+  const bm = Bm25.from([{ id: "a", text: "alpha beta" }, { id: "b", text: "alagorithm" }]);
+  assert.equal(bm.search("a", { prefixLast: true }).length, 0); // 1 char < minPrefix(2) → no expand → no exact term "a"
+  assert.ok(bm.search("al", { prefixLast: true }).length >= 1); // 2 chars → expands (alpha/alagorithm)
+});
