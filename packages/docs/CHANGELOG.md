@@ -1,5 +1,19 @@
 # @kurajs/docs
 
+## 0.0.43
+
+### Patch Changes
+
+- [#51](https://github.com/kurajs/kura/pull/51) [`918d857`](https://github.com/kurajs/kura/commit/918d85764d4f307253ac7cee96ecd341dfaa421c) Thanks [@linyiru](https://github.com/linyiru)! - Better keyword typeahead — prefix matching + navigation boost.
+
+  - **Prefix (`@kurajs/search`)**: `Bm25.search` gains `prefixLast` (+ `minPrefix`/`maxExpand` guards) — the last query token matches every indexed term starting with it, so a partially-typed word ("feis") finds the full term ("feishu"). BM25 matched whole tokens only, so non-English proper nouns returned nothing until fully typed. Earlier tokens stay exact.
+  - **Nav boost (`@kurajs/docs`)**: a SINGLE-word query whose prefix names a page/section (title/slug tier > heading tier) lifts it above docs that merely mention the term — turning search into fast go-to-page navigation. Gated to single-word queries, so multi-word content search is unchanged (benchmarked: navigation S@1 28%→70%, content queries byte-identical).
+
+  Exposed via `SearchOptions.prefix` / `navBoost`; enabled for static client-side search (which also drops its debounce 120→30 ms, since each keystroke is an in-memory query). Hybrid/submit search is unaffected (exact terms).
+
+- Updated dependencies [[`918d857`](https://github.com/kurajs/kura/commit/918d85764d4f307253ac7cee96ecd341dfaa421c)]:
+  - @kurajs/search@0.0.2
+
 ## 0.0.42
 
 ### Patch Changes
