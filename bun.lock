@@ -88,7 +88,7 @@
         "typescript": "^5.7.0",
       },
       "peerDependencies": {
-        "@kurajs/docs": ">=0.0.38",
+        "@kurajs/docs": ">=0.0.40",
         "@kurajs/transformers": ">=0.0.1 <0.1.0",
       },
       "optionalPeers": [
