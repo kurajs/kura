@@ -7,7 +7,7 @@
 // every per-locale helper collapses to the single default collection (zero overhead).
 // With `i18n`, June resolves ctx.locale before routing; the loaders thread it into the
 // content finders (variant → default fallback), the nav, the labels, and the MDX bucket.
-import { createNav, treeOf, flattenTree, processHtml, rewriteDocLinks, topFolderOf, activeTabIndex, normalizeBasePath, docPath, ogImageUrl, canonicalUrl, type DocLike, type Nav, type NavNode } from "./nav.ts";
+import { createNav, treeOf, flattenTree, processHtml, rewriteDocLinks, humanize, topFolderOf, activeTabIndex, normalizeBasePath, docPath, ogImageUrl, canonicalUrl, type DocLike, type Nav, type NavNode } from "./nav.ts";
 import { mergeMeta, type MetaMap, type TabConfig } from "./meta.ts";
 import { createSearch, type SearchHit } from "./search.ts";
 import { docsActions } from "./actions.ts";
@@ -71,6 +71,32 @@ export function createDocs<T extends DocLike>(opts: {
   // (June's document prefixes ASSET urls with the same value; here we prefix Kura's own nav links.)
   const deployBase = (opts.config.deploy?.basePath ?? "").replace(/^\/+|\/+$/g, "");
   const deployPrefix = deployBase ? "/" + deployBase : "";
+
+  // Virtual navigation (config.nav): group FLAT slugs into tabs + sidebar groups by config, without
+  // moving files or prefixing slugs. Precompute the slug→group→tab maps and per-page title overrides.
+  const navCfg = opts.config.nav;
+  const navTitle = new Map<string, string>(); // slug → sidebar/label override (a nicer name than the H1)
+  const slugToGroup = new Map<string, string>();
+  const groupToTab = new Map<string, number>();
+  if (navCfg) {
+    navCfg.tabs?.forEach((t, ti) => t.groups.forEach((gid) => groupToTab.set(gid, ti)));
+    for (const [gid, g] of Object.entries(navCfg.groups ?? {})) {
+      for (const p of g.pages ?? []) {
+        const slug = typeof p === "string" ? p : p.slug;
+        slugToGroup.set(slug, gid);
+        if (typeof p === "object" && p.title) navTitle.set(slug, p.title);
+      }
+    }
+  }
+  // Ordered group ids for a tab (or all groups if no tabs declared).
+  const tabGroupIds = (): string[] => navCfg?.tabs?.flatMap((t) => t.groups) ?? Object.keys(navCfg?.groups ?? {});
+  const groupTitleFor = (gid: string): string => navCfg?.groups?.[gid]?.title ?? humanize(gid);
+  // A group's ordered slugs: explicit `pages`, else auto-fill from the docs subfolder `<gid>/…`.
+  const groupSlugsFor = (locale: string | undefined, gid: string): string[] => {
+    const g = navCfg?.groups?.[gid];
+    if (g?.pages) return g.pages.map((p) => (typeof p === "string" ? p : p.slug));
+    return (docs ? docs(locale) : DOCS).filter((e) => e.slug.startsWith(gid + "/")).map((e) => e.slug).sort();
+  };
 
   // Localize an internal route path to a locale (identity when i18n is off), then prefix the deploy
   // subpath; build the language-switcher links for a given page (its URL in every locale). Both lean
@@ -142,19 +168,37 @@ export function createDocs<T extends DocLike>(opts: {
   // STRUCTURE is single-source (the default meta, locale-independent — arrays don't merge per-locale
   // cleanly); only the TITLE localizes, via config.tabLabels keyed by the English title.
   const tabDefs = (): TabConfig[] | undefined => {
+    if (navCfg?.tabs?.length) return navCfg.tabs.map((t) => ({ title: t.title, pages: t.groups })); // virtual nav
     if (hasSections) return undefined;
     const t = opts.meta?.[""]?.tabs;
     return t && t.length ? t : undefined;
   };
   const tabLabel = (locale: string | undefined, title: string): string => pickLabel(opts.config.tabLabels, locale, title);
-  // The top-level folders shown for the tab that owns `slug` (undefined = no tabs → all folders).
+  // The active tab index for a slug: virtual nav maps slug→group→tab (flat slugs have no folder to
+  // read); otherwise the folder-model derives it from the slug's top-level folder.
+  const activeTabFor = (defs: TabConfig[], slug?: string): number =>
+    navCfg ? groupToTab.get(slugToGroup.get(slug ?? "") ?? "") ?? 0 : activeTabIndex(defs, slug ?? "");
+  // The groups shown for the tab that owns `slug` (undefined = no tabs → all groups).
   const tabFoldersFor = (slug?: string): string[] | undefined => {
     const defs = tabDefs();
-    return defs ? defs[activeTabIndex(defs, slug ?? "")]!.pages : undefined;
+    return defs ? defs[activeTabFor(defs, slug)]!.pages : undefined;
   };
 
-  // Per-locale entries + nav, memoized — built once per locale, reused across requests.
-  const entriesFor = (locale?: string): readonly T[] => (docs ? docs(locale) : DOCS);
+  // Per-locale entries + nav, memoized — built once per locale, reused across requests. When config.nav
+  // sets per-page title overrides, apply them here (shallow copy) so the label flows everywhere the
+  // entry's title is read — sidebar, pager, page <title>, search — without mutating the frozen DOCS.
+  const entriesCache = new Map<string, readonly T[]>();
+  const entriesFor = (locale?: string): readonly T[] => {
+    const base = docs ? docs(locale) : DOCS;
+    if (!navTitle.size) return base;
+    const key = locale ?? "";
+    let e = entriesCache.get(key);
+    if (!e) {
+      e = base.map((x) => (navTitle.has(x.slug) ? { ...x, data: { ...x.data, title: navTitle.get(x.slug) } } : x));
+      entriesCache.set(key, e);
+    }
+    return e;
+  };
   const navCache = new Map<string, Nav<T>>();
   const navFor = (locale?: string): Nav<T> => {
     const key = locale ?? "";
@@ -186,6 +230,18 @@ export function createDocs<T extends DocLike>(opts: {
   };
   // `tabFolders` restricts the sidebar to one tab's top-level folders (in order); undefined = all.
   const sidebarFor = (locale?: string, tabFolders?: string[]): SidebarGroup[] => {
+    if (navCfg) {
+      // Virtual nav: groups + ordered pages come straight from config; slugs stay flat.
+      const gids = tabFolders ?? tabGroupIds();
+      const byslug = new Map(entriesFor(locale).map((e) => [e.slug, e] as const));
+      return gids.map((gid) => ({
+        title: groupTitleFor(gid),
+        items: groupSlugsFor(locale, gid)
+          .map((s) => byslug.get(s))
+          .filter((e): e is T => !!e)
+          .map((e) => ({ slug: e.slug, title: String(e.data.title ?? e.slug) })),
+      }));
+    }
     const meta = metaFor(locale);
     if (hasSections) {
       return navFor(locale).groups().map((g) => ({
@@ -211,7 +267,11 @@ export function createDocs<T extends DocLike>(opts: {
     const key = `${locale ?? ""}::${tabFolders ? tabFolders.join(",") : "*"}`;
     let o = orderCache.get(key);
     if (!o) {
-      if (hasSections) {
+      if (navCfg) {
+        const gids = tabFolders ?? tabGroupIds();
+        const byslug = new Map(entriesFor(locale).map((e) => [e.slug, e] as const));
+        o = gids.flatMap((gid) => groupSlugsFor(locale, gid).map((s) => byslug.get(s)).filter((e): e is T => !!e));
+      } else if (hasSections) {
         o = navFor(locale).groups().flatMap((g) => flattenTree(treeOf(g.items, metaFor(locale))));
       } else {
         const nodes = treeOf(entriesFor(locale), metaFor(locale));
@@ -234,7 +294,7 @@ export function createDocs<T extends DocLike>(opts: {
   const tabBarFor = (locale: string | undefined, slug: string): TabLink[] | undefined => {
     const defs = tabDefs();
     if (!defs) return undefined;
-    const ai = activeTabIndex(defs, slug);
+    const ai = activeTabFor(defs, slug);
     const h = hrefFor(locale);
     return defs.map((t, i) => {
       const landing = orderedFor(locale, t.pages)[0];
@@ -284,7 +344,8 @@ export function createDocs<T extends DocLike>(opts: {
       (typeof e.data.lastUpdated === "string" ? e.data.lastUpdated : undefined) ?? opts.lastUpdated?.[e.slug];
     return {
       slug: e.slug,
-      title: String(e.data.title ?? e.slug),
+      title: navTitle.get(e.slug) ?? String(e.data.title ?? e.slug), // config.nav label override wins
+
       section: sectionLabel(locale, String(e.data.section ?? "")),
       ...(description ? { description } : {}),
       html,
