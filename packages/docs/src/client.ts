@@ -4,6 +4,8 @@
 // /search and the full-page results render server-side. Zero React; @kurajs/ctrlk is vanilla DOM.
 import { createCtrlk, mountCtrlk, platformHotkeyLabel } from "@kurajs/ctrlk";
 import type { CtrlkItem } from "@kurajs/ctrlk";
+import type { SearchHandle } from "./search.ts";
+import type { DocLike } from "./nav.ts";
 
 /** One search hit as the /search.json projection returns it (mirrors SearchHit in search.ts). */
 interface SearchHitJSON {
@@ -26,6 +28,9 @@ export interface InitSearchOptions {
   docBase?: string;
   /** Render the ⌘K / Ctrl K hint on the trigger. Default true. */
   hint?: boolean;
+  /** Static build: build the BM25 index in-browser from the endpoint's corpus (no server per query).
+   *  Default: the trigger's `data-search-static` attribute. */
+  static?: boolean;
 }
 
 /** Enhance the docs search box. Safe to call before DOMContentLoaded (defers itself) and on the
@@ -42,11 +47,36 @@ function setup(opts: InitSearchOptions): void {
   if (trigger?.dataset.ctrlkReady) return; // already enhanced
   const endpoint = opts.endpoint ?? trigger?.dataset.searchEndpoint ?? "/search.json";
   const docBase = (opts.docBase ?? trigger?.dataset.docBase ?? "/docs/").replace(/\/?$/, "/");
+  const isStatic = opts.static ?? trigger?.dataset.searchStatic === "1";
+  const locale = trigger?.dataset.locale || undefined;
+
+  // Static: no server to answer per-query, so `endpoint` (the prerendered /search.json) IS the corpus.
+  // Build the pure-JS BM25 index once, in-browser, LAZILY — the ~300KB corpus only loads on first
+  // search, and every keystroke after is an in-memory BM25 query (~1ms), no network.
+  let loadingHandle: Promise<SearchHandle> | null = null;
+  const getHandle = () =>
+    // Dynamic-import the engine so it's a separate chunk loaded (in parallel with the corpus) only on
+    // first search of a static site — server targets that fetch per query never pull it into the bundle.
+    (loadingHandle ??= (async () => {
+      const [{ createSearch }, res] = await Promise.all([
+        import("./search.ts"),
+        fetch(endpoint, { headers: { accept: "application/json" } }),
+      ]);
+      if (!res.ok) throw new Error(`search index ${res.status}`);
+      const data = (await res.json()) as { index?: DocLike[] };
+      return createSearch({ entries: data.index ?? [] });
+    })());
 
   let tokens: string[] = []; // the engine's matched terms, for exact (CJK-correct) highlight
   const ctrl = createCtrlk<SearchHitJSON>({
     debounce: 120,
     async search(query, signal) {
+      if (isStatic) {
+        const h = await getHandle();
+        const hits = await h.search(query, { topK: 12, mode: "keyword", locale });
+        tokens = h.tokensOf(query, locale);
+        return (hits as SearchHitJSON[]).map(toItem(docBase));
+      }
       // mode=keyword → instant BM25 typeahead (no ~200ms query embed per keystroke).
       const url = `${endpoint}?q=${encodeURIComponent(query)}&mode=keyword`;
       const res = await fetch(url, { signal, headers: { accept: "application/json" } });

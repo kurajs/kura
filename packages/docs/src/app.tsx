@@ -322,7 +322,7 @@ export function createDocs<T extends DocLike>(opts: {
   const layout = ({ children }: { children: React.ReactNode }) => {
     const locale = opts.config.i18n ? currentLocale() : undefined;
     return (
-      <DocsLayoutShell site={site} navTabs={navTabsFor(locale)} basePath={basePath} labels={labelsFor(locale)} href={hrefFor(locale)} localeSwitch={switchFor(locale, "")}>
+      <DocsLayoutShell site={site} navTabs={navTabsFor(locale)} basePath={basePath} labels={labelsFor(locale)} href={hrefFor(locale)} localeSwitch={switchFor(locale, "")} searchStatic={isStatic} locale={locale}>
         <JuneOutlet>{children}</JuneOutlet>
       </DocsLayoutShell>
     );
@@ -441,6 +441,14 @@ export function createDocs<T extends DocLike>(opts: {
     View, md, json, metadata,
   };
 
+  // On a STATIC build there's no server to answer /search.json?q=… per keystroke, so ship the corpus
+  // instead: the browser builds the (pure-JS) BM25 index from it and searches locally. Computed once;
+  // titles use the config.nav override so client hits match the sidebar labels. Null on server targets
+  // (they query per request), so /search.json stays lean there.
+  const searchCorpus = isStatic
+    ? DOCS.map((e) => ({ slug: e.slug, body: e.body, data: { title: navTitle.get(e.slug) ?? e.data.title ?? e.slug }, ...(e.locale ? { locale: e.locale } : {}) }))
+    : null;
+
   const searchRoute = {
     loader: async (ctx: SearchCtx): Promise<{ q: string; hits: SearchHit[]; tokens: string[]; locale?: string }> => {
       const q = (ctx.url.searchParams.get("q") ?? "").trim();
@@ -457,7 +465,7 @@ export function createDocs<T extends DocLike>(opts: {
         <SearchResults query={d.q} hits={d.hits} basePath={basePath} labels={labelsFor(d.locale)} href={hrefFor(d.locale)} />
       </main>
     ),
-    json: (d: { q: string; hits: SearchHit[]; tokens: string[] }) => ({ q: d.q, hits: d.hits, tokens: d.tokens }),
+    json: (d: { q: string; hits: SearchHit[]; tokens: string[] }) => ({ q: d.q, hits: d.hits, tokens: d.tokens, ...(searchCorpus ? { index: searchCorpus } : {}) }),
     metadata: { title: "Search" },
   };
 
