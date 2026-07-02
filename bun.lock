@@ -13,7 +13,7 @@
     },
     "examples/docs": {
       "name": "@kurajs/example-docs",
-      "version": "0.0.14",
+      "version": "0.0.15",
       "dependencies": {
         "@junejs/server": ">=0.0.45 <0.1.0",
         "@kurajs/docs": "workspace:*",
@@ -34,7 +34,7 @@
     },
     "examples/docs-cjk": {
       "name": "@kurajs/example-docs-cjk",
-      "version": "0.0.13",
+      "version": "0.0.14",
       "dependencies": {
         "@junejs/server": ">=0.0.45 <0.1.0",
         "@kurajs/docs": "workspace:*",
@@ -56,7 +56,7 @@
     },
     "examples/search": {
       "name": "@kurajs/example-search",
-      "version": "0.0.14",
+      "version": "0.0.15",
       "dependencies": {
         "@junejs/server": ">=0.0.45 <0.1.0",
         "@kurajs/docs": "workspace:*",
@@ -111,12 +111,12 @@
     },
     "packages/docs": {
       "name": "@kurajs/docs",
-      "version": "0.0.42",
+      "version": "0.0.43",
       "dependencies": {
         "@junejs/og": "^0.0.4",
         "@kurajs/core": ">=0.0.1 <0.1.0",
         "@kurajs/ctrlk": ">=0.0.2 <0.1.0",
-        "@kurajs/search": ">=0.0.1 <0.1.0",
+        "@kurajs/search": ">=0.0.2",
         "@kurajs/tokenizers": ">=0.0.1 <0.1.0",
         "@mdx-js/mdx": "^3.1.0",
         "@momiji-rs/sparkdown": "^0.0.6",
@@ -168,7 +168,7 @@
     },
     "packages/search": {
       "name": "@kurajs/search",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "devDependencies": {
         "typescript": "^5.7.0",
       },

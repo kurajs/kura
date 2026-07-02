@@ -1,6 +1,6 @@
 {
   "name": "@kurajs/search",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "type": "module",
   "description": "Kura — retrieval engine: BM25 keyword search (+ hybrid fusion), portable and zero-dependency. Pairs with @kurajs/core's vector search.",
   "exports": {
