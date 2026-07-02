@@ -15,13 +15,13 @@ test("searchRoute.json: static target ships the corpus so the browser can run BM
     content: { DOCS, doc: finder as never },
     config: { basePath: "", deploy: { target: "github-pages", basePath: "/x" } } as never,
   });
-  const out = kura.searchRoute.json(empty) as { index?: { slug: string; body: string; data: { title: string } }[] };
+  const out = kura.searchRoute.json(empty) as { index?: { slug: string; html: string; data: { title: string } }[] };
   expect(Array.isArray(out.index)).toBe(true);
   expect(out.index!.length).toBe(DOCS.length);
-  // each corpus entry carries exactly what createSearch({ entries }) needs: slug + body + a title
+  // each corpus entry carries what the client index needs: slug + rendered HTML (→ text + preview) + a title
   const e = out.index![0]!;
   expect(typeof e.slug).toBe("string");
-  expect(typeof e.body).toBe("string");
+  expect(typeof e.html).toBe("string");
   expect(typeof e.data.title).toBe("string");
 });
 

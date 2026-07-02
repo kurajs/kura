@@ -32,7 +32,7 @@ export function defaultTokenizer(): TokenizerResolver {
 // rendered anchor (#heading); `heading` is the section's heading text (the page title still travels
 // in `title`). The intro section (text before the first h2–h4) has an empty headingId → page top.
 export type SearchData = { slug: string; title: string; section: string; text: string; locale?: string; headingId?: string; heading?: string };
-export type SearchHit = { slug: string; title: string; section: string; text: string; score: number; locale?: string; headingId?: string; heading?: string };
+export type SearchHit = { slug: string; title: string; section: string; text: string; score: number; locale?: string; headingId?: string; heading?: string; html?: string };
 
 /** Split a doc body into overlapping chunks for embedding. */
 export function chunk(text: string, size = 500, overlap = 80): string[] {
@@ -73,6 +73,42 @@ export function splitByHeadings(body: string): Section[] {
   }
   flush();
   return sections.length ? sections : [{ headingId: "", heading: "", text: body.trim() }];
+}
+
+/** Rendered HTML → readable plaintext (for indexing + matching): drop script/style, strip tags,
+ *  decode the few common entities, collapse whitespace. A regex, not a parser — cheap, no deps,
+ *  safe to run in the browser when the static client derives its index from the shipped HTML. */
+export function htmlToText(html: string): string {
+  return html
+    .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"').replace(/&#0?39;|&#x27;/gi, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Split rendered HTML into heading-anchored sections (h2–h4), mirroring {@link splitByHeadings} on
+ *  markdown. Ids come from the SAME slugger (createSlugger, top-to-bottom) that processHtml + the
+ *  markdown split use, so a section's `headingId` matches the live page's anchor (deep-links land).
+ *  Each section keeps its HTML (for a rich preview) and a derived plaintext (index + snippet). */
+function splitHtmlByHeadings(html: string): { headingId: string; heading: string; html: string; text: string }[] {
+  const slugId = createSlugger();
+  const out: { headingId: string; heading: string; html: string; text: string }[] = [];
+  for (const part of html.split(/(?=<h[2-4]\b)/i)) {
+    const m = /^<(h[2-4])\b[^>]*>([\s\S]*?)<\/\1>/i.exec(part);
+    if (m) {
+      const raw = m[2]!.replace(/<[^>]+>/g, "").trim(); // heading text as processHtml slugs it
+      const rest = part.slice(m[0].length).trim();
+      out.push({ headingId: slugId(raw), heading: htmlToText(m[2]!), html: rest, text: htmlToText(rest) });
+    } else {
+      // Intro (before the first h2) — drop the leading <h1> (the page title is shown separately).
+      const rest = part.replace(/^\s*<h1\b[^>]*>[\s\S]*?<\/h1>/i, "").trim();
+      const text = htmlToText(rest);
+      if (text) out.push({ headingId: "", heading: "", html: rest, text });
+    }
+  }
+  return out.length ? out : [{ headingId: "", heading: "", html: html.trim(), text: htmlToText(html) }];
 }
 
 /** Keep at most `max` hits per page (slug), preserving order — so one page can't crowd out the
@@ -144,24 +180,31 @@ export interface SearchHandle {
 // but a real ranked index: BM25's IDF + length normalization far outrank naive
 // substring hit-counting (XQuAD en: R@1 92% vs 46%). Title and section are folded
 // into the indexed text; a snippet is cut around the first query hit for display.
-type KeywordData = { slug: string; title: string; section: string; body: string; locale?: string; headingId?: string; heading?: string };
+type KeywordData = { slug: string; title: string; section: string; body: string; locale?: string; headingId?: string; heading?: string; html?: string };
 
 function buildKeywordIndex(entries: readonly DocLike[], tokenizer: TokenizerResolver): Bm25<KeywordData> {
   // One BM25 record per heading-anchored section so a keyword hit ranks (and deep-links to) the
   // most relevant heading, not just the page. The page title + section heading are folded into
   // each record's text, so searching a page's title still surfaces it via its sections.
+  // Source from the rendered HTML when present: it gives clean index text (htmlToText, no markdown
+  // symbols) AND keeps each section's HTML for a rich preview. Falls back to the markdown body.
   const records = entries.flatMap((e) => {
     const title = String(e.data.title ?? e.slug);
     const section = String(e.data.section ?? "");
-    return splitByHeadings(e.body ?? "").map((sec) => {
-      const body = stripMdx(sec.text);
-      return {
-        id: `${e.locale ?? "_"}:${e.slug}#${sec.headingId}`,
-        text: `${title}\n${sec.heading}\n${body}`,
-        lang: e.locale, // tokenize each doc by its own locale
-        data: { slug: e.slug, title, section, body, ...(sec.headingId ? { headingId: sec.headingId, heading: sec.heading } : {}), ...(e.locale ? { locale: e.locale } : {}) },
-      };
-    });
+    const secs = e.html
+      ? splitHtmlByHeadings(e.html)
+      : splitByHeadings(e.body ?? "").map((s) => ({ headingId: s.headingId, heading: s.heading, html: "", text: stripMdx(s.text) }));
+    return secs.map((sec) => ({
+      id: `${e.locale ?? "_"}:${e.slug}#${sec.headingId}`,
+      text: `${title}\n${sec.heading}\n${sec.text}`,
+      lang: e.locale, // tokenize each doc by its own locale
+      data: {
+        slug: e.slug, title, section, body: sec.text,
+        ...(sec.html ? { html: sec.html } : {}),
+        ...(sec.headingId ? { headingId: sec.headingId, heading: sec.heading } : {}),
+        ...(e.locale ? { locale: e.locale } : {}),
+      },
+    }));
   });
   return Bm25.from(records, { resolveTokenizer: tokenizer });
 }
@@ -221,6 +264,7 @@ function keywordSearch(index: Bm25<KeywordData>, query: string, limit: number, f
       section: h.data.section,
       text: snippetAround(h.data.body, queryTokens),
       score: Number(h.score.toFixed(3)),
+      ...(h.data.html ? { html: h.data.html } : {}), // rich HTML preview (rendered section)
       ...(h.data.locale ? { locale: h.data.locale } : {}),
       ...(h.data.headingId ? { headingId: h.data.headingId, heading: h.data.heading } : {}),
     };

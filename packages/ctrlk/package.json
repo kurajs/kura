@@ -30,6 +30,7 @@
   "homepage": "https://kura.build",
   "license": "MIT",
   "devDependencies": {
+    "happy-dom": "^20.10.6",
     "typescript": "^5.7.0"
   },
   "author": "Lawrence Lin",

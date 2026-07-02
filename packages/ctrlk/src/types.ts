@@ -13,6 +13,9 @@ export interface CtrlkItem<D = unknown> {
   description?: string;
   /** Snippet / matched body text shown under the title. */
   excerpt?: string;
+  /** Rich HTML preview shown under the title (rendered + sanitized via innerHTML, taking precedence
+   *  over `excerpt`). For TRUSTED, build-generated markup only — never user input. */
+  excerptHtml?: string;
   /** Group label. Items sharing a group render under one heading, in first-seen order. */
   group?: string;
   /** Leading glyph/icon hint for the default renderer ("page" | "hash" | custom string). */
