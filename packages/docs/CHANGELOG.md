@@ -1,5 +1,17 @@
 # @kurajs/docs
 
+## 0.0.39
+
+### Patch Changes
+
+- [`9f24a5c`](https://github.com/kurajs/kura/commit/9f24a5cd2113a37c965b00b9a8c8e8fa0c190cf0) Thanks [@linyiru](https://github.com/linyiru)! - Rewrite in-content Markdown cross-links to the target doc's real URL.
+
+  Authors write repo-relative `[x](other.md)` links between docs; previously these rendered
+  verbatim and resolved against the current page URL (→ 404). Now each `.md` link is matched to
+  a doc (by slug, else basename) and rewritten to that doc's URL — carrying the docs mount, locale
+  prefix, and deploy subpath, with any `#anchor` preserved. External / non-`.md` / unresolved links
+  are left untouched.
+
 ## 0.0.38
 
 ### Patch Changes
