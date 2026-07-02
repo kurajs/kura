@@ -1,6 +1,46 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { kuraJuneConfig } from "../src/config.ts";
+import { kuraJuneConfig, fromKuraToml } from "../src/config.ts";
+
+// fromKuraToml: normalize a parsed kura.toml (snake_case) into a KuraConfig (camelCase) + defaults.
+test("fromKuraToml: renames snake_case keys, keeps nav/content, defaults the title template", () => {
+  const cfg = fromKuraToml({
+    site: { name: "OpenAB", description: "d" },
+    markdown: "commonmark",
+    base_path: "",
+    deploy: { target: "github-pages", base_path: "/openab" },
+    content: { sources: [{ dir: "docs", mount: "" }] },
+    nav: { tabs: [{ title: "Guides", groups: ["platforms"] }], groups: { platforms: { title: "Platforms", pages: ["discord"] } } },
+  } as never) as {
+    site: { name: string; titleTemplate?: string };
+    markdown: string;
+    basePath: string;
+    deploy: { target: string; basePath: string };
+    content: { sources: { dir: string }[] };
+    nav: { tabs: unknown[] };
+  };
+  assert.equal(cfg.markdown, "commonmark");
+  assert.equal(cfg.basePath, ""); // base_path → basePath (empty preserved)
+  assert.deepEqual(cfg.deploy, { target: "github-pages", basePath: "/openab" }); // deploy.base_path → basePath
+  assert.equal(cfg.content.sources[0]!.dir, "docs"); // in-place mount, no ../ (that was scaffold plumbing)
+  assert.equal((cfg.nav.tabs as unknown[]).length, 1); // nav passes through 1:1
+  assert.equal(cfg.site.titleTemplate, "%s - OpenAB"); // defaulted from the site name
+});
+
+test("fromKuraToml: no [[content.sources]] → default-mount the repo's ./docs at the site root", () => {
+  const cfg = fromKuraToml({ site: { name: "S" } } as never) as { content: { sources: { dir: string; mount: string }[] } };
+  assert.deepEqual(cfg.content.sources, [{ dir: "docs", mount: "" }]);
+});
+
+test("fromKuraToml: an explicit title_template wins; i18n default_locale is renamed", () => {
+  const cfg = fromKuraToml({
+    site: { name: "S", title_template: "%s | S" },
+    i18n: { default_locale: "en", locales: { en: {}, "ja-JP": { path: "/ja" } } },
+  } as never) as { site: { titleTemplate: string }; i18n: { defaultLocale: string; locales: Record<string, unknown> } };
+  assert.equal(cfg.site.titleTemplate, "%s | S");
+  assert.equal(cfg.i18n.defaultLocale, "en");
+  assert.deepEqual(Object.keys(cfg.i18n.locales), ["en", "ja-JP"]); // locale KEYS untouched (not snake-cased)
+});
 
 // kuraJuneConfig forwards content.sources to June's `content.sources` (@junejs/server ≥0.0.51
 // scans them at `june gen`), defaulting `collection` to "docs" — the collection Kura serves.
