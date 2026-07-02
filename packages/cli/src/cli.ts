@@ -8,6 +8,7 @@
 import { buildIndex } from "@kurajs/docs/search";
 import { parseMeta, validatePages, type MetaMap } from "@kurajs/docs/meta";
 import { basePathSegments, docsRoute, pruneStaleDocsRoutes } from "./routes.js";
+import { stripConfigComments, isCommonmark, parseHighlightLangs } from "./config-read.js";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -221,26 +222,21 @@ async function cmdIndex(): Promise<void> {
   // "commonmark" renders via MDX format:'md' — no MDX/JSX parsing, so a literal {…} can't be read as
   // a JS expression and drop the page. Resolved BEFORE the hash so a format switch forces a rebuild
   // (otherwise the same content short-circuits and leaves _mdx.ts in the previous format).
-  let commonmark = process.argv.includes("--commonmark");
-  if (!commonmark) {
-    // Read the setting as TEXT, not by importing kura.config.ts — so `kura index` never executes user
-    // config code (no side effects, no heavy imports) on any run, including ones that short-circuit.
-    const cfgPath = path.join(cwd, "kura.config.ts");
-    if (fs.existsSync(cfgPath)) {
-      // Strip comments before matching so a commented-out `markdown: "commonmark"` can't flip the
-      // renderer. Only treat `//` as a comment at start-of-line/after-whitespace, so URLs survive.
-      const txt = fs.readFileSync(cfgPath, "utf8")
-        .replace(/\/\*[\s\S]*?\*\//g, "")
-        .replace(/(^|\s)\/\/.*$/gm, "$1");
-      if (/\bmarkdown\s*:\s*["']commonmark["']/.test(txt)) commonmark = true;
-    }
-  }
+  // Read kura.config.ts as TEXT, not by importing it — so `kura index` never executes user config
+  // code (no side effects, no heavy imports) on any run, including ones that short-circuit. The pure
+  // parsers live in config-read.ts (unit-tested there); comments are stripped once, up front.
+  const cfgPath = path.join(cwd, "kura.config.ts");
+  const cfgText = fs.existsSync(cfgPath) ? stripConfigComments(fs.readFileSync(cfgPath, "utf8")) : "";
+  const commonmark = process.argv.includes("--commonmark") || isCommonmark(cfgText);
   const format = commonmark ? "md" : "mdx";
   const strict = process.argv.includes("--strict");
+  // Extra shiki grammar names from `highlight: { langs: [...] }` — merged onto @kurajs/docs's curated
+  // base list so projects can highlight DSL fences the defaults miss (e.g. "hcl", "dockerfile").
+  const highlightLangs = parseHighlightLangs(cfgText);
 
   // Content hash — skip rebuilds when nothing changed, so `kura index` is cheap to run before
   // every dev/build. Covers the mode + format + model + locale/slug/body of every entry.
-  const hashInput = JSON.stringify([model, noEmbed, format, allEntries.map((e) => [e.locale ?? "", e.slug, e.body])]);
+  const hashInput = JSON.stringify([model, noEmbed, format, highlightLangs, allEntries.map((e) => [e.locale ?? "", e.slug, e.body])]);
   const contentHash = crypto.createHash("sha256").update(hashInput).digest("hex").slice(0, 16);
   const stamp = `// content-hash: ${contentHash}\n`;
   const hashOf = (f: string) => (fs.existsSync(f) ? fs.readFileSync(f, "utf8").match(/content-hash: (\S+)/)?.[1] : undefined);
@@ -300,7 +296,7 @@ async function cmdIndex(): Promise<void> {
   const { map, failures } = await renderMdxBuckets([
     { bucket: "default", entries: DOCS },
     ...[...byLocale].map(([bucket, entries]) => ({ bucket, entries })),
-  ], undefined, format);
+  ], undefined, format, highlightLangs);
   fs.writeFileSync(
     mdxTs,
     stamp +

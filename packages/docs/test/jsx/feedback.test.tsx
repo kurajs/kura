@@ -78,6 +78,34 @@ test("renderMdxBuckets format='md' (sparkdown-gfm): GFM + shiki highlight, bare 
   expect(h).toContain("plain"); // unknown language → highlighted as text, not dropped
 });
 
+// ── HCL highlighting: hcl/Terraform fences were rendering as plain text (no `hcl` grammar) ──
+test("renderMdxBuckets: ```hcl fences get real shiki highlighting (curated base list includes hcl)", async () => {
+  const body = '```hcl\nresource "aws_instance" "demo" {\n  name = "x"\n}\n```\n';
+  const { map, failures } = await renderMdxBuckets([{ bucket: "default", entries: [{ slug: "p", body }] }]);
+  const h = map.default!.p!;
+  expect(failures).toHaveLength(0);
+  expect(h).toContain('class="shiki'); // highlighted, not a plain <pre>
+  expect(h).toContain("language-hcl"); // tagged with the authored language
+  // `resource` is an hcl keyword → shiki wraps it in its own colored span. Plain-text fallback would
+  // leave the whole block in one span, so a per-token span for `resource` proves the grammar loaded.
+  expect(h).toMatch(/<span[^>]*>resource<\/span>/);
+});
+
+test("renderMdxBuckets: a project-configured extra lang (highlight.langs) is highlighted", async () => {
+  // Simulates the CLI passing kura.config `highlight: { langs: ["dockerfile"] }` — the name isn't in
+  // the curated base list, so it only highlights because the extra lang threaded through to shiki.
+  const body = "```dockerfile\nFROM node:20\nRUN echo hi\n```\n";
+  const { map } = await renderMdxBuckets(
+    [{ bucket: "default", entries: [{ slug: "p", body }] }],
+    undefined,
+    "mdx",
+    ["dockerfile"],
+  );
+  const h = map.default!.p!;
+  expect(h).toContain("language-dockerfile");
+  expect(h).toMatch(/<span[^>]*>FROM<\/span>/); // FROM tokenized → dockerfile grammar loaded
+});
+
 // ── i18n: sidebar/pager links must route through `href` (the current-locale localeHref) ──────────
 const PFX = "/ja-JP";
 const prefixed: Href = (p) => PFX + p; // stand-in for hrefFor("ja-JP") = localeHref(i18n, p, "ja-JP")

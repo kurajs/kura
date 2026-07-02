@@ -82,25 +82,34 @@ export const mdxComponents = { Callout, Card, Cards, Steps, Step, Tabs, Tab };
 
 // Highlighter singleton — created once per build process, shared across all mdxToHtml calls.
 // Dual-theme (light + dark): CSS variables strategy so the rendered HTML switches with
-// [data-theme="dark"] without any JS or re-render. Curated language list covers typical docs content.
+// [data-theme="dark"] without any JS or re-render. Curated language list covers typical docs content
+// (incl. `hcl` for Terraform/HCL config fences); projects extend it via kura.config
+// `highlight.langs` (any shiki-bundled grammar name) — see getHighlighter's `extraLangs`.
+const BASE_LANGS = [
+  "typescript", "tsx", "javascript", "jsx",
+  "bash", "sh", "shell",
+  "json", "jsonc", "yaml", "toml",
+  "html", "css",
+  "markdown", "mdx",
+  "python", "go", "rust",
+  "sql", "graphql",
+  "hcl",
+  "diff", "text",
+];
 type Highlighter = Awaited<ReturnType<typeof createHighlighter>>;
 let _highlighter: Highlighter | null = null;
-async function getHighlighter(): Promise<Highlighter> {
+// `extraLangs`: additional shiki-bundled grammar names from kura.config `highlight.langs`. Loaded
+// lazily (loadLanguage) rather than only at creation, so extras still register even if the singleton
+// already exists — no "first call wins" gotcha across the build (or across tests sharing this module).
+// loadLanguage is idempotent per name; an unknown name makes shiki throw a clear error, failing the
+// build loudly (a config typo to fix).
+async function getHighlighter(extraLangs: readonly string[] = []): Promise<Highlighter> {
   if (!_highlighter) {
-    _highlighter = await createHighlighter({
-      themes: ["github-light", "github-dark-default"],
-      langs: [
-        "typescript", "tsx", "javascript", "jsx",
-        "bash", "sh", "shell",
-        "json", "jsonc", "yaml", "toml",
-        "html", "css",
-        "markdown", "mdx",
-        "python", "go", "rust",
-        "sql", "graphql",
-        "diff", "text",
-      ],
-    });
+    _highlighter = await createHighlighter({ themes: ["github-light", "github-dark-default"], langs: BASE_LANGS });
   }
+  const loaded = new Set(_highlighter.getLoadedLanguages());
+  const missing = extraLangs.filter((l) => !loaded.has(l));
+  if (missing.length) await _highlighter.loadLanguage(...(missing as Parameters<Highlighter["loadLanguage"]>));
   return _highlighter;
 }
 
@@ -148,12 +157,12 @@ function highlightCommonmark(html: string, highlighter: Highlighter): string {
   });
 }
 
-async function renderCommonmark(source: string): Promise<string> {
+async function renderCommonmark(source: string, langs: readonly string[] = []): Promise<string> {
   if (!sparkInited) {
     initCommonmark(); // synchronous wasm init, idempotent, build-time only
     sparkInited = true;
   }
-  const highlighter = await getHighlighter();
+  const highlighter = await getHighlighter(langs);
   return highlightCommonmark(commonmarkToHtmlSync(source), highlighter);
 }
 
@@ -167,18 +176,20 @@ export async function mdxToHtml(
   source: string,
   components: Record<string, unknown> = mdxComponents,
   format: "mdx" | "md" = "mdx",
+  langs: readonly string[] = [],
 ): Promise<string> {
   // The cache key is format+source — it can't capture the `components` mapping identity, so only use
   // the cache for the default components (the only mapping any caller passes in practice). Custom
-  // components bypass the cache to stay correct.
+  // components bypass the cache to stay correct. `langs` is build-global (fixes the highlighter
+  // singleton on first call), so it doesn't vary within a process and needn't be in the key.
   const cacheable = components === mdxComponents;
   const key = `${format}\0${source}`;
   if (cacheable) { const hit = cache.get(key); if (hit !== undefined) return hit; }
   let html: string;
   if (format === "md") {
-    html = await renderCommonmark(source); // sparkdown-gfm + shiki; components are irrelevant in CommonMark
+    html = await renderCommonmark(source, langs); // sparkdown-gfm + shiki; components are irrelevant in CommonMark
   } else {
-    const highlighter = await getHighlighter();
+    const highlighter = await getHighlighter(langs);
     const mod = await evaluate(source, {
       ...(runtime as Record<string, unknown>),
       format,
@@ -211,6 +222,7 @@ export async function renderMdxBuckets(
   buckets: { bucket: string; entries: { slug: string; body: string }[] }[],
   components: Record<string, unknown> = mdxComponents,
   format: "mdx" | "md" = "mdx",
+  langs: readonly string[] = [],
 ): Promise<{ map: Record<string, Record<string, string>>; failures: MdxFailure[] }> {
   const map: Record<string, Record<string, string>> = {};
   const failures: MdxFailure[] = [];
@@ -218,7 +230,7 @@ export async function renderMdxBuckets(
     map[bucket] ??= {};
     for (const e of entries) {
       try {
-        map[bucket]![e.slug] = await mdxToHtml(e.body, components, format);
+        map[bucket]![e.slug] = await mdxToHtml(e.body, components, format, langs);
       } catch (err) {
         failures.push({ bucket, slug: e.slug, error: (err as Error).message });
       }
