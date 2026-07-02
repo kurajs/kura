@@ -1,6 +1,6 @@
 {
   "name": "@kurajs/ctrlk",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "type": "module",
   "description": "Kura — ⌘K command palette: a headless, zero-dependency command/search menu with a built-in default renderer. Framework-agnostic (vanilla DOM); mirrors cmdk's model & accessibility without React.",
   "exports": {
