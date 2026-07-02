@@ -1,5 +1,55 @@
 # @kurajs/docs
 
+## 0.0.37
+
+### Patch Changes
+
+- [#33](https://github.com/kurajs/kura/pull/33) [`7027dbc`](https://github.com/kurajs/kura/commit/7027dbcd2c3aa0d374b7d832256438224ec5ffc7) Thanks [@linyiru](https://github.com/linyiru)! - Docs-as-code: `content.sources` in kura.config.ts
+
+  Docs no longer have to live under `content/docs/`. Point Kura at the repo's existing
+  directories — `docs/`, `schema/`, `examples/` — and they feed the site directly, no copy and
+  no sync step:
+
+  ```ts
+  export default defineKura({
+    content: {
+      sources: [
+        { dir: "../docs" }, // merges into the docs collection
+        { dir: "../schema", mount: "schema" }, // pages at /docs/schema/…
+      ],
+    },
+  });
+  ```
+
+  - Sources are forwarded to June's `content.sources` (requires @junejs/server ≥0.0.51 /
+    @junejs/cli ≥0.0.50 — dependency ranges bumped), which merges their entries into
+    `app/_content.ts` at `june gen`, with the same `<dir>/<locale>/` mirror layout per source.
+  - `kura index` extends its own walks over the same trees: meta.json nav (mounted keys
+    prefixed; the root meta's tabs may reference a mount), lastUpdated git dates
+    (mount-prefixed slugs; a source's README dates the mount page), and locale discovery
+    (a translated external docs/ lights up its locale in the search index + MDX buckets).
+  - Sources participate in the content hash, so changing them forces a rebuild.
+  - Keep `sources` a flat array/object literal — `kura index` reads the config as text (it
+    never executes user config).
+
+- [#32](https://github.com/kurajs/kura/pull/32) [`8aa27f3`](https://github.com/kurajs/kura/commit/8aa27f3be09e107c329ff8e60350cb2b20028075) Thanks [@linyiru](https://github.com/linyiru)! - Highlight `hcl` fences, and make the shiki language list extensible via `highlight.langs`
+
+  `hcl` (Terraform / HashiCorp config) is now in the curated syntax-highlighting set, so those
+  fences get real dual-theme highlighting instead of falling back to plain text.
+
+  Projects can also extend the set from `kura.config.ts`:
+
+  ```ts
+  export default defineConfig({
+    highlight: { langs: ["hcl", "dockerfile", "kotlin"] }, // any shiki-bundled grammar name
+  });
+  ```
+
+  `kura index` reads `highlight.langs` as text (config is never executed at build), merges it onto the
+  curated base list, and loads the extra grammars lazily via shiki's `loadLanguage`. A langs change
+  participates in the content hash, so switching it forces a rebuild. An unknown grammar name makes the
+  build fail loudly.
+
 ## 0.0.36
 
 ### Patch Changes
