@@ -1,5 +1,12 @@
 # @kurajs/example-search
 
+## 0.0.10
+
+### Patch Changes
+
+- Updated dependencies [[`fb3f5a6`](https://github.com/kurajs/kura/commit/fb3f5a650ad954954ffee98a1d2cb81d9048e740)]:
+  - @kurajs/docs@0.0.38
+
 ## 0.0.9
 
 ### Patch Changes
