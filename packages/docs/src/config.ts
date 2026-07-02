@@ -145,6 +145,47 @@ export function defineKura(config: KuraConfig): KuraConfig {
 }
 
 /**
+ * Normalize a parsed `kura.toml` object into a KuraConfig. Lets a project be configured with a
+ * declarative `kura.toml` (idiomatic for non-JS repos) instead of `kura.config.ts` — the CLI reads
+ * it and the generated `.june` shims call this. TOML is snake_case; KuraConfig is camelCase, so the
+ * known keys are renamed here (`base_path`→`basePath`, …). Function-valued options (embedder,
+ * tokenizer) can't live in TOML — use `kura.config.ts` for those. The HTML `<title>` template
+ * defaults to `"{page} - {site name}"` when the site has a name and none is set.
+ */
+export function fromKuraToml(raw: Record<string, unknown>): KuraConfig {
+  const rename = (o: unknown, map: Record<string, string>): Record<string, unknown> => {
+    if (!o || typeof o !== "object") return {};
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(o as Record<string, unknown>)) out[map[k] ?? k] = v;
+    return out;
+  };
+  const r = raw as Record<string, any>;
+  const cfg: Record<string, unknown> = {};
+  if (r.site) cfg.site = rename(r.site, { title_template: "titleTemplate" });
+  if (r.markdown) cfg.markdown = r.markdown;
+  if (r.base_path !== undefined) cfg.basePath = r.base_path;
+  if (r.sections) cfg.sections = r.sections;
+  if (r.highlight) cfg.highlight = r.highlight;
+  if (r.site_url !== undefined) cfg.siteUrl = r.site_url;
+  if (r.last_updated !== undefined) cfg.lastUpdated = r.last_updated;
+  if (r.mermaid_cdn !== undefined) cfg.mermaidCdn = r.mermaid_cdn;
+  if (r.locale_names) cfg.localeNames = r.locale_names;
+  if (r.tab_labels) cfg.tabLabels = r.tab_labels;
+  if (r.section_labels) cfg.sectionLabels = r.section_labels;
+  if (r.labels) cfg.labels = r.labels;
+  if (r.i18n) cfg.i18n = rename(r.i18n, { default_locale: "defaultLocale" });
+  if (r.deploy) cfg.deploy = rename(r.deploy, { base_path: "basePath" });
+  if (r.nav) cfg.nav = r.nav; // virtual navigation — same shape in TOML and config
+  // A kura.toml site mounts the repo's ./docs at the site root by default (the docs-as-code
+  // convention) — override with [[content.sources]]. Any local content/docs/ merges on top.
+  cfg.content = { sources: r.content?.sources ?? [{ dir: "docs", mount: "" }] };
+  if (r.june) cfg.june = r.june;
+  const site = cfg.site as { name?: string; titleTemplate?: string } | undefined;
+  if (site?.name && !site.titleTemplate) cfg.site = { ...site, titleTemplate: `%s - ${site.name}` };
+  return cfg as KuraConfig;
+}
+
+/**
  * Build a June config from a KuraConfig. Called by the thin `june.config.ts` shim so the
  * user only ever edits `kura.config.ts`. Handles site/deploy/agent wiring automatically;
  * advanced june options flow through via `config.june`.
