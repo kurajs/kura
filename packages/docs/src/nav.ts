@@ -56,7 +56,7 @@ export type NavNode<T extends DocLike> =
   | { kind: "group"; key: string; title: string; index?: T; defaultOpen?: boolean; children: NavNode<T>[] };
 
 // "manual-installation" → "Manual installation". Folder fallback title when meta gives none.
-function humanize(seg: string): string {
+export function humanize(seg: string): string {
   const s = seg.replace(/[-_]/g, " ").trim();
   return s ? s[0]!.toUpperCase() + s.slice(1) : seg;
 }

@@ -30,6 +30,16 @@ export interface KuraConfig {
   basePath?: string;
   /** Sidebar group order (sections). */
   sections?: string[];
+  /** Virtual navigation: group FLAT doc slugs into on-screen tabs + sidebar groups purely by config,
+   *  without moving files or prefixing slugs. URLs stay flat (`/discord`), so repo-relative `.md`
+   *  cross-links resolve by exact slug (no folder ambiguity). A group with no `pages` auto-fills from
+   *  the docs subfolder of the same name (its slug prefix). A page is a bare slug (label = its H1) or
+   *  `{ slug, title }` to set a shorter sidebar label. Present → replaces the folder/meta.json + tabs
+   *  model. */
+  nav?: {
+    tabs?: { title: string; groups: string[] }[];
+    groups?: Record<string, { title?: string; pages?: (string | { slug: string; title?: string })[] }>;
+  };
   /** Site identity shown in the chrome and passed to June (name, brand, description, titleTemplate). */
   site?: { name?: string; brand?: string; description?: string; titleTemplate?: string };
   /** Embedding engine for search (e.g. transformers()); injected for local↔cloud parity. */
