@@ -123,6 +123,9 @@ export interface SearchOptions {
   mode?: "keyword" | "hybrid";
   /** Max hits per page (slug) in the result. Default 3. */
   maxPerPage?: number;
+  /** Typeahead: match the last query token as a PREFIX (so "feis" finds "feishu" mid-type). Only
+   *  affects keyword mode; the hybrid/submit path always uses exact terms. */
+  prefix?: boolean;
 }
 
 export interface SearchHandle {
@@ -181,7 +184,7 @@ function snippetAround(body: string, tokens: string[]): string {
   return body.slice(start, start + 160).trim();
 }
 
-function keywordSearch(index: Bm25<KeywordData>, query: string, limit: number, fetchK = limit * 4, locale?: string): SearchHit[] {
+function keywordSearch(index: Bm25<KeywordData>, query: string, limit: number, fetchK = limit * 4, locale?: string, prefixLast?: boolean): SearchHit[] {
   // Collapse a slug's locale variants (DOCS carries every locale) into one hit — otherwise
   // RRF, which fuses by slug, would see the same slug at several ranks and over-boost it.
   // Keep the highest-BM25 variant, breaking ties toward the reader's `locale` so the snippet
@@ -190,7 +193,7 @@ function keywordSearch(index: Bm25<KeywordData>, query: string, limit: number, f
   // tokenizes the query per-locale (CJK), matching how each doc was indexed.
   const queryTokens = index.tokensOf(query, locale); // the exact terms BM25 matches on
   const best = new Map<string, { hit: SearchHit; score: number }>();
-  for (const h of index.search(query, { topK: fetchK, lang: locale })) {
+  for (const h of index.search(query, { topK: fetchK, lang: locale, prefixLast })) {
     const hit: SearchHit = {
       slug: h.data.slug,
       title: h.data.title,
@@ -257,7 +260,7 @@ export function createSearch(opts: {
       search: async (query, o) => {
         const topK = o?.topK ?? 8;
         // Over-fetch sections, cap per page so one doc can't crowd the list, then take topK.
-        const hits = keywordSearch(idx(), query, topK * 3, undefined, o?.locale);
+        const hits = keywordSearch(idx(), query, topK * 3, undefined, o?.locale, o?.prefix);
         return capPerPage(hits, o?.maxPerPage ?? 3).slice(0, topK);
       },
       tokensOf: (query, locale) => idx().tokensOf(query, locale),
@@ -290,7 +293,7 @@ export function createSearch(opts: {
     const depth = topK * 4; // over-fetch from each side so RRF has rank signal to fuse
     // Keyword-only fast path (typeahead): BM25 alone, no embed (~200ms) on the request thread.
     if (o?.mode === "keyword") {
-      const hits = keywordSearch(getKeyword(), query, topK * 3, depth, o?.locale);
+      const hits = keywordSearch(getKeyword(), query, topK * 3, depth, o?.locale, o?.prefix);
       return capPerPage(hits, maxPerPage).slice(0, topK);
     }
     const kb = await getKb();
