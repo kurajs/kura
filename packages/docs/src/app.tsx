@@ -322,7 +322,7 @@ export function createDocs<T extends DocLike>(opts: {
   const layout = ({ children }: { children: React.ReactNode }) => {
     const locale = opts.config.i18n ? currentLocale() : undefined;
     return (
-      <DocsLayoutShell site={site} navTabs={navTabsFor(locale)} basePath={basePath} labels={labelsFor(locale)} href={hrefFor(locale)} localeSwitch={switchFor(locale, "")} searchStatic={isStatic} locale={locale}>
+      <DocsLayoutShell site={site} navTabs={navTabsFor(locale)} basePath={basePath} labels={labelsFor(locale)} href={hrefFor(locale)} localeSwitch={switchFor(locale, "")} searchStatic={isStatic} locale={locale} deployPrefix={deployPrefix}>
         <JuneOutlet>{children}</JuneOutlet>
       </DocsLayoutShell>
     );
