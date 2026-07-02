@@ -65,6 +65,12 @@ export interface KuraConfig {
    */
   markdown?: "mdx" | "commonmark";
   /**
+   * Syntax highlighting. `langs` adds shiki-bundled grammar names (e.g. "hcl", "dockerfile",
+   * "kotlin") on top of Kura's curated set — for DSL/code fences the defaults don't cover. Read as
+   * text by `kura index` (config is never executed at build), so use plain string literals here.
+   */
+  highlight?: { langs?: string[] };
+  /**
    * Show a "Last updated on <date>" line at the foot of each doc page, from the file's last git commit
    * date (a frontmatter `lastUpdated:` field overrides it per page). **Default off.** Requires the
    * build to run inside a git repo WITH history — in CI set the checkout to `fetch-depth: 0`, since a
