@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { stripConfigComments, isCommonmark, parseHighlightLangs, parseContentSources, parseI18nLocales } from "../src/config-read.ts";
+import { stripConfigComments, isCommonmark, parseHighlightLangs, parseContentSources, parseI18nLocales, parseDeployTarget, isStaticTarget } from "../src/config-read.ts";
 
 // The CLI reads kura.config.ts as TEXT (never executes it). These pure parsers are the risky part —
 // regexes over user source — so they're pinned here directly (cli.ts can't be imported: it dispatches
@@ -111,4 +111,23 @@ test("isCommonmark: detects markdown: commonmark, ignores a commented-out one", 
 test("stripConfigComments: keeps https:// URLs inside strings (// only strips at line-start/after-space)", () => {
   const src = `export default { site: { url: "https://kura.dev" } };`;
   assert.match(stripConfigComments(src), /https:\/\/kura\.dev/);
+});
+
+const target = (src: string) => parseDeployTarget(stripConfigComments(src));
+const staticT = (src: string) => isStaticTarget(stripConfigComments(src));
+
+test("parseDeployTarget: pulls the deploy target string; undefined when absent", () => {
+  assert.equal(target(`export default defineKura({ deploy: { target: "github-pages", basePath: "/x" } });`), "github-pages");
+  assert.equal(target(`export default defineKura({ deploy: { target: 'workers' } });`), "workers");
+  assert.equal(target(`export default defineKura({ site: { name: "x" } });`), undefined);
+});
+
+test("isStaticTarget: true for github-pages and the static alias, false otherwise", () => {
+  assert.equal(staticT(`export default defineKura({ deploy: { target: "github-pages" } });`), true);
+  assert.equal(staticT(`export default defineKura({ deploy: { target: "static" } });`), true);
+  assert.equal(staticT(`export default defineKura({ deploy: { target: "workers" } });`), false);
+  assert.equal(staticT(`export default defineKura({ deploy: { target: "vercel" } });`), false);
+  assert.equal(staticT(``), false);
+  // a commented-out target must not count
+  assert.equal(staticT(`export default defineKura({\n  // deploy: { target: "github-pages" }\n});`), false);
 });

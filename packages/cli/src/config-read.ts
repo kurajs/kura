@@ -15,6 +15,19 @@ export function isCommonmark(strippedCfg: string): boolean {
   return /\bmarkdown\s*:\s*["']commonmark["']/.test(strippedCfg);
 }
 
+/** The deploy target from `deploy: { target: "…" }`, or undefined. The deploy block is flat
+ *  (target/name/domain/basePath — no nesting), so a `[^}]*` scan to the target key is safe. */
+export function parseDeployTarget(strippedCfg: string): string | undefined {
+  return strippedCfg.match(/\bdeploy\s*:\s*\{[^}]*\btarget\s*:\s*["']([^"']+)["']/)?.[1];
+}
+
+/** True when the deploy target builds a pure static site ("github-pages" or its "static" alias) —
+ *  the CLI then drops the dynamic OG image route (it can't be prerendered on a static host). */
+export function isStaticTarget(strippedCfg: string): boolean {
+  const t = parseDeployTarget(strippedCfg);
+  return t === "github-pages" || t === "static";
+}
+
 /** Extra shiki grammar names from `highlight: { langs: [...] }`, merged onto @kurajs/docs's curated
  *  base list so projects can highlight DSL fences the defaults miss (e.g. "hcl", "dockerfile"). Pull
  *  the array literal, then the quoted strings inside it. Returns [] when there's no highlight.langs. */

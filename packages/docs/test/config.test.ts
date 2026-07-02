@@ -26,3 +26,28 @@ test("kuraJuneConfig: no sources → no content key (off by absence)", () => {
   assert.equal(("content" in (kuraJuneConfig({}, { DOCS: [] }) as JuneShape)), false);
   assert.equal(("content" in (kuraJuneConfig({ content: { sources: [] } }, { DOCS: [] }) as JuneShape)), false);
 });
+
+// The static target: "github-pages" (and its "static" alias) map to June's built-in static() target
+// (deploy.target "static"), and the deploy subpath becomes June's top-level basePath.
+type DeployShape = { deploy?: { target?: string; basePath?: string }; basePath?: string };
+
+test("kuraJuneConfig: github-pages → June target 'static' + top-level basePath", () => {
+  const june = kuraJuneConfig(
+    { deploy: { target: "github-pages", basePath: "/openab/docs" } },
+    { DOCS: [] },
+  ) as DeployShape;
+  assert.equal(june.deploy?.target, "static");
+  assert.equal(june.basePath, "/openab/docs");
+});
+
+test("kuraJuneConfig: 'static' alias behaves the same", () => {
+  const june = kuraJuneConfig({ deploy: { target: "static", basePath: "/x" } }, { DOCS: [] }) as DeployShape;
+  assert.equal(june.deploy?.target, "static");
+  assert.equal(june.basePath, "/x");
+});
+
+test("kuraJuneConfig: non-static deploy passes through untouched, no basePath leaks", () => {
+  const june = kuraJuneConfig({ deploy: { target: "workers", name: "site" } }, { DOCS: [] }) as DeployShape;
+  assert.equal(june.deploy?.target, "workers");
+  assert.equal("basePath" in june, false);
+});
