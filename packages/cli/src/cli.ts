@@ -7,7 +7,7 @@
 //     A content hash short-circuits re-embedding when nothing changed (cheap to run pre-dev).
 import { buildIndex } from "@kurajs/docs/search";
 import { basePathSegments, docsRoute, pruneStaleDocsRoutes } from "./routes.js";
-import { stripConfigComments, isCommonmark, parseHighlightLangs, parseContentSources, parseI18nLocales } from "./config-read.js";
+import { stripConfigComments, isCommonmark, parseHighlightLangs, parseContentSources, parseI18nLocales, isStaticTarget } from "./config-read.js";
 import { collectMeta, collectLastUpdated, discoverLocales } from "./content-walk.js";
 import fs from "node:fs";
 import path from "node:path";
@@ -329,6 +329,9 @@ function generateJuneConfig(cwd: string): void {
 
   const juneDir = path.join(cwd, ".june");
   const routesDir = path.join(juneDir, "routes");
+  // A static target has no server, so the dynamic OG image route can't run — drop it (and its
+  // og:image tags, dropped in app.tsx). Read the target from config as TEXT (never import it).
+  const staticTarget = isStaticTarget(stripConfigComments(fs.readFileSync(kuraConfigPath, "utf8")));
   // basePath drives the docs route location (June has no route-prefix config — URL = disk).
   const { docsDir, kuraImport } = docsRoute(routesDir, basePathSegments(cwd));
   // Catch-all so nested doc slugs (/og/getting-started/sdk.png) resolve, not just /og/sdk.png.
@@ -339,7 +342,9 @@ function generateJuneConfig(cwd: string): void {
   // single-segment OG URLs). Targeted, not a wholesale rm of routes/og, so writeIfChanged keeps the
   // og/[[...slug]] route's mtime stable across runs.
   fs.rmSync(path.join(routesDir, "og", "[slug]"), { recursive: true, force: true });
-  for (const d of [juneDir, routesDir, docsDir, ogDir, searchDir]) {
+  // Static: prune the whole OG route dir (a prior non-static run may have written it).
+  if (staticTarget) fs.rmSync(path.join(routesDir, "og"), { recursive: true, force: true });
+  for (const d of [juneDir, routesDir, docsDir, searchDir, ...(staticTarget ? [] : [ogDir])]) {
     fs.mkdirSync(d, { recursive: true });
   }
 
@@ -401,6 +406,9 @@ function generateJuneConfig(cwd: string): void {
     "export const md = kura.docRoute.md;\n" +
     "export const json = kura.docRoute.json;\n" +
     "export const metadata = kura.docRoute.metadata;\n" +
+    // staticPaths enumerates every doc page (× locale) so the static() target prerenders this
+    // dynamic catch-all to files. Inert on server targets (June only reads it when building static).
+    "export const staticPaths = kura.docRoute.staticPaths;\n" +
     "export default kura.docRoute.View;\n",
   );
 
@@ -414,12 +422,15 @@ function generateJuneConfig(cwd: string): void {
     "export default kura.searchRoute.View;\n",
   );
 
-  // .june/routes/og/[[...slug]]/route.ts — OG image (catch-all → nested slugs resolve)
-  writeIfChanged(path.join(ogDir, "route.ts"),
-    HEADER +
-    'import { kura } from "../../_kura";\n' +
-    "export default kura.ogRoute;\n",
-  );
+  // .june/routes/og/[[...slug]]/route.ts — OG image (catch-all → nested slugs resolve).
+  // Omitted on a static target (no server to render images; og:image tags are dropped too).
+  if (!staticTarget) {
+    writeIfChanged(path.join(ogDir, "route.ts"),
+      HEADER +
+      'import { kura } from "../../_kura";\n' +
+      "export default kura.ogRoute;\n",
+    );
+  }
 
   // .june/routes/_client.ts — island client entry. startJuneClient wires island hydration AND the
   // morph router (when clientRouter is on) — without it the router never starts. initSearch then
