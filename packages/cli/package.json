@@ -1,6 +1,6 @@
 {
   "name": "@kurajs/cli",
-  "version": "0.0.25",
+  "version": "0.0.26",
   "type": "module",
   "description": "Kura CLI — dev, build, deploy, and index a Kura docs app (one surface over June).",
   "bin": {
@@ -20,7 +20,7 @@
     "smol-toml": "^1.7.0"
   },
   "peerDependencies": {
-    "@kurajs/docs": ">=0.0.40",
+    "@kurajs/docs": ">=0.0.41",
     "@kurajs/transformers": ">=0.0.1 <0.1.0"
   },
   "peerDependenciesMeta": {

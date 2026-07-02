@@ -1,5 +1,14 @@
 # @kurajs/cli
 
+## 0.0.26
+
+### Patch Changes
+
+- [#48](https://github.com/kurajs/kura/pull/48) [`3453c25`](https://github.com/kurajs/kura/commit/3453c251e01437220b7916502d9ee13bfa16856f) Thanks [@linyiru](https://github.com/linyiru)! - Native `kura.toml` support. A project can now commit ONLY `kura.toml` (+ its `docs/`): the CLI parses it with `smol-toml` (works under node or bun), unifies both config formats through one `loadCliConfig()`, materializes the config to `.june/kura.gen.ts` for the generated shims (normalized via `fromKuraToml()`), and fills in the boilerplate `create-kura` would scaffold — `app/global.css`, `tsconfig.json`, a landing page, and the `./docs` mount. `kura.config.ts` projects are unchanged. Requires `@kurajs/docs >=0.0.41`.
+
+- Updated dependencies [[`3453c25`](https://github.com/kurajs/kura/commit/3453c251e01437220b7916502d9ee13bfa16856f)]:
+  - @kurajs/docs@0.0.41
+
 ## 0.0.25
 
 ### Patch Changes

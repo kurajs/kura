@@ -1,5 +1,11 @@
 # @kurajs/docs
 
+## 0.0.41
+
+### Patch Changes
+
+- [#48](https://github.com/kurajs/kura/pull/48) [`3453c25`](https://github.com/kurajs/kura/commit/3453c251e01437220b7916502d9ee13bfa16856f) Thanks [@linyiru](https://github.com/linyiru)! - Add `fromKuraToml()` — normalize a parsed `kura.toml` into a `KuraConfig`. This lets a project be configured with a declarative `kura.toml` (idiomatic for non-JS repos) instead of `kura.config.ts`. Renames the snake_case keys, defaults the `<title>` template to `"{page} - {site name}"`, and default-mounts the repo's `./docs` at the site root when no `[[content.sources]]` are declared.
+
 ## 0.0.40
 
 ### Patch Changes
