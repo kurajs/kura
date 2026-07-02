@@ -222,3 +222,15 @@ export function processHtml(html: string): { html: string; toc: Toc } {
   });
   return { html: out, toc };
 }
+
+/** Rewrite in-content Markdown cross-links (`<a href="…foo.md">` / `foo.md#anchor`) to the target
+ *  doc's real URL. Authors write repo-relative `[x](other.md)` links; without this they resolve
+ *  against the CURRENT page URL (→ 404), so every docs tool rewrites them. `resolve(href)` returns
+ *  the doc URL (basePath + slug, `#anchor` preserved) or null to leave the link as-is (external,
+ *  non-.md, or unresolved). Runs on rendered HTML (after processHtml). */
+export function rewriteDocLinks(html: string, resolve: (href: string) => string | null): string {
+  return html.replace(/(<a\b[^>]*?\shref=")([^"]*)(")/gi, (m, pre: string, href: string, post: string) => {
+    const u = resolve(href);
+    return u == null ? m : pre + u + post;
+  });
+}
