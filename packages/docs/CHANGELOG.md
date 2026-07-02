@@ -1,5 +1,11 @@
 # @kurajs/docs
 
+## 0.0.45
+
+### Patch Changes
+
+- [#55](https://github.com/kurajs/kura/pull/55) [`bed43b5`](https://github.com/kurajs/kura/commit/bed43b569d10f3abcb7e8e6989114f5e776a43f9) Thanks [@linyiru](https://github.com/linyiru)! - Fix footer deploy-root links. The `llms.txt` link was hardcoded `/llms.txt`, so on a site deployed under a subpath (e.g. GitHub Pages `/openab`) it 404'd instead of resolving to `/openab/llms.txt` — llms.txt lives at the deploy root, not under the docs basePath or a locale, so it now gets the deploy prefix. The `MCP` link (a server route that a static build never emits) is now hidden on static targets instead of pointing at a dead `/mcp`.
+
 ## 0.0.44
 
 ### Patch Changes
