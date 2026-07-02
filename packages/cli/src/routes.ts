@@ -13,7 +13,11 @@ import path from "node:path";
 export function parseBasePath(configText: string): string[] {
   const txt = configText
     .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|\s)\/\/.*$/gm, "$1");
+    .replace(/(^|\s)\/\/.*$/gm, "$1")
+    // `deploy.basePath` is the DEPLOY subpath (a GitHub Pages project path) — a different axis from
+    // the docs-mount `basePath` this reader wants. Strip the (flat) deploy block first so its
+    // basePath key can't be mistaken for the docs mount and misplace the route.
+    .replace(/\bdeploy\s*:\s*\{[^}]*\}/g, "");
   const m = txt.match(/\bbasePath\s*:\s*["']([^"']*)["']/);
   if (!m) return ["docs"]; // key absent → default "/docs"
   const segments = m[1]!.split("/").filter(Boolean); // trims leading/trailing/dup slashes; "" → []
