@@ -19,34 +19,35 @@ export function parseBasePath(configText: string): string[] {
     // basePath key can't be mistaken for the docs mount and misplace the route.
     .replace(/\bdeploy\s*:\s*\{[^}]*\}/g, "");
   const m = txt.match(/\bbasePath\s*:\s*["']([^"']*)["']/);
-  if (!m) return ["docs"]; // key absent → default "/docs"
-  const segments = m[1]!.split("/").filter(Boolean); // trims leading/trailing/dup slashes; "" → []
+  return basePathToSegments(m ? m[1] : undefined); // key absent → default "/docs"
+}
+
+/** URL path segments for a docs-mount basePath VALUE (the axis that places the route). `undefined`
+ *  → the "/docs" default; `""` → site root (`[]`); `"/a/b"` → `["a","b"]`. Rejects traversal
+ *  segments and reserved first segments. Shared by parseBasePath (kura.config.ts) and the kura.toml
+ *  reader so both validate identically. */
+export function basePathToSegments(value: string | undefined): string[] {
+  if (value === undefined) return ["docs"];
+  const segments = value.split("/").filter(Boolean); // trims leading/trailing/dup slashes; "" → []
   // Reject traversal/separator segments: "." / ".." / a backslash are meaningless in a URL prefix
   // and, joined into routesDir, would let the docs route escape .june/routes (a confusing config
   // mistake). Fail fast with the offending value so the user fixes basePath, not silently misplace files.
   for (const s of segments) {
     if (s === "." || s === ".." || s.includes("\\")) {
-      throw new Error(`Invalid basePath ${JSON.stringify(m[1])}: segment ${JSON.stringify(s)} is not a valid URL path segment.`);
+      throw new Error(`Invalid basePath ${JSON.stringify(value)}: segment ${JSON.stringify(s)} is not a valid URL path segment.`);
     }
   }
   // Reject a basePath that starts with a route segment kura already owns: docs at routes/og/[[...slug]]
   // would land on the OG route's own directory (page.tsx shadows route.ts → OG breaks), and /search is
   // the search route. Fail fast rather than silently clobber one of them.
   if (segments.length && RESERVED_ROOT_SEGMENTS.has(segments[0]!)) {
-    throw new Error(`Invalid basePath ${JSON.stringify(m[1])}: ${JSON.stringify(segments[0])} is a reserved route segment (kura serves the OG image and search routes there). Choose a different basePath.`);
+    throw new Error(`Invalid basePath ${JSON.stringify(value)}: ${JSON.stringify(segments[0])} is a reserved route segment (kura serves the OG image and search routes there). Choose a different basePath.`);
   }
   return segments;
 }
 
 // First-segment basePath values that would collide with a route kura generates under .june/routes.
 const RESERVED_ROOT_SEGMENTS = new Set(["og", "search"]);
-
-// `basePath` segments for the app at `cwd` (no kura.config.ts → default "/docs").
-export function basePathSegments(cwd: string): string[] {
-  const cfgPath = path.join(cwd, "kura.config.ts");
-  if (!fs.existsSync(cfgPath)) return ["docs"];
-  return parseBasePath(fs.readFileSync(cfgPath, "utf8"));
-}
 
 // The docs catch-all route dir + the relative import its page.tsx uses to reach routes/_kura.ts.
 // The import climbs one "../" per basePath segment plus one for the "[[...slug]]" dir itself:

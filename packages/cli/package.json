@@ -11,15 +11,16 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "node --experimental-strip-types --test test/*.test.ts"
+    "test": "node --experimental-strip-types --test test/*.test.ts && bun test test/bun/"
   },
   "license": "MIT",
   "dependencies": {
     "@junejs/cli": ">=0.0.50 <0.1.0",
-    "@kurajs/core": ">=0.0.1 <0.1.0"
+    "@kurajs/core": ">=0.0.1 <0.1.0",
+    "smol-toml": "^1.7.0"
   },
   "peerDependencies": {
-    "@kurajs/docs": ">=0.0.38",
+    "@kurajs/docs": ">=0.0.41",
     "@kurajs/transformers": ">=0.0.1 <0.1.0"
   },
   "peerDependenciesMeta": {

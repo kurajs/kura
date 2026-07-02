@@ -6,8 +6,8 @@
 //     and never reads the filesystem (Workers-safe; mirrors June's app/_content.ts freeze).
 //     A content hash short-circuits re-embedding when nothing changed (cheap to run pre-dev).
 import { buildIndex } from "@kurajs/docs/search";
-import { basePathSegments, docsRoute, pruneStaleDocsRoutes } from "./routes.js";
-import { stripConfigComments, isCommonmark, parseHighlightLangs, parseContentSources, parseI18nLocales, isStaticTarget } from "./config-read.js";
+import { docsRoute, pruneStaleDocsRoutes } from "./routes.js";
+import { loadCliConfig } from "./config-load.js";
 import { collectMeta, collectLastUpdated, discoverLocales } from "./content-walk.js";
 import fs from "node:fs";
 import path from "node:path";
@@ -32,19 +32,16 @@ async function cmdIndex(): Promise<void> {
   const mdxTs = path.join(cwd, "app", "_mdx.ts");
   const metaTs = path.join(cwd, "app", "_meta.ts");
 
-  // Read kura.config.ts as TEXT, not by importing it — so `kura index` never executes user config
-  // code (no side effects, no heavy imports) on any run, including ones that short-circuit. The pure
-  // parsers live in config-read.ts (unit-tested there); comments are stripped once, up front.
-  const cfgPath = path.join(cwd, "kura.config.ts");
-  const cfgText = fs.existsSync(cfgPath) ? stripConfigComments(fs.readFileSync(cfgPath, "utf8")) : "";
-  // Docs-as-code sources (`content: { sources: [...] }`): June already merged their ENTRIES into
-  // app/_content.ts at `june gen` (kuraJuneConfig forwards them); here they extend Kura's own
-  // walks — meta.json nav, lastUpdated dates, locale discovery — over the same external trees.
-  const contentSources = parseContentSources(cfgText);
-  // Locale buckets are DECLARED (config i18n: defaultLocale + locales keys), never guessed by
-  // folder shape — a shape regex swallowed cli/, sdk/, api/ … as phantom locales. No i18n ⇒ no
-  // locales. June's gen applies the same rule to the entries (@junejs/server ≥0.0.53).
-  const declaredLocales = new Set(parseI18nLocales(cfgText));
+  // Read config from kura.toml (real parse) or kura.config.ts (text-scanned — `kura index` never
+  // executes user code). Both collapse to the same shape; see config-load.ts.
+  const cfg = loadCliConfig(cwd);
+  // Docs-as-code sources (`content.sources`): June already merged their ENTRIES into app/_content.ts
+  // at `june gen`; here they extend Kura's own walks — meta.json nav, lastUpdated dates, locale
+  // discovery — over the same external trees.
+  const contentSources = cfg.contentSources;
+  // Locale buckets are DECLARED (config i18n: defaultLocale + locales keys), never guessed by folder
+  // shape. No i18n ⇒ no locales.
+  const declaredLocales = new Set(cfg.locales);
 
   // Nav metadata (meta.json) — validated and frozen first, so a bad meta fails fast and cheap.
   // META is the default tree; META_LOCALES holds each locale mirror's per-folder overrides.
@@ -87,12 +84,12 @@ async function cmdIndex(): Promise<void> {
   for (const locale of locales) for (const e of mod.docs!(locale)) if (e.locale === locale) variants.push(e);
   const allEntries = [...DOCS, ...variants];
 
-  // Optional "Last updated on …" dates (config.lastUpdated). Read as TEXT off cfgText (never
-  // execute user config). Default OFF. We ALWAYS write app/_dates.ts (empty when off) so the
+  // Optional "Last updated on …" dates (config.lastUpdated, read via loadCliConfig — never executes
+  // user config). Default OFF. We ALWAYS write app/_dates.ts (empty when off) so the
   // generated _kura.ts imports it unconditionally — same reason --no-embed writes a stub, not a
   // delete. Frozen before the up-to-date short-circuit so the file always exists.
   const datesTs = path.join(cwd, "app", "_dates.ts");
-  const lastUpdatedOn = /\blastUpdated\s*:\s*true\b/.test(cfgText);
+  const lastUpdatedOn = cfg.lastUpdated;
   const lastUpdated: Record<string, string> = lastUpdatedOn ? collectLastUpdated(cwd, contentSources, declaredLocales) : {};
   if (lastUpdatedOn) {
     const missing = DOCS.filter((d) => !(d.slug in lastUpdated)).map((d) => d.slug);
@@ -118,12 +115,12 @@ async function cmdIndex(): Promise<void> {
   // "commonmark" renders via MDX format:'md' — no MDX/JSX parsing, so a literal {…} can't be read as
   // a JS expression and drop the page. Resolved BEFORE the hash so a format switch forces a rebuild
   // (otherwise the same content short-circuits and leaves _mdx.ts in the previous format).
-  const commonmark = process.argv.includes("--commonmark") || isCommonmark(cfgText);
+  const commonmark = process.argv.includes("--commonmark") || cfg.commonmark;
   const format = commonmark ? "md" : "mdx";
   const strict = process.argv.includes("--strict");
-  // Extra shiki grammar names from `highlight: { langs: [...] }` — merged onto @kurajs/docs's curated
-  // base list so projects can highlight DSL fences the defaults miss (e.g. "hcl", "dockerfile").
-  const highlightLangs = parseHighlightLangs(cfgText);
+  // Extra shiki grammar names from `highlight.langs` — merged onto @kurajs/docs's curated base list
+  // so projects can highlight DSL fences the defaults miss (e.g. "hcl", "dockerfile").
+  const highlightLangs = cfg.highlightLangs;
 
   // Content hash — skip rebuilds when nothing changed, so `kura index` is cheap to run before
   // every dev/build. Covers the mode + format + model + locale/slug/body of every entry.
@@ -322,18 +319,55 @@ function writeIfChanged(filePath: string, content: string): void {
 //   .june/routes/search/page.tsx       — search route (always /search, basePath-independent)
 //   .june/routes/og/[[...slug]]/route.ts — OG image route (catch-all: nested slugs resolve)
 //   .june/routes/_client.ts            — island client entry (⌘K search)
+// Convention-over-configuration defaults for a kura.toml project: a project commits only kura.toml
+// (+ its docs/), so the CLI fills in the boilerplate create-kura would otherwise scaffold — but only
+// when absent (the app can override any of them). Skipped for kura.config.ts projects, which
+// create-kura already scaffolds. `import` deps (@kurajs/docs, react) still come from package.json —
+// those must be installed, so the wrapping action/create-kura provides that one file.
+function ensureBoilerplate(cwd: string, cfg: import("./config-load.js").CliConfig): void {
+  if (cfg.source !== "toml") return;
+  const writeIfAbsent = (rel: string, content: string): void => {
+    const p = path.join(cwd, rel);
+    if (fs.existsSync(p)) return;
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    fs.writeFileSync(p, content);
+  };
+  writeIfAbsent("app/global.css", '@import "tailwindcss";\n@import "@kurajs/docs/css";\n');
+  writeIfAbsent("tsconfig.json", JSON.stringify({ extends: "@kurajs/docs/tsconfig.kura.json", include: ["app"] }, null, 2) + "\n");
+  // A landing page: the site homepage AND a seed for the content collection so `june gen` bootstraps
+  // a mount-only site. Title/description come from [site]; the H1 drives the on-page heading.
+  const name = cfg.siteName ?? "Documentation";
+  const desc = cfg.siteDescription ?? "";
+  writeIfAbsent("content/docs/index.md",
+    `---\ntitle: ${JSON.stringify(name)}\n${desc ? `description: ${JSON.stringify(desc)}\n` : ""}---\n\n# ${name}\n\n` +
+    `${desc ? desc + "\n\n" : ""}Use the sidebar or search (\`/\`) to browse the docs. Every page is also available as ` +
+    "Markdown (append `.md`) and JSON, and via an MCP tool at `/mcp`.\n");
+}
+
 // June v0.0.44+ scans .june/routes/ alongside app/; app/ takes priority (override slot).
 function generateJuneConfig(cwd: string): void {
-  const kuraConfigPath = path.join(cwd, "kura.config.ts");
-  if (!fs.existsSync(kuraConfigPath)) return; // not a kura app, skip
+  const cfg = loadCliConfig(cwd);
+  if (cfg.source === "none") return; // no kura.toml / kura.config.ts → not a kura app, skip
+  const toml = cfg.source === "toml";
+
+  ensureBoilerplate(cwd, cfg); // default app/global.css + tsconfig + a landing page (toml projects)
 
   const juneDir = path.join(cwd, ".june");
   const routesDir = path.join(juneDir, "routes");
-  // A static target has no server, so the dynamic OG image route can't run — drop it (and its
-  // og:image tags, dropped in app.tsx). Read the target from config as TEXT (never import it).
-  const staticTarget = isStaticTarget(stripConfigComments(fs.readFileSync(kuraConfigPath, "utf8")));
+  // The config import lines + the `kuraConfig` binding for a shim. `ref` is the shim-relative path to
+  // the config module: the materialized ./kura.gen for toml, or the user's kura.config.ts.
+  const cfgImports = (ref: string, docsToo: boolean): string => {
+    const named = docsToo ? "createDocs" : "kuraJuneConfig";
+    return toml
+      ? `import { ${named}, fromKuraToml } from "@kurajs/docs";\nimport __toml from "${ref}";\nconst kuraConfig = fromKuraToml(__toml);\n`
+      : `import { ${named} } from "@kurajs/docs";\nimport kuraConfig from "${ref}";\n`;
+  };
+  // config.ts is in .june/ ; _kura.ts is in .june/routes/ — kura.gen.ts sits in .june/.
+  const configRef = { config: toml ? "./kura.gen" : "../kura.config.ts", kura: toml ? "../kura.gen" : "../../kura.config.ts" };
+  const cfgFile = toml ? "kura.toml" : "kura.config.ts";
+  const staticTarget = cfg.staticTarget; // no server → drop the dynamic OG route + og:image tags
   // basePath drives the docs route location (June has no route-prefix config — URL = disk).
-  const { docsDir, kuraImport } = docsRoute(routesDir, basePathSegments(cwd));
+  const { docsDir, kuraImport } = docsRoute(routesDir, cfg.basePathSegments);
   // Catch-all so nested doc slugs (/og/getting-started/sdk.png) resolve, not just /og/sdk.png.
   const ogDir = path.join(routesDir, "og", "[[...slug]]");
   const searchDir = path.join(routesDir, "search");
@@ -348,13 +382,21 @@ function generateJuneConfig(cwd: string): void {
     fs.mkdirSync(d, { recursive: true });
   }
 
-  const HEADER = "// @kura-generated — do not edit. Configure your site in kura.config.ts instead.\n";
+  // A kura.toml is parsed by the CLI (smol-toml — no runtime .toml import, so June can run under node
+  // or bun) and MATERIALIZED here; the shims import this plain module and normalize it with
+  // fromKuraToml() at load time. (kura.config.ts projects skip this — their shims import it directly.)
+  if (toml) {
+    writeIfChanged(path.join(juneDir, "kura.gen.ts"),
+      "// @kura-generated from kura.toml — do not edit. Regenerated on every build.\n" +
+      `export default ${JSON.stringify(cfg.raw)} as const;\n`);
+  }
+
+  const HEADER = `// @kura-generated — do not edit. Configure your site in ${cfgFile} instead.\n`;
 
   // .june/config.ts
   writeIfChanged(path.join(juneDir, "config.ts"),
     HEADER +
-    'import { kuraJuneConfig } from "@kurajs/docs";\n' +
-    'import kuraConfig from "../kura.config.ts";\n' +
+    cfgImports(configRef.config, false) +
     'import { DOCS } from "../app/_content";\n' +
     "\nexport default kuraJuneConfig(kuraConfig, { DOCS });\n",
   );
@@ -362,8 +404,7 @@ function generateJuneConfig(cwd: string): void {
   // .june/routes/_kura.ts — createDocs() singleton; imported by every route below.
   writeIfChanged(path.join(routesDir, "_kura.ts"),
     HEADER +
-    'import { createDocs } from "@kurajs/docs";\n' +
-    'import kuraConfig from "../../kura.config.ts";\n' +
+    cfgImports(configRef.kura, true) +
     'import { DOCS, doc, docs } from "../../app/_content";\n' +
     'import { MDX } from "../../app/_mdx";\n' +
     'import { META, META_LOCALES } from "../../app/_meta";\n' +
@@ -446,7 +487,7 @@ function generateJuneConfig(cwd: string): void {
 }
 
 async function freeze(cwd: string): Promise<void> {
-  generateJuneConfig(cwd); // write .june/config.ts from kura.config.ts
+  generateJuneConfig(cwd); // write .june shims from kura.toml / kura.config.ts
   let code = await runJune(cwd, ["gen"]); // june gen → app/_content.ts
   if (code) process.exit(code);
   code = await runKuraIndex(cwd); // kura index → app/_index.ts + _mdx.ts (own process)
