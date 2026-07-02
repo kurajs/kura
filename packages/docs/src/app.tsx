@@ -7,7 +7,7 @@
 // every per-locale helper collapses to the single default collection (zero overhead).
 // With `i18n`, June resolves ctx.locale before routing; the loaders thread it into the
 // content finders (variant → default fallback), the nav, the labels, and the MDX bucket.
-import { createNav, treeOf, flattenTree, processHtml, topFolderOf, activeTabIndex, normalizeBasePath, docPath, ogImageUrl, canonicalUrl, type DocLike, type Nav, type NavNode } from "./nav.ts";
+import { createNav, treeOf, flattenTree, processHtml, rewriteDocLinks, topFolderOf, activeTabIndex, normalizeBasePath, docPath, ogImageUrl, canonicalUrl, type DocLike, type Nav, type NavNode } from "./nav.ts";
 import { mergeMeta, type MetaMap, type TabConfig } from "./meta.ts";
 import { createSearch, type SearchHit } from "./search.ts";
 import { docsActions } from "./actions.ts";
@@ -89,6 +89,32 @@ export function createDocs<T extends DocLike>(opts: {
           active: l === (locale ?? i18n.defaultLocale),
         }))
       : undefined;
+
+  // Resolve in-content Markdown cross-links (`[x](other.md)`) to the target doc's real URL: match the
+  // link to a doc slug (exact, else by basename) and route it through hrefFor so it carries the docs
+  // mount, locale prefix, and deploy subpath. Lets repo-relative .md links survive folder grouping.
+  const slugSet = new Set<string>(DOCS.map((d) => d.slug));
+  const byBasename = new Map<string, string[]>();
+  for (const d of DOCS) {
+    const b = d.slug.split("/").pop() ?? d.slug;
+    const arr = byBasename.get(b);
+    arr ? arr.push(d.slug) : byBasename.set(b, [d.slug]);
+  }
+  const resolveDocSlug = (target: string): string | null => {
+    const clean = target.replace(/\.md$/i, "").replace(/^(\.\.?\/)+/, "").replace(/^\/+/, "");
+    if (slugSet.has(clean)) return clean;
+    const cands = byBasename.get(clean.split("/").pop() ?? "");
+    // Prefer the shallowest slug (a top-level doc over a same-named ADR), then lexical for stability.
+    return cands?.length ? [...cands].sort((a, b) => a.split("/").length - b.split("/").length || a.localeCompare(b))[0]! : null;
+  };
+  const docLinkResolver = (locale?: string) => (href: string): string | null => {
+    if (/^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith("//") || href.startsWith("#")) return null; // external / bare anchor
+    const hash = href.indexOf("#");
+    const p = hash >= 0 ? href.slice(0, hash) : href;
+    if (!/\.md$/i.test(p)) return null; // only Markdown links
+    const slug = resolveDocSlug(p);
+    return slug == null ? null : hrefFor(locale)(docPath(basePath, slug)) + (hash >= 0 ? href.slice(hash) : "");
+  };
 
   const site: SiteInfo = { name: opts.config.site?.name, brand: opts.config.site?.brand };
   const search = createSearch({ entries: DOCS, embedder: opts.config.embedder, indexBytes: opts.indexBytes, tokenizer: opts.config.tokenizer });
@@ -247,7 +273,8 @@ export function createDocs<T extends DocLike>(opts: {
     opts.mdxHtml?.[e.locale ?? "default"]?.[e.slug] ?? opts.mdxHtml?.default?.[e.slug] ?? e.html;
 
   const viewOf = (e: T, locale?: string): DocView => {
-    const { html, toc } = processHtml(mdxFor(e));
+    const { html: anchored, toc } = processHtml(mdxFor(e));
+    const html = rewriteDocLinks(anchored, docLinkResolver(locale)); // repo-relative .md links → doc URLs
     const { prev, next } = prevNextOf(e.slug, locale);
     // A non-default locale that resolved to a non-variant entry fell back to default.
     const notTranslated = !!(locale && defaultLocale && locale !== defaultLocale && e.locale !== locale);
