@@ -22,3 +22,24 @@ export function parseHighlightLangs(strippedCfg: string): string[] {
   const block = strippedCfg.match(/\bhighlight\s*:\s*\{[^}]*\blangs\s*:\s*\[([^\]]*)\]/)?.[1] ?? "";
   return [...block.matchAll(/["']([^"']+)["']/g)].map((m) => m[1]!);
 }
+
+/** One extra content source (docs-as-code): a dir outside content/docs merged into a collection.
+ *  Mirrors @kurajs/docs KuraContentSource with `collection` resolved to its "docs" default. */
+export type ContentSource = { dir: string; collection: string; mount?: string };
+
+/** Extra content sources from `content: { sources: [{ dir, collection?, mount? }, …] }`. Pull the
+ *  array literal, then each `{…}` object's string fields (source objects are flat — no nested
+ *  braces/brackets — which the KuraConfig docs pin as the contract for text-readability).
+ *  `collection` defaults to "docs", matching kuraJuneConfig's forwarding. */
+export function parseContentSources(strippedCfg: string): ContentSource[] {
+  const block = strippedCfg.match(/\bcontent\s*:\s*\{\s*sources\s*:\s*\[([^\]]*)\]/)?.[1] ?? "";
+  const out: ContentSource[] = [];
+  for (const obj of block.match(/\{[^}]*\}/g) ?? []) {
+    const field = (name: string) => obj.match(new RegExp(`\\b${name}\\s*:\\s*["']([^"']+)["']`))?.[1];
+    const dir = field("dir");
+    if (!dir) continue; // a source without a dir is meaningless — skip rather than crash
+    const mount = field("mount");
+    out.push({ dir, collection: field("collection") ?? "docs", ...(mount ? { mount } : {}) });
+  }
+  return out;
+}

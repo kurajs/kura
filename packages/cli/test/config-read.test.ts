@@ -1,12 +1,44 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { stripConfigComments, isCommonmark, parseHighlightLangs } from "../src/config-read.ts";
+import { stripConfigComments, isCommonmark, parseHighlightLangs, parseContentSources } from "../src/config-read.ts";
 
 // The CLI reads kura.config.ts as TEXT (never executes it). These pure parsers are the risky part —
 // regexes over user source — so they're pinned here directly (cli.ts can't be imported: it dispatches
 // a command on load). `strip → parse` is the real pipeline, so tests run stripped text through it.
 const parse = (src: string) => parseHighlightLangs(stripConfigComments(src));
 const cm = (src: string) => isCommonmark(stripConfigComments(src));
+const sources = (src: string) => parseContentSources(stripConfigComments(src));
+
+test("parseContentSources: pulls dir/collection/mount from content.sources; collection defaults to docs", () => {
+  const src = `export default defineKura({
+    content: {
+      sources: [
+        { dir: "../docs" },
+        { dir: '../schema', mount: 'schema' },
+        { dir: "../blog", collection: "posts" },
+      ],
+    },
+  });`;
+  assert.deepEqual(sources(src), [
+    { dir: "../docs", collection: "docs" },
+    { dir: "../schema", collection: "docs", mount: "schema" },
+    { dir: "../blog", collection: "posts" },
+  ]);
+});
+
+test("parseContentSources: no content block / empty sources / dir-less object → [] (or skipped)", () => {
+  assert.deepEqual(sources(`export default { markdown: "commonmark" };`), []);
+  assert.deepEqual(sources(`export default { content: { sources: [] } };`), []);
+  assert.deepEqual(sources(`export default { content: { sources: [{ mount: "x" }] } };`), []);
+});
+
+test("parseContentSources: a commented-out source is ignored", () => {
+  const src = `export default { content: { sources: [
+    { dir: "../docs" },
+    // { dir: "../drafts" },
+  ] } };`;
+  assert.deepEqual(sources(src), [{ dir: "../docs", collection: "docs" }]);
+});
 
 test("parseHighlightLangs: pulls quoted langs from highlight.langs", () => {
   const src = `export default defineConfig({ highlight: { langs: ["hcl", "dockerfile"] } });`;

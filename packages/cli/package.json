@@ -15,7 +15,7 @@
   },
   "license": "MIT",
   "dependencies": {
-    "@junejs/cli": ">=0.0.38 <0.1.0",
+    "@junejs/cli": ">=0.0.50 <0.1.0",
     "@kurajs/core": ">=0.0.1 <0.1.0"
   },
   "peerDependencies": {

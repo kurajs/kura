@@ -8,6 +8,19 @@ import { kuraLlms } from "./agent.ts";
 /** i18n config shape — re-exported so apps import from @kurajs/docs, not @junejs/core. */
 export type KuraI18nConfig = I18nConfig;
 
+/** An extra content source: a directory OUTSIDE `content/docs/` whose markdown joins the docs —
+ *  the docs-as-code seam (the repo's own `docs/`, `schema/`, `examples/` feed the site directly,
+ *  no copy into `content/` and no sync step). Forwarded to June's `content.sources`
+ *  (@junejs/core ≥0.0.48), which scans each dir with the same locale-mirror layout. */
+export type KuraContentSource = {
+  /** Directory to scan, relative to the app root — may point outside it (e.g. "../docs"). */
+  dir: string;
+  /** June collection the entries merge into. Default "docs" (the collection Kura serves). */
+  collection?: string;
+  /** Slug prefix ("schema" → pages at schema/<slug>; the dir's own README becomes /schema). */
+  mount?: string;
+};
+
 export interface KuraConfig {
   /** URL prefix for doc pages (default `/docs`). Set `""` to mount docs at the site root, or e.g.
    *  `"/guide"` for a custom prefix. Drives BOTH the generated links (sidebar, pager, tabs, search
@@ -71,6 +84,14 @@ export interface KuraConfig {
    */
   highlight?: { langs?: string[] };
   /**
+   * Extra content sources — docs-as-code. Directories outside `content/docs/` (typically outside
+   * the app root: the repo's own `docs/`, `schema/`, …) whose markdown merges into the docs, with
+   * an optional `mount` slug prefix. Same locale-mirror layout as `content/docs/` per source; a
+   * slug collision between sources fails the build loudly. Read as TEXT by `kura index` (config is
+   * never executed at build), so keep `sources` a plain array/object literal — no spreads or calls.
+   */
+  content?: { sources?: KuraContentSource[] };
+  /**
    * Show a "Last updated on <date>" line at the foot of each doc page, from the file's last git commit
    * date (a frontmatter `lastUpdated:` field overrides it per page). **Default off.** Requires the
    * build to run inside a git repo WITH history — in CI set the checkout to `fetch-depth: 0`, since a
@@ -122,11 +143,15 @@ export function kuraJuneConfig<T extends DocLike>(
   // Lazy import so @junejs/core is only resolved at runtime (peer dep — always present in a
   // running Kura app, because @kurajs/cli brings in @junejs/cli which brings in @junejs/core).
   // Using a dynamic shape avoids a hard compile-time dep on @junejs/core types here.
-  const { site, deploy, i18n, june = {} } = config;
+  const { site, deploy, i18n, content: kuraContent, june = {} } = config;
+  // Forward content sources to June's content.sources (@junejs/server ≥0.0.51 scans them at
+  // `june gen`), defaulting `collection` to "docs" — the collection Kura serves.
+  const sources = (kuraContent?.sources ?? []).map((s) => ({ collection: "docs", ...s }));
   return {
     ...(site ? { site } : {}),
     ...(deploy ? { deploy } : {}),
     ...(i18n ? { i18n } : {}),
+    ...(sources.length ? { content: { sources } } : {}),
     agent: { enabled: true, llms: kuraLlms({ DOCS: content.DOCS }) },
     ...june,
   };
