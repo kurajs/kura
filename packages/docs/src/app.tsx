@@ -442,11 +442,13 @@ export function createDocs<T extends DocLike>(opts: {
   };
 
   // On a STATIC build there's no server to answer /search.json?q=… per keystroke, so ship the corpus
-  // instead: the browser builds the (pure-JS) BM25 index from it and searches locally. Computed once;
-  // titles use the config.nav override so client hits match the sidebar labels. Null on server targets
-  // (they query per request), so /search.json stays lean there.
+  // instead: the browser builds the (pure-JS) BM25 index from it and searches locally. We ship the
+  // rendered HTML (not markdown) — the client derives clean index text from it (htmlToText) AND uses
+  // each section's HTML for a rich, formatted preview (tables/code render, no raw markdown syntax).
+  // Computed once; titles use the config.nav override so client hits match the sidebar labels. Null
+  // on server targets (they query per request), so /search.json stays lean there.
   const searchCorpus = isStatic
-    ? DOCS.map((e) => ({ slug: e.slug, body: e.body, data: { title: navTitle.get(e.slug) ?? e.data.title ?? e.slug }, ...(e.locale ? { locale: e.locale } : {}) }))
+    ? DOCS.map((e) => ({ slug: e.slug, html: e.html, data: { title: navTitle.get(e.slug) ?? e.data.title ?? e.slug }, ...(e.locale ? { locale: e.locale } : {}) }))
     : null;
 
   const searchRoute = {

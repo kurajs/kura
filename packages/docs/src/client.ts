@@ -17,6 +17,7 @@ interface SearchHitJSON {
   locale?: string;
   headingId?: string;
   heading?: string;
+  html?: string; // rendered section HTML for a rich preview (static client search)
 }
 
 export interface InitSearchOptions {
@@ -118,6 +119,7 @@ function toItem(docBase: string) {
     title: h.heading || h.title, // the section heading, falling back to the page title
     description: [h.section, h.title].filter(Boolean).join(" › "), // breadcrumb path
     excerpt: h.text,
+    ...(h.html ? { excerptHtml: h.html } : {}), // rich preview (rendered section) when available
     group: h.section || "",
     icon: h.headingId ? "hash" : "page",
     href: `${docBase}${h.slug}${h.headingId ? `#${h.headingId}` : ""}`,

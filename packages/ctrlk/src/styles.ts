@@ -69,6 +69,18 @@ export const CSS = `
 .ctrlk-option-title { font-size: .92rem; font-weight: 500; color: var(--ctrlk-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ctrlk-option-path { font-size: .76rem; color: var(--ctrlk-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ctrlk-option-excerpt { font-size: .8rem; color: var(--ctrlk-muted); margin-top: 2px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+/* Rich HTML preview (rendered section): clamp height + fade, and render tables/code/lists compactly
+   so a formatted snippet stays inside the row instead of the raw markdown syntax. */
+.ctrlk-option-html { display: block; -webkit-line-clamp: none; max-height: 5.5em; overflow: hidden; -webkit-mask-image: linear-gradient(#000 70%, transparent); mask-image: linear-gradient(#000 70%, transparent); }
+.ctrlk-option-html > :first-child { margin-top: 0; } .ctrlk-option-html > :last-child { margin-bottom: 0; }
+.ctrlk-option-html p, .ctrlk-option-html ul, .ctrlk-option-html ol, .ctrlk-option-html pre { margin: .15em 0; }
+.ctrlk-option-html ul, .ctrlk-option-html ol { padding-left: 1.1em; }
+.ctrlk-option-html code { font-size: .92em; background: var(--ctrlk-code-bg, rgba(127,127,127,.16)); border-radius: 3px; padding: 0 .25em; }
+.ctrlk-option-html pre { background: var(--ctrlk-code-bg, rgba(127,127,127,.12)); border-radius: 5px; padding: .3em .5em; overflow: hidden; white-space: pre-wrap; }
+.ctrlk-option-html pre code { background: none; padding: 0; }
+.ctrlk-option-html table { border-collapse: collapse; font-size: .92em; display: block; overflow: hidden; }
+.ctrlk-option-html :is(td, th) { border: 1px solid var(--ctrlk-border, rgba(127,127,127,.3)); padding: 1px .4em; text-align: left; white-space: nowrap; }
+.ctrlk-option-html a { color: inherit; text-decoration: underline; } .ctrlk-option-html img { display: none; }
 .ctrlk-option mark { background: var(--ctrlk-mark); color: var(--ctrlk-mark-fg); border-radius: 2px; padding: 0 1px; }
 
 .ctrlk-state { padding: 36px 16px; text-align: center; color: var(--ctrlk-muted); font-size: .9rem; }

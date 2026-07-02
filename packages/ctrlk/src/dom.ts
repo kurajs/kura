@@ -7,6 +7,26 @@ import type { Ctrlk, CtrlkItem, CtrlkState } from "./types.ts";
 import { highlight } from "./highlight.ts";
 import { injectStyles } from "./styles.ts";
 
+// Elements that must never reach innerHTML — scripts, resource loaders, form/embeds.
+const UNSAFE_EL = /^(script|style|iframe|object|embed|form|input|button|link|meta|base|svg)$/i;
+/** Clean TRUSTED, build-generated HTML before innerHTML (defense in depth — never a general XSS
+ *  sanitizer). Parse inert in a <template> (no scripts run, no resources load), then drop dangerous
+ *  elements, every `on*` handler, and `javascript:` URLs. */
+export function sanitizeHtml(html: string, doc: Document): string {
+  const tpl = doc.createElement("template");
+  tpl.innerHTML = html;
+  for (const el of Array.from(tpl.content.querySelectorAll("*"))) {
+    if (UNSAFE_EL.test(el.tagName)) { el.remove(); continue; }
+    for (const attr of Array.from(el.attributes)) {
+      const n = attr.name.toLowerCase();
+      if (n.startsWith("on") || ((n === "href" || n === "src" || n === "xlink:href") && /^\s*javascript:/i.test(attr.value))) {
+        el.removeAttribute(attr.name);
+      }
+    }
+  }
+  return tpl.innerHTML;
+}
+
 export interface MountLabels {
   placeholder?: string;
   /** Shown when a non-empty query returns nothing. */
@@ -181,7 +201,12 @@ export function mountCtrlk<D = unknown>(ctrl: Ctrlk<D>, opts: MountOptions<D> = 
       fillHighlighted(path, item.description, tokens);
       body.append(path);
     }
-    if (item.excerpt) {
+    if (item.excerptHtml) {
+      const ex = doc.createElement("div");
+      ex.className = "ctrlk-option-excerpt ctrlk-option-html";
+      ex.innerHTML = sanitizeHtml(item.excerptHtml, doc); // trusted build HTML, cleaned defensively
+      body.append(ex);
+    } else if (item.excerpt) {
       const ex = doc.createElement("div");
       ex.className = "ctrlk-option-excerpt";
       fillHighlighted(ex, item.excerpt, tokens);
