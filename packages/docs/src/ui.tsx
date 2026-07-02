@@ -163,8 +163,10 @@ const SIDEBAR_SYNC_JS = `(function(){
  *  groups, client-filtered to the active tab) + footer. The page content goes in `children` (wrapped
  *  by <JuneOutlet> upstream). Active page/tab state is client-driven (aria-current), so the shell is
  *  never re-rendered on navigation — only the outlet content swaps. */
-export function DocsLayoutShell({ site, navTabs, basePath = "/docs", labels = DEFAULT_LABELS, href = (p) => p, localeSwitch, children }: {
-  site?: SiteInfo; navTabs: NavTab[]; basePath?: string; labels?: Labels; href?: Href; localeSwitch?: LocaleLink[]; children: ReactNode;
+export function DocsLayoutShell({ site, navTabs, basePath = "/docs", labels = DEFAULT_LABELS, href = (p) => p, localeSwitch, searchStatic, locale, children }: {
+  site?: SiteInfo; navTabs: NavTab[]; basePath?: string; labels?: Labels; href?: Href; localeSwitch?: LocaleLink[];
+  /** Static build: the client builds the BM25 index in-browser from /search.json's corpus (no server). */
+  searchStatic?: boolean; locale?: string; children: ReactNode;
 }) {
   const brand = site?.brand ?? site?.name ?? "Kura";
   const currentLang = localeSwitch?.find((l) => l.active) ?? localeSwitch?.[0];
@@ -176,7 +178,7 @@ export function DocsLayoutShell({ site, navTabs, basePath = "/docs", labels = DE
       <header className="sticky top-0 z-20 flex items-center gap-4 h-14 px-5 bg-topbar-bg backdrop-blur-sm border-b border-border max-md:px-4 max-md:gap-2.5">
         <a className="flex items-center gap-1.5 font-bold text-[1.05rem]" href={href("/")}>{brand} <span className="font-normal text-muted text-[.85rem]">Docs</span></a>
         <form className="ml-auto max-md:ml-2 max-md:flex-1 max-md:min-w-0" method="get" action={href("/search")}>
-          <input className="w-[280px] max-w-[40vw] px-3 py-2 text-[.9rem] border border-border rounded-lg bg-surface-2 text-fg max-md:w-full max-md:max-w-none search-box" name="q" placeholder={labels.searchPlaceholder} aria-label={labels.search} data-search-endpoint={`${href("/search")}.json`} data-doc-base={href(docPath(basePath, ""))} />
+          <input className="w-[280px] max-w-[40vw] px-3 py-2 text-[.9rem] border border-border rounded-lg bg-surface-2 text-fg max-md:w-full max-md:max-w-none search-box" name="q" placeholder={labels.searchPlaceholder} aria-label={labels.search} data-search-endpoint={`${href("/search")}.json`} data-doc-base={href(docPath(basePath, ""))} data-search-static={searchStatic ? "1" : undefined} data-locale={locale || undefined} />
         </form>
         <nav className="flex items-center gap-4 text-muted text-[.9rem]">
           {localeSwitch && localeSwitch.length > 1 && currentLang && (
