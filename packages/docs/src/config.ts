@@ -99,8 +99,17 @@ export interface KuraConfig {
    * or shallow clone) is simply shown without the line; it never fails the build.
    */
   lastUpdated?: boolean;
-  /** Deploy target passed to June (target, worker/function name, custom domain). */
-  deploy?: { target?: "workers" | "vercel" | "deno"; name?: string; domain?: string };
+  /** Deploy target passed to June (target, worker/function name, custom domain).
+   *  "github-pages" (alias "static") builds a fully prerendered static site into dist/static/ —
+   *  no server, deploys to GitHub Pages / any file host. `basePath` is the public subpath the site
+   *  is served under (e.g. "/openab/docs" for https://user.github.io/openab/docs/) — required for a
+   *  GitHub Pages *project* site so assets + links resolve; omit it for a user/root site. */
+  deploy?: {
+    target?: "workers" | "vercel" | "deno" | "github-pages" | "static";
+    name?: string;
+    domain?: string;
+    basePath?: string;
+  };
   /**
    * Canonical site URL (e.g. "https://kura.build"). When set, og:image and canonical tags use
    * absolute URLs so social media crawlers can fetch them. Falls back to relative paths when absent.
@@ -147,9 +156,17 @@ export function kuraJuneConfig<T extends DocLike>(
   // Forward content sources to June's content.sources (@junejs/server ≥0.0.51 scans them at
   // `june gen`), defaulting `collection` to "docs" — the collection Kura serves.
   const sources = (kuraContent?.sources ?? []).map((s) => ({ collection: "docs", ...s }));
+  // Static target: "github-pages"/"static" both map to June's built-in static() target (deploy
+  // target "static"), and the deploy subpath becomes June's top-level `basePath` (which the built
+  // document prefixes onto asset URLs). Other targets pass through unchanged.
+  const isStatic = deploy?.target === "github-pages" || deploy?.target === "static";
+  const juneDeploy = deploy
+    ? { ...deploy, ...(isStatic ? { target: "static" as const } : {}) }
+    : undefined;
   return {
     ...(site ? { site } : {}),
-    ...(deploy ? { deploy } : {}),
+    ...(juneDeploy ? { deploy: juneDeploy } : {}),
+    ...(isStatic && deploy?.basePath ? { basePath: deploy.basePath } : {}),
     ...(i18n ? { i18n } : {}),
     ...(sources.length ? { content: { sources } } : {}),
     agent: { enabled: true, llms: kuraLlms({ DOCS: content.DOCS }) },

@@ -65,19 +65,27 @@ export function createDocs<T extends DocLike>(opts: {
   // URL prefix for doc pages ("/docs" default, "" = site root). All generated doc links go through
   // docPath(basePath, …); the app mounts its route files to match.
   const basePath = normalizeBasePath(opts.config.basePath);
+  // Deploy subpath (config.deploy.basePath) — the prefix the WHOLE site is served under on a static
+  // host (e.g. GitHub Pages "/openab/docs"). Orthogonal to `basePath` (the docs-mount prefix): the
+  // two compose in the final URL. Empty for a root deploy → every link is byte-identical to before.
+  // (June's document prefixes ASSET urls with the same value; here we prefix Kura's own nav links.)
+  const deployBase = (opts.config.deploy?.basePath ?? "").replace(/^\/+|\/+$/g, "");
+  const deployPrefix = deployBase ? "/" + deployBase : "";
 
-  // Localize an internal route path to a locale (identity when i18n is off); build the
-  // language-switcher links for a given page (its URL in every locale). Both lean on June's
-  // localeHref so inbound routing and these outbound links can never drift.
+  // Localize an internal route path to a locale (identity when i18n is off), then prefix the deploy
+  // subpath; build the language-switcher links for a given page (its URL in every locale). Both lean
+  // on June's localeHref so inbound routing and these outbound links can never drift.
   const hrefFor = (locale?: string): Href =>
-    i18n ? (path) => localeHref(i18n, path, locale ?? i18n.defaultLocale) : (path) => path;
+    i18n
+      ? (path) => deployPrefix + localeHref(i18n, path, locale ?? i18n.defaultLocale)
+      : (path) => deployPrefix + path;
   const localeName = (l: string): string => opts.config.localeNames?.[l] ?? l;
   const switchFor = (locale: string | undefined, routePath: string): LocaleLink[] | undefined =>
     i18n
       ? Object.keys(i18n.locales).map((l) => ({
           locale: l,
           name: localeName(l),
-          href: localeHref(i18n, routePath, l),
+          href: deployPrefix + localeHref(i18n, routePath, l),
           active: l === (locale ?? i18n.defaultLocale),
         }))
       : undefined;
@@ -291,11 +299,15 @@ export function createDocs<T extends DocLike>(opts: {
   };
   const siteUrl = opts.config.siteUrl;
   const siteDesc = opts.config.site?.description;
+  // Static targets have no server, so the dynamic OG image route is dropped from codegen — don't
+  // emit og:image URLs that would 404. (Set siteUrl to the full deploy URL incl. the subpath for
+  // correct canonical/OG links under a project subpath.)
+  const isStatic = opts.config.deploy?.target === "static" || opts.config.deploy?.target === "github-pages";
   const metadata = (d: DocPage) => {
     const desc = d.doc.description ?? siteDesc;
     // Empty slug (home) → /og/index.png, not the broken /og/.png; nested slugs pass through and the
     // catch-all OG route resolves them. canonical needs siteUrl, so both are gated on it.
-    const ogImage = siteUrl ? ogImageUrl(siteUrl, d.doc.slug) : undefined;
+    const ogImage = siteUrl && !isStatic ? ogImageUrl(siteUrl, d.doc.slug) : undefined;
     return {
       title: d.doc.title,
       ...(desc ? { description: desc } : {}),
@@ -316,6 +328,20 @@ export function createDocs<T extends DocLike>(opts: {
       return pageOf(e, ctx.locale);
     },
     View, md, json, metadata,
+    // Enumerate every doc page (× locale) so the static() target can prerender this DYNAMIC
+    // catch-all to one HTML file each. FULL pathnames, locale prefix applied, WITHOUT the deploy
+    // subpath (June fetches these bare during prerender). Reuses the same localeHref + docPath the
+    // links use, so prerendered files and their inbound links can't drift. Ignored off-static.
+    staticPaths: (): string[] => {
+      const locales = i18n ? Object.keys(i18n.locales) : [undefined];
+      const seen = new Set<string>();
+      for (const l of locales) {
+        for (const e of entriesFor(l)) {
+          seen.add(i18n ? localeHref(i18n, docPath(basePath, e.slug), l!) : docPath(basePath, e.slug));
+        }
+      }
+      return [...seen];
+    },
   };
 
   const home = {
