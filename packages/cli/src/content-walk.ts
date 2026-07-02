@@ -4,13 +4,17 @@
 // content sources (kura.config `content.sources`): each source dir outside content/docs is
 // walked like a mounted subtree of the docs collection, mirroring what June's `content.sources`
 // does for the entries themselves at `june gen`.
+//
+// Locale buckets are DECLARED, not guessed: every walk takes the locale set from kura.config
+// `i18n` (defaultLocale + locales keys). Guessing by folder shape (a BCP-47-ish regex) silently
+// swallowed any 2–3-letter section folder — `cli/`, `sdk/`, `api/`, `faq/` all read as locales
+// and vanished. No i18n config ⇒ empty set ⇒ nothing is a locale. June's `june gen` applies the
+// same declared-only rule to the entries themselves (@junejs/server ≥0.0.53).
 import { parseMeta, validatePages, type MetaMap } from "@kurajs/docs/meta";
 import type { ContentSource } from "./config-read.js";
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-
-export const LOCALE_DIR = /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/;
 
 // A docs-collection source resolved to an absolute dir. Non-"docs" collections are June's business
 // (entries only); Kura's nav/dates/locales concern the docs collection it serves.
@@ -32,14 +36,14 @@ export function walkMetaTree(
   rootDir: string,
   skipTopLocales: boolean,
   wherePrefix = "",
-  opts?: { keyPrefix?: string; extraRootChildren?: ReadonlySet<string> },
+  opts?: { keyPrefix?: string; extraRootChildren?: ReadonlySet<string>; locales?: ReadonlySet<string> },
 ): { meta: MetaMap; errors: string[] } {
   const meta: MetaMap = {};
   const errors: string[] = [];
   if (!fs.existsSync(rootDir)) return { meta, errors };
   const keyPrefix = opts?.keyPrefix ?? "";
   const keyOf = (rel: string) => (rel ? (keyPrefix ? `${keyPrefix}/${rel}` : rel) : keyPrefix);
-  const skipped = (rel: string, name: string) => skipTopLocales && rel === "" && LOCALE_DIR.test(name);
+  const skipped = (rel: string, name: string) => skipTopLocales && rel === "" && (opts?.locales?.has(name) ?? false);
   const walk = (dir: string, rel: string) => {
     const ents = fs.readdirSync(dir, { withFileTypes: true });
     if (ents.some((e) => !e.isDirectory() && e.name === "meta.json")) {
@@ -96,6 +100,7 @@ function mergeMeta(into: MetaMap, add: MetaMap, errors: string[], label: string)
 export function collectMeta(
   cwd: string,
   sources: readonly ContentSource[] = [],
+  locales: ReadonlySet<string> = new Set(),
 ): { meta: MetaMap; metaLocales: Record<string, MetaMap>; errors: string[] } {
   const root = path.join(cwd, "content", "docs");
   const srcs = resolveDocsSources(cwd, sources);
@@ -107,19 +112,19 @@ export function collectMeta(
     if (s.mount) extraRootChildren.add(s.mount.split("/")[0]!);
     else if (fs.existsSync(s.abs)) {
       for (const e of fs.readdirSync(s.abs, { withFileTypes: true })) {
-        if (e.isDirectory() && !LOCALE_DIR.test(e.name)) extraRootChildren.add(e.name);
+        if (e.isDirectory() && !locales.has(e.name)) extraRootChildren.add(e.name);
         else if (/\.mdx?$/.test(e.name)) extraRootChildren.add(e.name.replace(/\.mdx?$/, ""));
       }
     }
   }
   const errors: string[] = [];
-  const { meta, errors: e0 } = walkMetaTree(root, true, "", { extraRootChildren });
+  const { meta, errors: e0 } = walkMetaTree(root, true, "", { extraRootChildren, locales });
   errors.push(...e0);
   const metaLocales: Record<string, MetaMap> = {};
   const localeWalk = (treeRoot: string, wherePrefix: string, keyPrefix?: string) => {
     if (!fs.existsSync(treeRoot)) return;
     for (const ent of fs.readdirSync(treeRoot, { withFileTypes: true })) {
-      if (!ent.isDirectory() || !LOCALE_DIR.test(ent.name)) continue;
+      if (!ent.isDirectory() || !locales.has(ent.name)) continue;
       const { meta: lm, errors: le } = walkMetaTree(path.join(treeRoot, ent.name), false, `${wherePrefix}${ent.name}/`, { keyPrefix });
       errors.push(...le);
       if (!Object.keys(lm).length) continue;
@@ -129,7 +134,7 @@ export function collectMeta(
   };
   localeWalk(root, "");
   for (const s of srcs) {
-    const { meta: sm, errors: se } = walkMetaTree(s.abs, true, `${s.abs}/`, { keyPrefix: s.mount });
+    const { meta: sm, errors: se } = walkMetaTree(s.abs, true, `${s.abs}/`, { keyPrefix: s.mount, locales });
     errors.push(...se);
     mergeMeta(meta, sm, errors, s.abs);
     localeWalk(s.abs, `${s.abs}/`, s.mount);
@@ -166,6 +171,7 @@ export function gitDateOf(file: string, cwd: string): string | null {
 export function collectLastUpdated(
   cwd: string,
   sources: readonly ContentSource[] = [],
+  locales: ReadonlySet<string> = new Set(),
   dateOf: (file: string, cwd: string) => string | null = gitDateOf,
 ): Record<string, string> {
   const lastUpdated: Record<string, string> = {};
@@ -174,7 +180,7 @@ export function collectLastUpdated(
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
       const childRel = rel ? `${rel}/${e.name}` : e.name;
       if (e.isDirectory()) {
-        if (top && LOCALE_DIR.test(e.name)) continue; // top-level <locale>/ dirs are variants, not default docs
+        if (top && locales.has(e.name)) continue; // top-level DECLARED <locale>/ dirs are variants, not default docs
         walkDates(path.join(dir, e.name), childRel, false);
       } else if (/\.(md|mdx)$/.test(e.name)) {
         const slug = childRel.replace(/\.(md|mdx)$/, "").replace(/(^|\/)(index|README)$/i, ""); // mirrors June's slugOf
@@ -188,24 +194,30 @@ export function collectLastUpdated(
   return lastUpdated;
 }
 
-// Locales that have variant content: `content/<collection>/<locale>/` dirs, plus each configured
-// source's top-level `<locale>/` mirrors — so a translated external docs/ lights up its locale in
-// the index and MDX buckets just like a translated content/docs would.
-export function discoverLocales(cwd: string, sources: readonly ContentSource[] = []): Set<string> {
+// DECLARED locales that actually have variant content: `content/<collection>/<locale>/` dirs,
+// plus each configured source's top-level `<locale>/` mirrors — so a translated external docs/
+// lights up its locale in the index and MDX buckets just like a translated content/docs would.
+// Only names in the declared set count; `cli/`, `sdk/` and friends are sections, not locales.
+export function discoverLocales(
+  cwd: string,
+  sources: readonly ContentSource[] = [],
+  declared: ReadonlySet<string> = new Set(),
+): Set<string> {
   const locales = new Set<string>();
+  if (!declared.size) return locales;
   const contentRoot = path.join(cwd, "content");
   if (fs.existsSync(contentRoot)) {
     for (const col of fs.readdirSync(contentRoot, { withFileTypes: true })) {
       if (!col.isDirectory()) continue;
       for (const sub of fs.readdirSync(path.join(contentRoot, col.name), { withFileTypes: true })) {
-        if (sub.isDirectory() && LOCALE_DIR.test(sub.name)) locales.add(sub.name);
+        if (sub.isDirectory() && declared.has(sub.name)) locales.add(sub.name);
       }
     }
   }
   for (const s of resolveDocsSources(cwd, sources)) {
     if (!fs.existsSync(s.abs)) continue;
     for (const sub of fs.readdirSync(s.abs, { withFileTypes: true })) {
-      if (sub.isDirectory() && LOCALE_DIR.test(sub.name)) locales.add(sub.name);
+      if (sub.isDirectory() && declared.has(sub.name)) locales.add(sub.name);
     }
   }
   return locales;

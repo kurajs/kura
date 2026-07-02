@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { stripConfigComments, isCommonmark, parseHighlightLangs, parseContentSources } from "../src/config-read.ts";
+import { stripConfigComments, isCommonmark, parseHighlightLangs, parseContentSources, parseI18nLocales } from "../src/config-read.ts";
 
 // The CLI reads kura.config.ts as TEXT (never executes it). These pure parsers are the risky part —
 // regexes over user source — so they're pinned here directly (cli.ts can't be imported: it dispatches
@@ -30,6 +30,32 @@ test("parseContentSources: no content block / empty sources / dir-less object �
   assert.deepEqual(sources(`export default { markdown: "commonmark" };`), []);
   assert.deepEqual(sources(`export default { content: { sources: [] } };`), []);
   assert.deepEqual(sources(`export default { content: { sources: [{ mount: "x" }] } };`), []);
+});
+
+test("parseI18nLocales: defaultLocale + locales keys, bare and quoted, nested values walked over", () => {
+  const src = `export default defineKura({
+    i18n: {
+      defaultLocale: "en",
+      locales: { en: {}, "ja-JP": { path: "/ja" }, "zh-TW": { path: "/{tw}", domain: "tw.example.com" } },
+      prefixDefaultLocale: false,
+    },
+  });`;
+  assert.deepEqual(parseI18nLocales(stripConfigComments(src)).sort(), ["en", "ja-JP", "zh-TW"]);
+});
+
+test("parseI18nLocales: nested object keys (path/domain) never become phantom locales", () => {
+  const src = `export default { i18n: { defaultLocale: "en", locales: { de: { path: "/de", domain: "x.de" } } } };`;
+  assert.deepEqual(parseI18nLocales(src).sort(), ["de", "en"]);
+});
+
+test("parseI18nLocales: no i18n → [] (an undeclared locale is not a locale)", () => {
+  assert.deepEqual(parseI18nLocales(`export default { site: { name: "t" } };`), []);
+  assert.deepEqual(parseI18nLocales(``), []);
+});
+
+test("parseI18nLocales: a commented-out i18n block is ignored", () => {
+  const src = `export default {\n  // i18n: { defaultLocale: "en", locales: { de: {} } },\n};`;
+  assert.deepEqual(parseI18nLocales(stripConfigComments(src)), []);
 });
 
 test("parseContentSources: a commented-out source is ignored", () => {

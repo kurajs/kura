@@ -35,6 +35,8 @@ function makeApp(): string {
   write(path.join(cwd, "schema", "meta.json"), JSON.stringify({ title: "Schema" }));
   return cwd;
 }
+// The DECLARED locale set (kura.config i18n) — walks never guess locales by folder shape.
+const DE = new Set(["en", "de", "ja-JP"]);
 const SOURCES = [
   { dir: "extdocs", collection: "docs" },
   { dir: "schema", collection: "docs", mount: "schema" },
@@ -42,7 +44,7 @@ const SOURCES = [
 
 test("collectMeta: source meta trees merge in — mounted keys prefixed, unmounted keys as-is", () => {
   const cwd = makeApp();
-  const { meta, metaLocales, errors } = collectMeta(cwd, SOURCES);
+  const { meta, metaLocales, errors } = collectMeta(cwd, SOURCES, DE);
   assert.deepEqual(errors, []);
   assert.ok(meta[""]); // content/docs root meta (tabs)
   assert.ok(meta["guides"]); // content/docs subtree
@@ -53,13 +55,13 @@ test("collectMeta: source meta trees merge in — mounted keys prefixed, unmount
 
 test("collectMeta: root meta tabs may reference a MOUNT (virtual top-level folder) without a false error", () => {
   const cwd = makeApp();
-  const { errors } = collectMeta(cwd, SOURCES);
+  const { errors } = collectMeta(cwd, SOURCES, DE);
   assert.deepEqual(errors.filter((e) => e.includes("schema")), []);
 });
 
 test("collectMeta: WITHOUT the sources, the same root meta tab IS a validation error (guards the fixture)", () => {
   const cwd = makeApp();
-  const { errors } = collectMeta(cwd, []);
+  const { errors } = collectMeta(cwd, [], DE);
   assert.ok(errors.some((e) => e.includes('tab "Schema"')));
 });
 
@@ -67,13 +69,13 @@ test("collectMeta: two trees claiming the same folder key is a LOUD error, not l
   const cwd = makeApp();
   // an unmounted source with its own ROOT meta.json collides with content/docs's root meta ("")
   write(path.join(cwd, "extdocs", "meta.json"), JSON.stringify({ pages: ["setup", "reference"] }));
-  const { errors } = collectMeta(cwd, SOURCES);
+  const { errors } = collectMeta(cwd, SOURCES, DE);
   assert.ok(errors.some((e) => e.includes("more than one content tree")));
 });
 
 test("collectLastUpdated: source slugs are mount-prefixed; a mounted README dates the mount page; locale mirrors skipped", () => {
   const cwd = makeApp();
-  const dates = collectLastUpdated(cwd, SOURCES, () => "2026-07-01T00:00:00+00:00");
+  const dates = collectLastUpdated(cwd, SOURCES, DE, () => "2026-07-01T00:00:00+00:00");
   assert.ok(dates["guides/install"]); // content/docs
   assert.ok(dates["setup"]); // unmounted source, root-level file
   assert.ok(dates["reference/api"]); // unmounted source, nested
@@ -84,37 +86,67 @@ test("collectLastUpdated: source slugs are mount-prefixed; a mounted README date
 
 test("collectLastUpdated: a null date is omitted, never an empty entry", () => {
   const cwd = makeApp();
-  assert.deepEqual(collectLastUpdated(cwd, SOURCES, () => null), {});
+  assert.deepEqual(collectLastUpdated(cwd, SOURCES, DE, () => null), {});
 });
 
 test("discoverLocales: sees content/<col>/<locale>/ AND each source's own locale mirrors", () => {
   const cwd = makeApp();
-  assert.deepEqual([...discoverLocales(cwd, [])], []); // content/docs has no locale dirs
-  assert.deepEqual([...discoverLocales(cwd, SOURCES)], ["de"]); // extdocs/de/ found
+  assert.deepEqual([...discoverLocales(cwd, [], DE)], []); // content/docs has no locale dirs
+  assert.deepEqual([...discoverLocales(cwd, SOURCES, DE)], ["de"]); // extdocs/de/ found
   write(path.join(cwd, "content", "docs", "ja-JP", "guides", "install.md"), md("インストール"));
-  assert.deepEqual([...discoverLocales(cwd, SOURCES)].sort(), ["de", "ja-JP"]);
+  assert.deepEqual([...discoverLocales(cwd, SOURCES, DE)].sort(), ["de", "ja-JP"]);
 });
 
 test("no sources → behavior identical to the pre-sources walks (zero regression)", () => {
   const cwd = makeApp();
-  const { meta, metaLocales } = collectMeta(cwd, []);
+  const { meta, metaLocales } = collectMeta(cwd, [], DE);
   assert.ok(Object.keys(meta).sort().join(",") === ",guides");
   assert.deepEqual(metaLocales, {});
-  const dates = collectLastUpdated(cwd, [], () => "2026-07-01T00:00:00+00:00");
+  const dates = collectLastUpdated(cwd, [], DE, () => "2026-07-01T00:00:00+00:00");
   assert.deepEqual(Object.keys(dates), ["guides/install"]);
 });
 
 test("a missing source dir yields no meta/dates/locales from it (June's gen is the loud failure)", () => {
   const cwd = makeApp();
   const gone = [{ dir: "no-such-dir", collection: "docs" }];
-  assert.deepEqual(collectMeta(cwd, gone).errors.filter((e) => !e.includes('tab "Schema"')), []);
-  assert.deepEqual([...discoverLocales(cwd, gone)], []);
+  assert.deepEqual(collectMeta(cwd, gone, DE).errors.filter((e) => !e.includes('tab "Schema"')), []);
+  assert.deepEqual([...discoverLocales(cwd, gone, DE)], []);
 });
 
 test("non-docs collections are June's business — ignored by every walk", () => {
   const cwd = makeApp();
   const other = [{ dir: "extdocs", collection: "posts" }];
-  const { meta } = collectMeta(cwd, other);
+  const { meta } = collectMeta(cwd, other, DE);
   assert.equal(meta["reference"], undefined);
-  assert.deepEqual([...discoverLocales(cwd, other)], []);
+  assert.deepEqual([...discoverLocales(cwd, other, DE)], []);
+});
+
+// ── THE locale-guessing bug: any 2–3-letter top-level folder (cli/, sdk/, api/ …) used to be
+// shape-detected as a locale and silently dropped. Locales are DECLARED now; sections survive. ──
+test("cli/ sdk/ api/ top-level sections are CONTENT, not phantom locales", () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "kura-walk-bug-"));
+  for (const section of ["cli", "sdk", "api"]) {
+    write(path.join(cwd, "content", "docs", section, "usage.md"), md(section.toUpperCase()));
+    write(path.join(cwd, "content", "docs", section, "meta.json"), JSON.stringify({ title: section }));
+  }
+  write(path.join(cwd, "content", "docs", "de", "cli", "usage.md"), md("CLI DE"));
+  write(path.join(cwd, "content", "docs", "de", "cli", "meta.json"), JSON.stringify({ title: "CLI (de)" }));
+  const declared = new Set(["en", "de"]);
+  const { meta, metaLocales, errors } = collectMeta(cwd, [], declared);
+  assert.deepEqual(errors, []);
+  for (const section of ["cli", "sdk", "api"]) assert.ok(meta[section], `${section} meta survives`);
+  assert.ok(metaLocales["de"]); // the DECLARED locale still buckets
+  const dates = collectLastUpdated(cwd, [], declared, () => "2026-07-01T00:00:00+00:00");
+  for (const section of ["cli", "sdk", "api"]) assert.ok(dates[`${section}/usage`], `${section} dated`);
+  assert.equal(dates["de/cli/usage"], undefined); // de/ = variants, skipped
+  assert.deepEqual([...discoverLocales(cwd, [], declared)], ["de"]); // de yes, cli/sdk/api no
+});
+
+test("no declared locales → nothing buckets; a de/ dir is plain content", () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "kura-walk-none-"));
+  write(path.join(cwd, "content", "docs", "de", "x.md"), md("X"));
+  const none = new Set<string>();
+  assert.deepEqual([...discoverLocales(cwd, [], none)], []);
+  const dates = collectLastUpdated(cwd, [], none, () => "2026-07-01T00:00:00+00:00");
+  assert.ok(dates["de/x"]); // walked as content, not skipped as a variant
 });

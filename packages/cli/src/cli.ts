@@ -7,7 +7,7 @@
 //     A content hash short-circuits re-embedding when nothing changed (cheap to run pre-dev).
 import { buildIndex } from "@kurajs/docs/search";
 import { basePathSegments, docsRoute, pruneStaleDocsRoutes } from "./routes.js";
-import { stripConfigComments, isCommonmark, parseHighlightLangs, parseContentSources } from "./config-read.js";
+import { stripConfigComments, isCommonmark, parseHighlightLangs, parseContentSources, parseI18nLocales } from "./config-read.js";
 import { collectMeta, collectLastUpdated, discoverLocales } from "./content-walk.js";
 import fs from "node:fs";
 import path from "node:path";
@@ -41,10 +41,14 @@ async function cmdIndex(): Promise<void> {
   // app/_content.ts at `june gen` (kuraJuneConfig forwards them); here they extend Kura's own
   // walks — meta.json nav, lastUpdated dates, locale discovery — over the same external trees.
   const contentSources = parseContentSources(cfgText);
+  // Locale buckets are DECLARED (config i18n: defaultLocale + locales keys), never guessed by
+  // folder shape — a shape regex swallowed cli/, sdk/, api/ … as phantom locales. No i18n ⇒ no
+  // locales. June's gen applies the same rule to the entries (@junejs/server ≥0.0.53).
+  const declaredLocales = new Set(parseI18nLocales(cfgText));
 
   // Nav metadata (meta.json) — validated and frozen first, so a bad meta fails fast and cheap.
   // META is the default tree; META_LOCALES holds each locale mirror's per-folder overrides.
-  const { meta, metaLocales, errors: metaErrors } = collectMeta(cwd, contentSources);
+  const { meta, metaLocales, errors: metaErrors } = collectMeta(cwd, contentSources, declaredLocales);
   if (metaErrors.length) {
     console.error("kura index: meta.json validation failed —\n  " + metaErrors.join("\n  "));
     process.exit(1);
@@ -78,7 +82,7 @@ async function cmdIndex(): Promise<void> {
   // locale mirrors), then collect each locale's actual variants (entry.locale === locale;
   // fallbacks stay in the default set). Both the search index and the MDX precompile cover
   // default + every variant → cross-lingual by construction.
-  const locales = mod.docs ? discoverLocales(cwd, contentSources) : new Set<string>();
+  const locales = mod.docs ? discoverLocales(cwd, contentSources, declaredLocales) : new Set<string>();
   const variants: Entry[] = [];
   for (const locale of locales) for (const e of mod.docs!(locale)) if (e.locale === locale) variants.push(e);
   const allEntries = [...DOCS, ...variants];
@@ -89,7 +93,7 @@ async function cmdIndex(): Promise<void> {
   // delete. Frozen before the up-to-date short-circuit so the file always exists.
   const datesTs = path.join(cwd, "app", "_dates.ts");
   const lastUpdatedOn = /\blastUpdated\s*:\s*true\b/.test(cfgText);
-  const lastUpdated: Record<string, string> = lastUpdatedOn ? collectLastUpdated(cwd, contentSources) : {};
+  const lastUpdated: Record<string, string> = lastUpdatedOn ? collectLastUpdated(cwd, contentSources, declaredLocales) : {};
   if (lastUpdatedOn) {
     const missing = DOCS.filter((d) => !(d.slug in lastUpdated)).map((d) => d.slug);
     console.log(`kura index: lastUpdated — ${Object.keys(lastUpdated).length} git date(s), ${DOCS.length - missing.length}/${DOCS.length} docs covered`);
@@ -123,7 +127,7 @@ async function cmdIndex(): Promise<void> {
 
   // Content hash — skip rebuilds when nothing changed, so `kura index` is cheap to run before
   // every dev/build. Covers the mode + format + model + locale/slug/body of every entry.
-  const hashInput = JSON.stringify([model, noEmbed, format, highlightLangs, contentSources, allEntries.map((e) => [e.locale ?? "", e.slug, e.body])]);
+  const hashInput = JSON.stringify([model, noEmbed, format, highlightLangs, contentSources, [...declaredLocales].sort(), allEntries.map((e) => [e.locale ?? "", e.slug, e.body])]);
   const contentHash = crypto.createHash("sha256").update(hashInput).digest("hex").slice(0, 16);
   const stamp = `// content-hash: ${contentHash}\n`;
   const hashOf = (f: string) => (fs.existsSync(f) ? fs.readFileSync(f, "utf8").match(/content-hash: (\S+)/)?.[1] : undefined);
