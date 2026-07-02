@@ -43,3 +43,66 @@ export function parseContentSources(strippedCfg: string): ContentSource[] {
   }
   return out;
 }
+
+// The `{…}` block starting at openIdx (which must point at "{"), braces balanced, string
+// literals skipped (a "{" inside "path: '/{x}'" must not count). Returns "" when unbalanced.
+function balancedBlock(s: string, openIdx: number): string {
+  let depth = 0;
+  let quote: string | null = null;
+  for (let i = openIdx; i < s.length; i++) {
+    const c = s[i]!;
+    if (quote) {
+      if (c === "\\") i++; // skip the escaped char
+      else if (c === quote) quote = null;
+      continue;
+    }
+    if (c === '"' || c === "'" || c === "`") quote = c;
+    else if (c === "{") depth++;
+    else if (c === "}" && --depth === 0) return s.slice(openIdx, i + 1);
+  }
+  return "";
+}
+
+/** The DECLARED locale set from `i18n: { defaultLocale, locales: { … } }` — defaultLocale plus
+ *  each `locales` key (bare or quoted, e.g. `en` / `"ja-JP"`). Locale entries nest (`{ path }`),
+ *  so this walks braces instead of trusting a flat regex; keys are taken at depth 1 only.
+ *  Returns [] when no i18n is configured — an undeclared locale is not a locale. */
+export function parseI18nLocales(strippedCfg: string): string[] {
+  const i18nAt = strippedCfg.search(/\bi18n\s*:\s*\{/);
+  if (i18nAt === -1) return [];
+  const i18n = balancedBlock(strippedCfg, strippedCfg.indexOf("{", i18nAt));
+  const out = new Set<string>();
+  const def = i18n.match(/\bdefaultLocale\s*:\s*["']([^"']+)["']/)?.[1];
+  if (def) out.add(def);
+  const localesAt = i18n.search(/\blocales\s*:\s*\{/);
+  if (localesAt !== -1) {
+    const inner = balancedBlock(i18n, i18n.indexOf("{", localesAt)).slice(1, -1);
+    // Keys at depth 0 of the locales object: skip each value by brace-walking to the next
+    // depth-0 comma, so a nested `{ path: "/ja" }` can't contribute phantom keys.
+    let depth = 0;
+    let quote: string | null = null;
+    let atKey = true;
+    for (let i = 0; i < inner.length; i++) {
+      const c = inner[i]!;
+      if (quote) {
+        if (c === "\\") i++;
+        else if (c === quote) quote = null;
+        continue;
+      }
+      if (depth === 0 && atKey) {
+        const m = inner.slice(i).match(/^\s*(?:"([^"]+)"|'([^']+)'|([A-Za-z0-9$_-]+))\s*:/);
+        if (m) {
+          out.add(m[1] ?? m[2] ?? m[3]!);
+          i += m[0].length - 1;
+          atKey = false;
+          continue;
+        }
+      }
+      if (c === '"' || c === "'" || c === "`") quote = c;
+      else if (c === "{" || c === "[") depth++;
+      else if (c === "}" || c === "]") depth--;
+      else if (c === "," && depth === 0) atKey = true;
+    }
+  }
+  return [...out];
+}
