@@ -31,6 +31,22 @@ test("parseBasePath: explicit values map to segments", () => {
   assert.deepEqual(parseBasePath("{ basePath: '/guide' }"), ["guide"]); // single quotes
 });
 
+test("parseBasePath: deploy.basePath (the deploy subpath) never moves the docs route", () => {
+  // Regression: `deploy: { basePath }` is a DIFFERENT axis (the GitHub Pages project subpath). The
+  // reader must not mistake it for the docs-mount basePath, or the route lands at the wrong path
+  // and every prerendered page 404s. With no top-level basePath → the /docs default stands.
+  assert.deepEqual(parseBasePath('{ deploy: { target: "github-pages", basePath: "/openab-docs" } }'), ["docs"]);
+  // a top-level basePath still wins, regardless of a deploy.basePath present too
+  assert.deepEqual(
+    parseBasePath('{ basePath: "/guide", deploy: { target: "github-pages", basePath: "/proj" } }'),
+    ["guide"],
+  );
+  assert.deepEqual(
+    parseBasePath('{ deploy: { basePath: "/proj" }, basePath: "" }'), // deploy first, root docs mount
+    [],
+  );
+});
+
 test("parseBasePath: a commented-out basePath does not move the route", () => {
   assert.deepEqual(parseBasePath('{ /* basePath: "" */ sections: [] }'), ["docs"]);
   assert.deepEqual(parseBasePath('{\n  // basePath: ""\n  sections: []\n}'), ["docs"]);
