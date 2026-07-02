@@ -163,10 +163,13 @@ const SIDEBAR_SYNC_JS = `(function(){
  *  groups, client-filtered to the active tab) + footer. The page content goes in `children` (wrapped
  *  by <JuneOutlet> upstream). Active page/tab state is client-driven (aria-current), so the shell is
  *  never re-rendered on navigation — only the outlet content swaps. */
-export function DocsLayoutShell({ site, navTabs, basePath = "/docs", labels = DEFAULT_LABELS, href = (p) => p, localeSwitch, searchStatic, locale, children }: {
+export function DocsLayoutShell({ site, navTabs, basePath = "/docs", labels = DEFAULT_LABELS, href = (p) => p, localeSwitch, searchStatic, locale, deployPrefix = "", children }: {
   site?: SiteInfo; navTabs: NavTab[]; basePath?: string; labels?: Labels; href?: Href; localeSwitch?: LocaleLink[];
   /** Static build: the client builds the BM25 index in-browser from /search.json's corpus (no server). */
-  searchStatic?: boolean; locale?: string; children: ReactNode;
+  searchStatic?: boolean; locale?: string;
+  /** Deploy subpath prefix (e.g. "/openab") for deploy-ROOT files — llms.txt lives there, not under
+   *  the docs basePath or a locale, so it needs the deploy prefix alone. */
+  deployPrefix?: string; children: ReactNode;
 }) {
   const brand = site?.brand ?? site?.name ?? "Kura";
   const currentLang = localeSwitch?.find((l) => l.active) ?? localeSwitch?.[0];
@@ -240,8 +243,10 @@ export function DocsLayoutShell({ site, navTabs, basePath = "/docs", labels = DE
       <footer className="border-t border-border mt-8">
         <div className="flex items-center justify-between flex-wrap gap-4 max-w-[1280px] mx-auto px-6 py-5 max-md:px-4">
           <nav className="flex items-center gap-[1.1rem] text-[.85rem]">
-            <a className="text-muted hover:text-fg" href="/llms.txt">llms.txt</a>
-            <a className="text-muted hover:text-fg" href="/mcp">MCP</a>
+            {/* Deploy-ROOT files: prefix with the deploy subpath (not the docs basePath / locale). */}
+            <a className="text-muted hover:text-fg" href={`${deployPrefix}/llms.txt`}>llms.txt</a>
+            {/* MCP is a server route — a static build emits no /mcp, so don't link a dead endpoint. */}
+            {!searchStatic && <a className="text-muted hover:text-fg" href={`${deployPrefix}/mcp`}>MCP</a>}
             <button type="button" className="inline-flex items-center justify-center w-[30px] h-[30px] p-0 text-[.95rem] leading-none border border-border rounded-lg bg-surface text-fg cursor-pointer hover:bg-hover" data-theme-toggle aria-label="Toggle theme" />
           </nav>
           <a className="text-muted text-[.85rem] hover:text-accent" href="https://kura.build/" target="_blank" rel="noreferrer">Powered by Kura</a>
