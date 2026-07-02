@@ -96,7 +96,7 @@
     },
     "packages/create-kura": {
       "name": "create-kura",
-      "version": "0.0.15",
+      "version": "0.0.16",
       "bin": {
         "create-kura": "index.js",
       },
