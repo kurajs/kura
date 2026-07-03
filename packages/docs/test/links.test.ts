@@ -297,3 +297,8 @@ describe("variant-base tier-1 (locale paths registered in the maps)", () => {
   test("../ from the ja mirror still reaches the default-tree sibling via tier 1", () =>
     assert.equal(resolveLink("../API.md", "docs/ja/guide.md", ctx, href), "/API"));
 });
+
+test("an authored %2F cannot change path boundaries", () => {
+  // "notes%2Fguide.md" is NOT "notes/guide.md" — it must not resolve to the tracked file.
+  assert.equal(r("notes%2Fguide.md", "API"), null);
+});

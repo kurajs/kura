@@ -45,7 +45,7 @@ export function docsActions(opts: {
 
   const get_page = defineAction({
     id: "get_page",
-    description: "Fetch one doc page as clean Markdown by its slug (e.g. introduction, search, agents).",
+    description: "Fetch one doc page as the authored Markdown source by its slug (e.g. introduction, search, agents).",
     input: {
       type: "object",
       properties: {

@@ -161,12 +161,19 @@ export function resolveLink(
   // Path tiers — only for relative targets with a known source location. Site-absolute hrefs
   // ("/guide.md") keep their historical legacy treatment (leading slashes stripped there).
   if (fromPath && ctx.slugByPath && !rawPath.startsWith("/")) {
-    let p = rawPath;
-    try {
-      p = decodeURIComponent(rawPath); // authored "%20" etc. → the on-disk name
-    } catch {
-      /* malformed escape → match the raw spelling */
-    }
+    // Decode PER SEGMENT so an escape can't change path boundaries (an authored %2F must not
+    // become a separator); a segment whose decode introduces "/" keeps its raw spelling.
+    const p = rawPath
+      .split("/")
+      .map((seg) => {
+        try {
+          const dec = decodeURIComponent(seg); // authored "%20" etc. → the on-disk name
+          return dec.includes("/") ? seg : dec;
+        } catch {
+          return seg; // malformed escape → match the raw spelling
+        }
+      })
+      .join("/");
     const norm = repoPathOf(fromPath, p);
     if (norm != null) {
       // tier 1: the target IS a page on this site (file path first, then folder page).
