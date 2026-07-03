@@ -126,6 +126,16 @@ export interface KuraConfig {
    */
   siteUrl?: string;
   /**
+   * The repository the docs are authored in — "owner/name" shorthand or a full URL. Powers the
+   * repo-file link fallback: an authored link to a file that exists in the repo but not on the site
+   * (a pruned doc, the root README, source files) rewrites to the repo's web view instead of
+   * 404ing. Usually OMIT it: the build auto-detects the repo (GITHUB_REPOSITORY in CI, else the git
+   * remote), which stays correct across forks and mirrors. Set a string to pin a canonical repo, or
+   * `false` to disable the fallback entirely (e.g. a private repo). Top-level on purpose — `site`
+   * is forwarded wholesale to June.
+   */
+  repo?: string | false;
+  /**
    * i18n routing config — passed to June and to createDocs(). Define locales and paths here
    * so both the server router and the docs framework share a single source of truth.
    * Re-exported as KuraI18nConfig from @kurajs/docs for type-safe inline definitions.
@@ -167,6 +177,7 @@ export function fromKuraToml(raw: Record<string, unknown>): KuraConfig {
   if (r.sections) cfg.sections = r.sections;
   if (r.highlight) cfg.highlight = r.highlight;
   if (r.site_url !== undefined) cfg.siteUrl = r.site_url;
+  if (r.repo !== undefined) cfg.repo = r.repo === false ? false : String(r.repo);
   if (r.last_updated !== undefined) cfg.lastUpdated = r.last_updated;
   if (r.mermaid_cdn !== undefined) cfg.mermaidCdn = r.mermaid_cdn;
   if (r.locale_names) cfg.localeNames = r.locale_names;

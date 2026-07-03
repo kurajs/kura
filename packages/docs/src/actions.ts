@@ -19,6 +19,9 @@ export function docsActions(opts: {
   search: SearchHandle;
   entries: readonly DocLike[];
   doc: (slug: string, locale?: string) => DocLike | null | undefined;
+  /** slug → repo-relative source path (from frozen LinkData). get_page returns it as `source.path`
+   *  so an agent holding the RAW markdown can resolve its relative links itself. */
+  sourcePaths?: Record<string, string>;
 }) {
   const search_docs = defineAction({
     id: "search_docs",
@@ -53,7 +56,8 @@ export function docsActions(opts: {
           title: String(e.data.title ?? e.slug),
           section: String(e.data.section ?? ""),
           sources: sourcesOf(e), // code↔doc map (used to scope maintenance)
-          markdown: e.original,
+          markdown: e.original, // RAW authored bytes — agents resolve relative links via source.path
+          ...(opts.sourcePaths?.[e.slug] ? { source: { path: opts.sourcePaths[e.slug] } } : {}),
         };
       return { error: `No page "${input.slug}". Pages: ${opts.entries.map((d) => d.slug).join(", ")}` };
     },
