@@ -1,5 +1,11 @@
 # @kurajs/docs
 
+## 0.0.47
+
+### Patch Changes
+
+- [#59](https://github.com/kurajs/kura/pull/59) [`4ab0612`](https://github.com/kurajs/kura/commit/4ab0612cd53b0928438fc9f44e42cdbfebc05bf0) Thanks [@linyiru](https://github.com/linyiru)! - 3-tier in-content link resolution (docs side, inert until the CLI freezes LinkData): with `app/_links.ts` each page resolves authored links from its own source path — on-site targets become site URLs (path-exact, with index/README folder-page aliases), repo files not on the site become repo web URLs (blob/tree, anchors kept), unknowns stay authored. Adds the top-level `repo` config field ("owner/name" | url | false, kura.toml parity), agent-surface rewriting (.md/.json projections via a fence-aware markdown rewriter, per-entry locale binding for the static search corpus, `source.path` on MCP get_page), and keeps the legacy slug/basename matcher as the rescue net — without LinkData every output is byte-identical to before.
+
 ## 0.0.46
 
 ### Patch Changes
