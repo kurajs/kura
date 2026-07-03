@@ -66,7 +66,7 @@ describe("normalizeRepoUrl", () => {
   test("owner/name shorthand → GitHub URL", () => assert.equal(normalizeRepoUrl("o/r"), "https://github.com/o/r"));
   test("full URL passes through, trailing .git and slashes dropped", () => {
     assert.equal(normalizeRepoUrl("https://github.com/o/r.git"), "https://github.com/o/r");
-    assert.equal(normalizeRepoUrl("https://gitlab.com/o/r/"), "https://gitlab.com/o/r");
+    assert.equal(normalizeRepoUrl("https://github.example.com/o/r/"), "https://github.example.com/o/r"); // GHES
   });
 });
 

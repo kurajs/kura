@@ -141,7 +141,7 @@ export function createDocs<T extends DocLike>(opts: {
     (locale?: string, src?: { slug: string; locale?: string }, flavor: "html" | "md" = "html") =>
     (href: string): string | null =>
       resolveLink(href, fromPathOf(src), linkCtx, (slug) =>
-        hrefFor(locale)(docPath(basePath, slug) + (flavor === "md" && slug !== "" ? ".md" : "")),
+        hrefFor(locale)(flavor === "md" ? docPath(basePath, `${slug}.md`) : docPath(basePath, slug)),
       );
 
   const site: SiteInfo = { name: opts.config.site?.name, brand: opts.config.site?.brand };

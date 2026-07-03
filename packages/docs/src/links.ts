@@ -23,7 +23,8 @@ import type { DocLike } from "./nav.ts";
 
 /** Frozen by `kura index` as app/_links.ts; absent on older CLIs (resolver degrades to legacy). */
 export type LinkData = {
-  /** Repo web URL ("https://github.com/owner/name") or null when undetectable. */
+  /** Repo web URL ("https://github.com/owner/name") or null when undetectable. Tier-2 URLs are
+   *  GitHub-shaped (/blob/, /tree/) — GitHub and GHES; other forges need a future URL template. */
   repoUrl: string | null;
   /** Git ref for blob/tree URLs — the exact commit sha in CI, "HEAD" for local builds. */
   ref?: string;
