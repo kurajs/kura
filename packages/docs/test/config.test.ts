@@ -91,3 +91,10 @@ test("kuraJuneConfig: non-static deploy passes through untouched, no basePath le
   assert.equal(june.deploy?.target, "workers");
   assert.equal("basePath" in june, false);
 });
+
+test("fromKuraToml: repo accepts a string or false, ignores other types", () => {
+  assert.equal(fromKuraToml({ repo: "o/r" }).repo, "o/r");
+  assert.equal(fromKuraToml({ repo: false }).repo, false);
+  assert.equal(fromKuraToml({ repo: true } as never).repo, undefined);
+  assert.equal(fromKuraToml({}).repo, undefined);
+});

@@ -14,6 +14,7 @@ import { docsActions } from "./actions.ts";
 import { DocsLayoutShell, DocBody, SearchResults, type SiteInfo, type SidebarGroup, type SidebarNode, type DocView, type Href, type LocaleLink, type TabLink, type NavTab } from "./ui.tsx";
 import type { KuraConfig } from "./config.ts";
 import { resolveLabels, pickLabel, type Labels } from "./labels.ts";
+import { buildLinkContext, resolveLink, rewriteMarkdownLinks, type LinkData } from "./links.ts";
 import { localeHref, type I18nConfig } from "@junejs/core/i18n";
 import { JuneOutlet } from "@junejs/core/outlet";
 import { currentLocale } from "@junejs/db";
@@ -52,6 +53,10 @@ export function createDocs<T extends DocLike>(opts: {
    *  `config.lastUpdated` is on (an empty map otherwise → no dates shown). A frontmatter
    *  `lastUpdated:` on a page overrides its entry here. */
   lastUpdated?: Record<string, string>;
+  /** Frozen link-resolution data (source paths + repo file oracle), from app/_links.ts by
+   *  `kura index`. Absent (older CLI / direct callers) → link handling is byte-identical to the
+   *  legacy slug/basename matching. See links.ts. */
+  links?: LinkData;
 }) {
   const { DOCS, doc, docs } = opts.content;
   // embedder is OPTIONAL: with one, search is semantic (over the frozen index); without one,
@@ -116,35 +121,32 @@ export function createDocs<T extends DocLike>(opts: {
         }))
       : undefined;
 
-  // Resolve in-content Markdown cross-links (`[x](other.md)`) to the target doc's real URL: match the
-  // link to a doc slug (exact, else by basename) and route it through hrefFor so it carries the docs
-  // mount, locale prefix, and deploy subpath. Lets repo-relative .md links survive folder grouping.
-  const slugSet = new Set<string>(DOCS.map((d) => d.slug));
-  const byBasename = new Map<string, string[]>();
-  for (const d of DOCS) {
-    const b = d.slug.split("/").pop() ?? d.slug;
-    const arr = byBasename.get(b);
-    arr ? arr.push(d.slug) : byBasename.set(b, [d.slug]);
-  }
-  const resolveDocSlug = (target: string): string | null => {
-    const clean = target.replace(/\.md$/i, "").replace(/^(\.\.?\/)+/, "").replace(/^\/+/, "");
-    if (slugSet.has(clean)) return clean;
-    const cands = byBasename.get(clean.split("/").pop() ?? "");
-    // Prefer the shallowest slug (a top-level doc over a same-named ADR), then lexical for stability.
-    return cands?.length ? [...cands].sort((a, b) => a.split("/").length - b.split("/").length || a.localeCompare(b))[0]! : null;
-  };
-  const docLinkResolver = (locale?: string) => (href: string): string | null => {
-    if (/^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith("//") || href.startsWith("#")) return null; // external / bare anchor
-    const hash = href.indexOf("#");
-    const p = hash >= 0 ? href.slice(0, hash) : href;
-    if (!/\.md$/i.test(p)) return null; // only Markdown links
-    const slug = resolveDocSlug(p);
-    return slug == null ? null : hrefFor(locale)(docPath(basePath, slug)) + (hash >= 0 ? href.slice(hash) : "");
-  };
+  // Resolve in-content cross-links to their real URLs — the 3-tier resolver in links.ts. With
+  // frozen LinkData (app/_links.ts, kura index) each page resolves links from its own SOURCE PATH:
+  // on-site targets → site URLs, repo-only targets → the repo's web view, unknowns stay authored.
+  // Without LinkData this degrades to the legacy slug/basename matching, byte-identical.
+  const linkCtx = buildLinkContext(DOCS, opts.links, opts.config.repo);
+  // The SOURCE is the entry actually rendered: a locale variant lives one directory deeper
+  // (content/docs/<locale>/…), so it must resolve relative links from its OWN path — the default
+  // path only when no variant path is frozen (fallback entries ARE the default file).
+  const fromPathOf = (src?: { slug: string; locale?: string }): string | undefined =>
+    src === undefined
+      ? undefined
+      : (src.locale ? opts.links?.localeSourcePaths?.[src.locale]?.[src.slug] : undefined) ??
+        opts.links?.sourcePaths[src.slug];
+  // `locale` localizes the emitted URL; `src` locates the linking file; `flavor` picks the tier-1
+  // target shape: the rendered page for HTML, the sibling `.md` projection for agent-facing
+  // markdown surfaces (an agent crawling markdown stays in markdown).
+  const docLinkResolver =
+    (locale?: string, src?: { slug: string; locale?: string }, flavor: "html" | "md" = "html") =>
+    (href: string): string | null =>
+      resolveLink(href, fromPathOf(src), linkCtx, (slug) =>
+        hrefFor(locale)(flavor === "md" ? docPath(basePath, `${slug}.md`) : docPath(basePath, slug)),
+      );
 
   const site: SiteInfo = { name: opts.config.site?.name, brand: opts.config.site?.brand };
   const search = createSearch({ entries: DOCS, embedder: opts.config.embedder, indexBytes: opts.indexBytes, tokenizer: opts.config.tokenizer });
-  const actions = docsActions({ search, entries: DOCS, doc });
+  const actions = docsActions({ search, entries: DOCS, doc, sourcePaths: opts.links?.sourcePaths, localeSourcePaths: opts.links?.localeSourcePaths });
 
   // Folder nav metadata for a locale: the default `meta`, with this locale's per-folder overrides
   // merged in (shallow, per folder key) so a locale can relabel/reorder a folder without restating
@@ -334,7 +336,7 @@ export function createDocs<T extends DocLike>(opts: {
 
   const viewOf = (e: T, locale?: string): DocView => {
     const { html: anchored, toc } = processHtml(mdxFor(e));
-    const html = rewriteDocLinks(anchored, docLinkResolver(locale)); // repo-relative .md links → doc URLs
+    const html = rewriteDocLinks(anchored, docLinkResolver(locale, { slug: e.slug, locale: e.locale })); // repo-relative links → doc/repo URLs
     const { prev, next } = prevNextOf(e.slug, locale);
     // A non-default locale that resolved to a non-variant entry fell back to default.
     const notTranslated = !!(locale && defaultLocale && locale !== defaultLocale && e.locale !== locale);
@@ -380,10 +382,29 @@ export function createDocs<T extends DocLike>(opts: {
   const View = (d: DocPage) => (
     <DocBody doc={d.doc} basePath={basePath} labels={d.labels} href={hrefFor(d.locale)} mermaidCdn={opts.config.mermaidCdn} locale={d.locale} />
   );
-  const md = (d: DocPage) => stripMdx(doc(d.doc.slug, d.locale)?.original ?? "");
+  // Agent-facing markdown: with LinkData, rewrite authored link targets with the same resolver
+  // (md flavor — tier 1 lands on the sibling .md projections; fences/code spans stay untouched).
+  // Without it, verbatim as before.
+  const agentMd = (raw: string, e: { slug: string; locale?: string }, urlLocale?: string): string =>
+    opts.links ? rewriteMarkdownLinks(raw, docLinkResolver(urlLocale, { slug: e.slug, locale: e.locale }, "md")) : raw;
+  const md = (d: DocPage) => {
+    const e = doc(d.doc.slug, d.locale);
+    return e ? agentMd(stripMdx(e.original ?? ""), { slug: d.doc.slug, locale: e.locale }, d.locale) : "";
+  };
   const json = (d: DocPage) => {
     const e = doc(d.doc.slug, d.locale);
-    return { slug: d.doc.slug, title: d.doc.title, section: d.doc.section, locale: d.locale, markdown: e?.original, body: e?.body };
+    return {
+      slug: d.doc.slug,
+      title: d.doc.title,
+      section: d.doc.section,
+      locale: d.locale,
+      markdown: e?.original == null ? e?.original : agentMd(e.original, { slug: d.doc.slug, locale: e.locale }, d.locale),
+      body: e?.body,
+      ...(() => {
+        const path = fromPathOf(e ? { slug: d.doc.slug, locale: e.locale } : undefined);
+        return path ? { source: { path } } : {};
+      })(),
+    };
   };
   const siteUrl = opts.config.siteUrl;
   const siteDesc = opts.config.site?.description;
@@ -448,7 +469,14 @@ export function createDocs<T extends DocLike>(opts: {
   // Computed once; titles use the config.nav override so client hits match the sidebar labels. Null
   // on server targets (they query per request), so /search.json stays lean there.
   const searchCorpus = isStatic
-    ? DOCS.map((e) => ({ slug: e.slug, html: e.html, data: { title: navTitle.get(e.slug) ?? e.data.title ?? e.slug }, ...(e.locale ? { locale: e.locale } : {}) }))
+    ? DOCS.map((e) => ({
+        slug: e.slug,
+        // With LinkData, palette previews carry resolved hrefs too (bound per entry: its own slug
+        // for the source path, its own locale for the URL prefix). Without it, verbatim as before.
+        html: opts.links ? rewriteDocLinks(e.html, docLinkResolver(e.locale ?? defaultLocale, { slug: e.slug, locale: e.locale })) : e.html,
+        data: { title: navTitle.get(e.slug) ?? e.data.title ?? e.slug },
+        ...(e.locale ? { locale: e.locale } : {}),
+      }))
     : null;
 
   const searchRoute = {

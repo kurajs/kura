@@ -46,3 +46,20 @@ test("an unresolved .md link is left as-is (no crash)", () => {
   const html = render('<a href="does-not-exist.md">x</a>');
   expect(html).toContain('href="does-not-exist.md"');
 });
+
+test("with frozen LinkData: tier 2 sends a pruned-doc link to the repo blob, tier 1 stays on-site", () => {
+  const app = createDocs({
+    content: { DOCS, doc: finder as never },
+    mdxHtml: { default: { "features/search": '<a href="../RECEIPTS.md#keep">gone</a><a href="semantic.md">here</a>' } },
+    config: { basePath: "/docs", deploy: { target: "github-pages", basePath: "/openab" } } as never,
+    links: {
+      repoUrl: "https://github.com/o/r",
+      ref: "abc123",
+      sourcePaths: { "features/search": "docs/features/search.md", "features/search/semantic": "docs/features/search/semantic.md" },
+      repoFiles: ["docs/RECEIPTS.md"],
+    },
+  });
+  const html = (app.docRoute.loader({ params: { slug: "features/search" } } as never) as { doc: { html: string } }).doc.html;
+  expect(html).toContain('href="https://github.com/o/r/blob/abc123/docs/RECEIPTS.md#keep"');
+  expect(html).toContain('href="/openab/docs/features/search/semantic"');
+});
