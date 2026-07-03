@@ -231,7 +231,9 @@ export function processHtml(html: string): { html: string; toc: Toc } {
 // eats a screenful of vertical space. Detect that heading + the list right after it and fold both into a
 // <details> that is closed by default. Only a list that actually looks like a ToC (mostly in-page anchor
 // links) is wrapped, so an ordinary list that happens to follow such a heading is left untouched.
-const TOC_HEADING = /<h([1-6])(?:\s[^>]*)?>\s*(Table of Contents|Contents)\s*<\/h\1>/gi;
+// h2–h4 only, matching the scope of the heading-id pass and the search indexer (splitByHeadings scans
+// ##–####), so the folded ToC's slugger id stays aligned with them.
+const TOC_HEADING = /<h([2-4])(?:\s[^>]*)?>\s*(Table of Contents|Contents)\s*<\/h\1>/gi;
 
 function collapseInPageToc(html: string, slugId: (text: string) => string): string {
   let result = "";

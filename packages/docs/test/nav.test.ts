@@ -246,3 +246,9 @@ test("processHtml: the folded ToC id is reserved in the slugger so a later same-
   assert.ok(out.includes('<h2 id="table-of-contents-1">'), "later same-text heading is deduped, no id collision");
   assert.equal(toc.find((h) => h.text === "Table of Contents")?.id, "table-of-contents-1");
 });
+
+test("processHtml: folds only an h2-h4 Table of Contents (matches the heading-id/search scope)", () => {
+  const list = '\n<ul><li><a href="#a">A</a></li></ul>';
+  assert.ok(!processHtml("<h1>Table of Contents</h1>" + list).html.includes("kura-toc"), "h1 ToC not folded");
+  assert.ok(processHtml("<h3>Table of Contents</h3>" + list).html.includes("kura-toc"), "h3 ToC folded");
+});
