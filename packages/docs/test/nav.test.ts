@@ -213,3 +213,42 @@ test("canonicalUrl: siteUrl + doc path, trailing slash trimmed (home stays at th
   assert.equal(canonicalUrl(SITE, "", ""), "https://kura.build/"); // root home → "/"
   assert.equal(canonicalUrl("https://kura.build/", "/docs", "a/b"), "https://kura.build/docs/a/b"); // siteUrl trailing slash → no //
 });
+
+test("processHtml: folds a hand-written Table of Contents into a collapsed <details>, drops it from toc, strips fencing hr", () => {
+  const html =
+    '<p>intro</p>\n<hr>\n<h2>Table of Contents</h2>\n<ul>\n<li><a href="#intro">Intro</a></li>\n' +
+    '<li><a href="#setup">Setup</a>\n<ul><li><a href="#deps">Deps</a></li></ul></li>\n</ul>\n<hr>\n' +
+    "<h2>Intro</h2>\n<p>hi</p>\n<h2>Setup</h2>\n<p>go</p>";
+  const { html: out, toc } = processHtml(html);
+  assert.match(out, /<details class="kura-toc" id="table-of-contents"><summary class="chevron">Table of Contents<\/summary><ul>/);
+  assert.ok(out.includes('href="#deps"'), "nested list preserved");
+  assert.ok(!out.includes("<hr"), "the <hr>s fencing the ToC are removed");
+  assert.deepEqual(toc.map((h) => h.text), ["Intro", "Setup"]); // ToC heading is not in the right-rail
+});
+
+test("processHtml: leaves an ordinary list after a non-ToC heading alone", () => {
+  const { html: out, toc } = processHtml('<h2>Features</h2>\n<ul><li><a href="https://x">x</a></li><li>y</li></ul>');
+  assert.ok(!out.includes("kura-toc"));
+  assert.equal(toc[0].text, "Features");
+});
+
+test("processHtml: a Table of Contents heading whose list has no anchor links is left alone", () => {
+  const { html: out } = processHtml("<h2>Table of Contents</h2>\n<ul><li>prose only, no anchors</li></ul>");
+  assert.ok(!out.includes("kura-toc"));
+});
+
+test("processHtml: the folded ToC id is reserved in the slugger so a later same-text heading can't collide", () => {
+  const html =
+    '<h2>Table of Contents</h2>\n<ul><li><a href="#a">A</a></li></ul>\n' +
+    "<h2>Table of Contents</h2>\n<p>a real section that happens to share the name</p>";
+  const { html: out, toc } = processHtml(html);
+  assert.match(out, /<details class="kura-toc" id="table-of-contents">/);
+  assert.ok(out.includes('<h2 id="table-of-contents-1">'), "later same-text heading is deduped, no id collision");
+  assert.equal(toc.find((h) => h.text === "Table of Contents")?.id, "table-of-contents-1");
+});
+
+test("processHtml: folds only an h2-h4 Table of Contents (matches the heading-id/search scope)", () => {
+  const list = '\n<ul><li><a href="#a">A</a></li></ul>';
+  assert.ok(!processHtml("<h1>Table of Contents</h1>" + list).html.includes("kura-toc"), "h1 ToC not folded");
+  assert.ok(processHtml("<h3>Table of Contents</h3>" + list).html.includes("kura-toc"), "h3 ToC folded");
+});
