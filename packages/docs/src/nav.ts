@@ -212,11 +212,12 @@ export function createSlugger(): (text: string) => string {
 
 /** Inject ids into h2–h4 of rendered HTML and extract the table of contents. */
 export function processHtml(html: string): { html: string; toc: Toc } {
-  html = collapseInPageToc(html); // fold a hand-written "Table of Contents" list into a collapsed
-  // <details>; done BEFORE the heading pass, so that heading is no longer an <h*> and thus also drops
-  // out of the right-rail `toc` below (it duplicates it).
   const toc: Toc = [];
   const slugId = createSlugger();
+  html = collapseInPageToc(html, slugId); // fold a hand-written "Table of Contents" list into a collapsed
+  // <details>; done BEFORE the heading pass, so that heading is no longer an <h*> and thus also drops out
+  // of the right-rail `toc` below. Its id comes from the SAME slugger, so a later real heading with the
+  // same text can't collide with it (and ids stay aligned with the search indexer).
   const out = html.replace(/<h([2-4])>([\s\S]*?)<\/h\1>/g, (_m, lvl: string, inner: string) => {
     const text = inner.replace(/<[^>]+>/g, "").trim();
     const id = slugId(text);
@@ -232,7 +233,7 @@ export function processHtml(html: string): { html: string; toc: Toc } {
 // links) is wrapped, so an ordinary list that happens to follow such a heading is left untouched.
 const TOC_HEADING = /<h([1-6])(?:\s[^>]*)?>\s*(Table of Contents|Contents)\s*<\/h\1>/gi;
 
-function collapseInPageToc(html: string): string {
+function collapseInPageToc(html: string, slugId: (text: string) => string): string {
   let result = "";
   let last = 0;
   let m: RegExpExecArray | null;
@@ -254,7 +255,7 @@ function collapseInPageToc(html: string): string {
     const after = /^\s*<hr\b[^>]*>/i.exec(html.slice(end));
     if (after) end += after[0].length;
     result += html.slice(last, start);
-    result += `<details class="kura-toc" id="${slugify(m[2])}"><summary class="chevron">${m[2]}</summary>${html.slice(listStart, listEnd)}</details>`;
+    result += `<details class="kura-toc" id="${slugId(m[2])}"><summary class="chevron">${m[2]}</summary>${html.slice(listStart, listEnd)}</details>`;
     last = end;
     TOC_HEADING.lastIndex = end; // resume scanning after the wrapped list (and consumed hr)
   }

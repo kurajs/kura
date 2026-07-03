@@ -236,3 +236,13 @@ test("processHtml: a Table of Contents heading whose list has no anchor links is
   const { html: out } = processHtml("<h2>Table of Contents</h2>\n<ul><li>prose only, no anchors</li></ul>");
   assert.ok(!out.includes("kura-toc"));
 });
+
+test("processHtml: the folded ToC id is reserved in the slugger so a later same-text heading can't collide", () => {
+  const html =
+    '<h2>Table of Contents</h2>\n<ul><li><a href="#a">A</a></li></ul>\n' +
+    "<h2>Table of Contents</h2>\n<p>a real section that happens to share the name</p>";
+  const { html: out, toc } = processHtml(html);
+  assert.match(out, /<details class="kura-toc" id="table-of-contents">/);
+  assert.ok(out.includes('<h2 id="table-of-contents-1">'), "later same-text heading is deduped, no id collision");
+  assert.equal(toc.find((h) => h.text === "Table of Contents")?.id, "table-of-contents-1");
+});
