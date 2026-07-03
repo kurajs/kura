@@ -145,11 +145,14 @@
 .kura-toc > summary { display: flex; justify-content: space-between; align-items: center; gap: .5rem; cursor: pointer; padding: .55rem .85rem; font-weight: 600; font-size: .95em; }
 .kura-toc > summary:hover { background: color-mix(in srgb, currentColor 5%, transparent); border-radius: 10px; }
 .kura-toc > :not(summary) { margin: .1rem .9rem .55rem; }
-/* Smooth open where supported (progressive enhancement; instant elsewhere, still zero JS). */
-@supports (interpolate-size: allow-keywords) {
-  :root { interpolate-size: allow-keywords; }
-  .kura-toc::details-content { height: 0; overflow: hidden; transition: height .2s ease, content-visibility .2s allow-discrete; }
-  .kura-toc[open]::details-content { height: auto; }
+/* Smooth open where supported (progressive enhancement; instant elsewhere and for reduced-motion
+   users, still zero JS). Gated on prefers-reduced-motion like the other animations in this file. */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (interpolate-size: allow-keywords) {
+    :root { interpolate-size: allow-keywords; }
+    .kura-toc::details-content { height: 0; overflow: hidden; transition: height .2s ease, content-visibility .2s allow-discrete; }
+    .kura-toc[open]::details-content { height: auto; }
+  }
 }
 /* Sidebar active page — driven by aria-current (not a server className) so it works in the
    PERSISTENT segment shell: the layout doesn't know the current page, so the client sync sets
