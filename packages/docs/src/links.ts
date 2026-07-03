@@ -165,7 +165,7 @@ export function resolveLink(
       if (ctx.repoUrl) {
         const ref = ctx.ref ?? "HEAD";
         if (ctx.repoFiles?.has(norm)) return `${ctx.repoUrl}/blob/${ref}/${encodePath(norm)}${hash}`;
-        if (ctx.repoDirs?.has(norm)) return `${ctx.repoUrl}/tree/${ref}/${encodePath(norm)}`;
+        if (ctx.repoDirs?.has(norm)) return `${ctx.repoUrl}/tree/${ref}/${encodePath(norm)}${hash}`;
       }
     }
   }
@@ -207,13 +207,19 @@ export function rewriteMarkdownLinks(md: string, resolve: (href: string) => stri
   const out: string[] = [];
   let inFence = false;
   let fenceMark = "";
+  let fenceLen = 0;
   for (const line of md.split("\n")) {
-    const fence = /^([ \t]{0,3})(`{3,}|~{3,})/.exec(line);
+    const fence = /^[ \t]{0,3}(`{3,}|~{3,})(.*)$/.exec(line);
     if (fence) {
+      const run = fence[1]!;
       if (!inFence) {
         inFence = true;
-        fenceMark = fence[2]![0]!;
-      } else if (fence[2]![0] === fenceMark) inFence = false;
+        fenceMark = run[0]!;
+        fenceLen = run.length;
+      } else if (run[0] === fenceMark && run.length >= fenceLen && fence[2]!.trim() === "") {
+        // CommonMark closer: same char, at least the opening length, nothing but whitespace after.
+        inFence = false;
+      }
       out.push(line);
       continue;
     }

@@ -234,3 +234,21 @@ describe("rewriteMarkdownLinks — agent surfaces", () => {
     );
   });
 });
+
+describe("review follow-ups", () => {
+  test("tier-2 directory link keeps its anchor (tree URL + #fragment)", () =>
+    assert.equal(
+      resolveLink("artifacts/soak/gate8b/#readme", LINKS.sourcePaths.API, CTX, href),
+      "https://github.com/o/r/tree/abc123/docs/artifacts/soak/gate8b#readme",
+    ));
+  test("a 4-backtick fence is not closed by a 3-backtick line (CommonMark closer >= opener)", () => {
+    const resolve = (h: string): string | null => (h === "other.md" ? "/other" : null);
+    const md = "````\n```\n[x](other.md)\n```\n````\n[x](other.md)";
+    assert.equal(rewriteMarkdownLinks(md, resolve), "````\n```\n[x](other.md)\n```\n````\n[x](/other)");
+  });
+  test("an info-string line inside a fence does not close it", () => {
+    const resolve = (h: string): string | null => (h === "other.md" ? "/other" : null);
+    const md = "```\n```ts not a closer\n[x](other.md)\n```\n[x](other.md)";
+    assert.equal(rewriteMarkdownLinks(md, resolve), "```\n```ts not a closer\n[x](other.md)\n```\n[x](/other)");
+  });
+});
