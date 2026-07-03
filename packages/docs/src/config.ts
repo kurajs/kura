@@ -177,7 +177,7 @@ export function fromKuraToml(raw: Record<string, unknown>): KuraConfig {
   if (r.sections) cfg.sections = r.sections;
   if (r.highlight) cfg.highlight = r.highlight;
   if (r.site_url !== undefined) cfg.siteUrl = r.site_url;
-  if (r.repo !== undefined) cfg.repo = r.repo === false ? false : String(r.repo);
+  if (r.repo === false || typeof r.repo === "string") cfg.repo = r.repo; // other types: ignored, not coerced
   if (r.last_updated !== undefined) cfg.lastUpdated = r.last_updated;
   if (r.mermaid_cdn !== undefined) cfg.mermaidCdn = r.mermaid_cdn;
   if (r.locale_names) cfg.localeNames = r.locale_names;
