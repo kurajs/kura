@@ -29,6 +29,10 @@ export type LinkData = {
   ref?: string;
   /** slug → repo-relative source path of the entry's default-locale file ("docs/cookbook/x.md"). */
   sourcePaths: Record<string, string>;
+  /** locale → slug → the variant's OWN source path ("docs/ja/guide.md"). i18n mirrors live one
+   *  directory deeper, so their relative links resolve against a different base than the default
+   *  file's — a variant page must use its own path. Missing entries fall back to sourcePaths. */
+  localeSourcePaths?: Record<string, Record<string, string>>;
   /** Repo-relative, git-tracked FILE paths that authored links actually reach (corpus-filtered —
    *  never the whole index, so a monorepo can't bloat the worker bundle). */
   repoFiles?: readonly string[];
@@ -233,13 +237,55 @@ export function rewriteMarkdownLinks(md: string, resolve: (href: string) => stri
       out.push(u == null ? line : line.slice(0, ref[1]!.length) + u + line.slice(ref[1]!.length + ref[2]!.length));
       continue;
     }
-    // Split around inline code spans (`…` runs) so code-quoted link shapes stay untouched.
-    out.push(
-      line
-        .split(/(`+[^`]*`+)/)
-        .map((part, i) => (i % 2 === 1 ? part : rewriteSegment(part, resolve)))
-        .join(""),
-    );
+    out.push(rewriteOutsideCodeSpans(line, resolve));
   }
   return out.join("\n");
+}
+
+// Rewrite a line's links only OUTSIDE inline code spans, per CommonMark: an opener of N backticks
+// is closed by the NEXT run of exactly N (so a span can contain shorter/longer runs), and an
+// unmatched run is literal text. Line-scoped: multi-line spans are rare in docs and the fence pass
+// above already guards the common multi-line code shapes.
+function rewriteOutsideCodeSpans(line: string, resolve: (href: string) => string | null): string {
+  let out = "";
+  let plain = ""; // pending rewritable text
+  const flush = () => {
+    out += rewriteSegment(plain, resolve);
+    plain = "";
+  };
+  let i = 0;
+  while (i < line.length) {
+    if (line[i] !== "`") {
+      plain += line[i];
+      i++;
+      continue;
+    }
+    let n = i;
+    while (n < line.length && line[n] === "`") n++;
+    const runLen = n - i;
+    // Find the next backtick run of EXACTLY runLen — that closes the span.
+    let j = n;
+    let close = -1;
+    while (j < line.length) {
+      if (line[j] === "`") {
+        let k = j;
+        while (k < line.length && line[k] === "`") k++;
+        if (k - j === runLen) {
+          close = k;
+          break;
+        }
+        j = k;
+      } else j++;
+    }
+    if (close >= 0) {
+      flush();
+      out += line.slice(i, close); // the whole span, verbatim
+      i = close;
+    } else {
+      plain += line.slice(i, n); // unmatched run: literal text
+      i = n;
+    }
+  }
+  flush();
+  return out;
 }

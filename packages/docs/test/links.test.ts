@@ -255,3 +255,34 @@ describe("review follow-ups", () => {
     assert.equal(rewriteMarkdownLinks(md, resolve), "```\n```ts not a closer\n[x](other.md)\n```\n[x](/other)");
   });
 });
+
+describe("locale variants resolve from their OWN source path", () => {
+  test("../README.md means different targets from docs/ja/guide.md vs docs/guide.md", () => {
+    // From the ja mirror (one dir deeper) "../README.md" is docs/README.md — the site homepage.
+    assert.equal(resolveLink("../README.md", "docs/ja/guide.md", CTX, href), "/");
+    // From the default file it's the repo-root README — tier 2.
+    assert.equal(
+      resolveLink("../README.md", "docs/guide.md", CTX, href),
+      "https://github.com/o/r/blob/abc123/README.md",
+    );
+  });
+});
+
+describe("code spans, CommonMark exact-run matching", () => {
+  const resolve = (h: string): string | null => (h === "other.md" ? "/other" : null);
+  test("a double-backtick span containing single backticks stays untouched", () =>
+    assert.equal(
+      rewriteMarkdownLinks("``x ` [a](other.md) ` y`` then [a](other.md)", resolve),
+      "``x ` [a](other.md) ` y`` then [a](/other)",
+    ));
+  test("an unmatched backtick run is literal text; the link after it still rewrites", () =>
+    assert.equal(
+      rewriteMarkdownLinks("odd ` tick [a](other.md)", resolve),
+      "odd ` tick [a](/other)",
+    ));
+  test("a simple span still guards its content", () =>
+    assert.equal(
+      rewriteMarkdownLinks("`[a](other.md)` and [a](other.md)", resolve),
+      "`[a](other.md)` and [a](/other)",
+    ));
+});
