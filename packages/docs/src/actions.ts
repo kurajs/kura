@@ -22,6 +22,9 @@ export function docsActions(opts: {
   /** slug → repo-relative source path (from frozen LinkData). get_page returns it as `source.path`
    *  so an agent holding the RAW markdown can resolve its relative links itself. */
   sourcePaths?: Record<string, string>;
+  /** locale → slug → the variant's own source path — keeps source.path truthful when a locale
+   *  variant's bytes are returned (the pairing invariant: path always describes the bytes). */
+  localeSourcePaths?: Record<string, Record<string, string>>;
 }) {
   const search_docs = defineAction({
     id: "search_docs",
@@ -45,20 +48,28 @@ export function docsActions(opts: {
     description: "Fetch one doc page as clean Markdown by its slug (e.g. introduction, search, agents).",
     input: {
       type: "object",
-      properties: { slug: { type: "string", description: "The page slug." } },
+      properties: {
+        slug: { type: "string", description: "The page slug." },
+        locale: { type: "string", description: "Optional locale — returns that variant when it exists." },
+      },
       required: ["slug"],
     },
-    run(input: { slug: string }) {
-      const e = opts.doc(input.slug);
-      if (e)
+    run(input: { slug: string; locale?: string }) {
+      const e = opts.doc(input.slug, input.locale);
+      if (e) {
+        // The pairing invariant: source.path always describes the BYTES returned — the variant's
+        // own file when a locale variant is served, the default file otherwise (incl. fallback).
+        const path =
+          (e.locale ? opts.localeSourcePaths?.[e.locale]?.[e.slug] : undefined) ?? opts.sourcePaths?.[e.slug];
         return {
           slug: e.slug,
           title: String(e.data.title ?? e.slug),
           section: String(e.data.section ?? ""),
           sources: sourcesOf(e), // code↔doc map (used to scope maintenance)
           markdown: e.original, // RAW authored bytes — agents resolve relative links via source.path
-          ...(opts.sourcePaths?.[e.slug] ? { source: { path: opts.sourcePaths[e.slug] } } : {}),
+          ...(path ? { source: { path } } : {}),
         };
+      }
       return { error: `No page "${input.slug}". Pages: ${opts.entries.map((d) => d.slug).join(", ")}` };
     },
   });

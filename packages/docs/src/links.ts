@@ -86,7 +86,7 @@ export function buildLinkContext(
   if (!links) return { slugSet, byBasename };
   const slugByPath = new Map<string, string>();
   const dirSlugByPath = new Map<string, string>();
-  for (const [slug, path] of Object.entries(links.sourcePaths)) {
+  const register = (path: string, slug: string) => {
     slugByPath.set(path, slug);
     // A collapsed index/README owns its folder: alias the sibling spellings (authors write either),
     // and register the DIRECTORY itself so "cookbook/" and "../" resolve to the folder page.
@@ -98,7 +98,13 @@ export function buildLinkContext(
       }
       dirSlugByPath.set(dir, slug);
     }
-  }
+  };
+  for (const [slug, path] of Object.entries(links.sourcePaths)) register(path, slug);
+  // Locale-variant paths resolve to the SAME slugs, so a link normalized against a variant base
+  // ("docs/ja/…") tier-1 resolves too (the caller's toDocHref supplies the locale prefix) instead
+  // of leaking to the repo oracle or the basename guesser.
+  for (const bySlug of Object.values(links.localeSourcePaths ?? {}))
+    for (const [slug, path] of Object.entries(bySlug)) register(path, slug);
   const repoUrl =
     repoOverride === false ? null : repoOverride ? normalizeRepoUrl(repoOverride) : links.repoUrl;
   return {

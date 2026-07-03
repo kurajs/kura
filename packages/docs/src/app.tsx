@@ -146,7 +146,7 @@ export function createDocs<T extends DocLike>(opts: {
 
   const site: SiteInfo = { name: opts.config.site?.name, brand: opts.config.site?.brand };
   const search = createSearch({ entries: DOCS, embedder: opts.config.embedder, indexBytes: opts.indexBytes, tokenizer: opts.config.tokenizer });
-  const actions = docsActions({ search, entries: DOCS, doc, sourcePaths: opts.links?.sourcePaths });
+  const actions = docsActions({ search, entries: DOCS, doc, sourcePaths: opts.links?.sourcePaths, localeSourcePaths: opts.links?.localeSourcePaths });
 
   // Folder nav metadata for a locale: the default `meta`, with this locale's per-folder overrides
   // merged in (shallow, per folder key) so a locale can relabel/reorder a folder without restating

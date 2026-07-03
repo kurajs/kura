@@ -286,3 +286,14 @@ describe("code spans, CommonMark exact-run matching", () => {
       "`[a](other.md)` and [a](/other)",
     ));
 });
+
+describe("variant-base tier-1 (locale paths registered in the maps)", () => {
+  const ctx = buildLinkContext(ENTRIES, {
+    ...LINKS,
+    localeSourcePaths: { ja: { OPERATIONS: "docs/ja/OPERATIONS.md", guide: "docs/ja/guide.md" } },
+  });
+  test("a sibling link resolved against a ja variant base hits tier 1, not the repo oracle", () =>
+    assert.equal(resolveLink("./OPERATIONS.md", "docs/ja/guide.md", ctx, href), "/OPERATIONS"));
+  test("../ from the ja mirror still reaches the default-tree sibling via tier 1", () =>
+    assert.equal(resolveLink("../API.md", "docs/ja/guide.md", ctx, href), "/API"));
+});
