@@ -1,5 +1,11 @@
 # @kurajs/docs
 
+## 0.0.46
+
+### Patch Changes
+
+- [#57](https://github.com/kurajs/kura/pull/57) [`7196a74`](https://github.com/kurajs/kura/commit/7196a74a96904cc6e372d89b05d008aa524c73b6) Thanks [@linyiru](https://github.com/linyiru)! - Fold a hand-written in-page "Table of Contents" into a collapsed `<details>` (closed by default), drop its now-duplicate entry from the right-rail "On this page", and strip the `---` rules that fenced it. Only a list that is mostly in-page anchor links is wrapped, so ordinary lists are left untouched. Pure HTML/CSS, no JS.
+
 ## 0.0.45
 
 ### Patch Changes
