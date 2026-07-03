@@ -94,8 +94,11 @@ describe("tier 1 — on-site targets resolve from the linking doc's own director
   test("T08 mid-path ..: planning/../OPERATIONS.md", () =>
     assert.equal(r("planning/../OPERATIONS.md", "API"), "/OPERATIONS"));
   test("T09 self-link with anchor", () => assert.equal(r("./API.md#auth", "API"), "/API#auth"));
-  test("percent-encoded target decodes before matching", () =>
-    assert.equal(r("OPERATIONS.md", "API"), r("OPERATIONS%2Emd".replace("%2E", "."), "API")));
+  test("percent-encoded target decodes before matching (%20 → the on-disk space)", () =>
+    assert.equal(
+      r("assets/arch%20diagram.png", "API"),
+      "https://github.com/o/r/blob/abc123/docs/assets/arch%20diagram.png",
+    ));
   test(".mdx source resolves via its real path (no legacy widening needed)", () =>
     assert.equal(r("mdx-page.mdx", "API"), "/mdx-page"));
   test("T24 authored path beats legacy shallowest-basename: guide.md FROM adr/ is adr's own guide", () =>
