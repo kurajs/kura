@@ -213,3 +213,26 @@ test("canonicalUrl: siteUrl + doc path, trailing slash trimmed (home stays at th
   assert.equal(canonicalUrl(SITE, "", ""), "https://kura.build/"); // root home → "/"
   assert.equal(canonicalUrl("https://kura.build/", "/docs", "a/b"), "https://kura.build/docs/a/b"); // siteUrl trailing slash → no //
 });
+
+test("processHtml: folds a hand-written Table of Contents into a collapsed <details>, drops it from toc, strips fencing hr", () => {
+  const html =
+    '<p>intro</p>\n<hr>\n<h2>Table of Contents</h2>\n<ul>\n<li><a href="#intro">Intro</a></li>\n' +
+    '<li><a href="#setup">Setup</a>\n<ul><li><a href="#deps">Deps</a></li></ul></li>\n</ul>\n<hr>\n' +
+    "<h2>Intro</h2>\n<p>hi</p>\n<h2>Setup</h2>\n<p>go</p>";
+  const { html: out, toc } = processHtml(html);
+  assert.match(out, /<details class="kura-toc" id="table-of-contents"><summary class="chevron">Table of Contents<\/summary><ul>/);
+  assert.ok(out.includes('href="#deps"'), "nested list preserved");
+  assert.ok(!out.includes("<hr"), "the <hr>s fencing the ToC are removed");
+  assert.deepEqual(toc.map((h) => h.text), ["Intro", "Setup"]); // ToC heading is not in the right-rail
+});
+
+test("processHtml: leaves an ordinary list after a non-ToC heading alone", () => {
+  const { html: out, toc } = processHtml('<h2>Features</h2>\n<ul><li><a href="https://x">x</a></li><li>y</li></ul>');
+  assert.ok(!out.includes("kura-toc"));
+  assert.equal(toc[0].text, "Features");
+});
+
+test("processHtml: a Table of Contents heading whose list has no anchor links is left alone", () => {
+  const { html: out } = processHtml("<h2>Table of Contents</h2>\n<ul><li>prose only, no anchors</li></ul>");
+  assert.ok(!out.includes("kura-toc"));
+});

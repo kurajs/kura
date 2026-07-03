@@ -212,6 +212,9 @@ export function createSlugger(): (text: string) => string {
 
 /** Inject ids into h2–h4 of rendered HTML and extract the table of contents. */
 export function processHtml(html: string): { html: string; toc: Toc } {
+  html = collapseInPageToc(html); // fold a hand-written "Table of Contents" list into a collapsed
+  // <details>; done BEFORE the heading pass, so that heading is no longer an <h*> and thus also drops
+  // out of the right-rail `toc` below (it duplicates it).
   const toc: Toc = [];
   const slugId = createSlugger();
   const out = html.replace(/<h([2-4])>([\s\S]*?)<\/h\1>/g, (_m, lvl: string, inner: string) => {
@@ -221,6 +224,62 @@ export function processHtml(html: string): { html: string; toc: Toc } {
     return `<h${lvl} id="${id}">${inner}</h${lvl}>`;
   });
   return { html: out, toc };
+}
+
+// A doc that hand-writes a "## Table of Contents" list duplicates the auto-generated right-rail ToC and
+// eats a screenful of vertical space. Detect that heading + the list right after it and fold both into a
+// <details> that is closed by default. Only a list that actually looks like a ToC (mostly in-page anchor
+// links) is wrapped, so an ordinary list that happens to follow such a heading is left untouched.
+const TOC_HEADING = /<h([1-6])(?:\s[^>]*)?>\s*(Table of Contents|Contents)\s*<\/h\1>/gi;
+
+function collapseInPageToc(html: string): string {
+  let result = "";
+  let last = 0;
+  let m: RegExpExecArray | null;
+  TOC_HEADING.lastIndex = 0;
+  while ((m = TOC_HEADING.exec(html))) {
+    const afterHeading = m.index + m[0].length;
+    const lead = /^(\s*)<(ul|ol)[\s>]/.exec(html.slice(afterHeading));
+    if (!lead) continue; // heading not immediately followed by a list → leave it alone
+    const listStart = afterHeading + lead[1].length;
+    const listEnd = matchBalancedTag(html, listStart, lead[2]);
+    if (listEnd < 0) continue;
+    if (!looksLikeToc(html.slice(listStart, listEnd))) continue;
+    // Authors often fence the ToC with `---` rules; once it is a collapsed <details> those <hr>s are
+    // just noise, so drop one immediately before the heading and one immediately after the list.
+    let start = m.index;
+    const before = /<hr\b[^>]*>\s*$/i.exec(html.slice(last, start));
+    if (before) start = last + before.index;
+    let end = listEnd;
+    const after = /^\s*<hr\b[^>]*>/i.exec(html.slice(end));
+    if (after) end += after[0].length;
+    result += html.slice(last, start);
+    result += `<details class="kura-toc" id="${slugify(m[2])}"><summary class="chevron">${m[2]}</summary>${html.slice(listStart, listEnd)}</details>`;
+    last = end;
+    TOC_HEADING.lastIndex = end; // resume scanning after the wrapped list (and consumed hr)
+  }
+  return last === 0 ? html : result + html.slice(last);
+}
+
+/** Index just past the balanced closing </tag> for the opening <tag at `start` (handles nesting), or -1. */
+function matchBalancedTag(html: string, start: number, tag: string): number {
+  const re = new RegExp(`<(/?)${tag}[\\s>]`, "gi");
+  re.lastIndex = start;
+  let depth = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html))) {
+    depth += m[1] ? -1 : 1;
+    if (depth === 0) return re.lastIndex;
+  }
+  return -1;
+}
+
+/** A list is a ToC when it has links and most of them are in-page anchors (href="#…"). */
+function looksLikeToc(listHtml: string): boolean {
+  const links = (listHtml.match(/<a\s[^>]*href=/gi) || []).length;
+  if (links === 0) return false;
+  const anchors = (listHtml.match(/<a\s[^>]*href="#/gi) || []).length;
+  return anchors >= Math.ceil(links * 0.6);
 }
 
 /** Rewrite in-content Markdown cross-links (`<a href="…foo.md">` / `foo.md#anchor`) to the target
