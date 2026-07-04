@@ -2,7 +2,7 @@
   "name": "@kurajs/docs",
   "version": "0.0.48",
   "type": "module",
-  "description": "Kura — the docs framework on June. Sidebar, ToC, search, copy-markdown, and the agent surface (MCP) for a knowledgebase that serves humans and agents.",
+  "description": "Kura \u2014 the docs framework on June. Sidebar, ToC, search, copy-markdown, and the agent surface (MCP) for a knowledgebase that serves humans and agents.",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

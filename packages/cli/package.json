@@ -2,7 +2,7 @@
   "name": "@kurajs/cli",
   "version": "0.0.26",
   "type": "module",
-  "description": "Kura CLI — dev, build, deploy, and index a Kura docs app (one surface over June).",
+  "description": "Kura CLI \u2014 dev, build, deploy, and index a Kura docs app (one surface over June).",
   "bin": {
     "kura": "dist/cli.js"
   },
@@ -17,7 +17,8 @@
   "dependencies": {
     "@junejs/cli": ">=0.0.50 <0.1.0",
     "@kurajs/core": ">=0.0.1 <0.1.0",
-    "smol-toml": "^1.7.0"
+    "smol-toml": "^1.7.0",
+    "@kurajs/docs": ">=0.0.48"
   },
   "peerDependencies": {
     "@kurajs/docs": ">=0.0.41",
