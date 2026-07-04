@@ -53,8 +53,8 @@ export function contentPathMapper(trees: readonly Tree[]): (absFile: string) => 
   return (absFile) => {
     for (const t of trees) {
       const rel = path.relative(t.root, absFile);
-      const escapes = rel === ".." || rel.startsWith(".." + path.sep) || path.isAbsolute(rel);
-      if (!escapes) return t.mount ? `${t.mount}/${posix(rel)}` : posix(rel);
+      if (!(rel === ".." || rel.startsWith(".." + path.sep) || path.isAbsolute(rel)))
+        return t.mount ? `${t.mount}/${posix(rel)}` : posix(rel);
     }
     return undefined;
   };
