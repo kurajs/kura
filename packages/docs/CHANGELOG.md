@@ -1,5 +1,11 @@
 # @kurajs/docs
 
+## 0.0.50
+
+### Patch Changes
+
+- [#65](https://github.com/kurajs/kura/pull/65) [`1870721`](https://github.com/kurajs/kura/commit/18707214c40fe0e1ec6d380a2f161c63132080c0) Thanks [@linyiru](https://github.com/linyiru)! - A link whose TEXT is a code span (`[`file.toml`](../file.toml)`, everywhere in real docs) now rewrites: the code-span guard skips a link only when its TARGET sits inside a span (a quoted example), instead of splitting the line around spans — which stranded the `](target)` from its `[text` and made both the markdown surfaces and the CLI's corpus scan blind to such links.
+
 ## 0.0.49
 
 ### Patch Changes
