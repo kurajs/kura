@@ -1,5 +1,11 @@
 # @kurajs/docs
 
+## 0.0.48
+
+### Patch Changes
+
+- [#62](https://github.com/kurajs/kura/pull/62) [`1da00e9`](https://github.com/kurajs/kura/commit/1da00e9cc0dbc59d631afe01cab2c9a2bdae7c37) Thanks [@linyiru](https://github.com/linyiru)! - Add the lean `@kurajs/docs/links` subpath export (June-free entry to the link resolver) and export `resolveRepoPath` — the CLI's corpus scan shares the resolver's exact path semantics (per-segment escape decoding, repo-root escape rejection).
+
 ## 0.0.47
 
 ### Patch Changes
