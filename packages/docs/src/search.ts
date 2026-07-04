@@ -327,6 +327,10 @@ export function createSearch(opts: {
   const known = opts.knownLocales?.length ? new Set(opts.knownLocales) : null;
   // Normalize a requested locale: only declared tags scope the search; unknown/absent → default view.
   const scope = (l?: string): string | undefined => (l && known?.has(l) ? l : undefined);
+  // Tokenization language: with DECLARED locales only declared tags apply (unknown behaves as unset,
+  // and arbitrary strings can't grow the tokenizer cache); without declarations (legacy callers) the
+  // raw locale keeps today's behavior. Absent either way → the site's default locale.
+  const lang = (l?: string): string | undefined => (known ? scope(l) : l) ?? opts.defaultLocale;
   const entriesOf = (l?: string): readonly DocLike[] =>
     l && opts.entriesFor ? opts.entriesFor(l) : opts.entries;
   // One keyword index per SCOPED locale (bounded by knownLocales), built lazily. Key "" = default.
@@ -357,13 +361,13 @@ export function createSearch(opts: {
         const topK = o?.topK ?? 8;
         // Over-fetch sections, cap per page so one doc can't crowd the list, then take topK.
         const l = scope(o?.locale);
-        // The QUERY tokenizes in the request locale, defaulting to the site's default locale — a
+        // The QUERY tokenizes in the (declared) request locale, else the site's default — a
         // locale-less request on a CJK-default site must segment like its index did.
-        const qLang = o?.locale ?? opts.defaultLocale;
+        const qLang = lang(o?.locale);
         const hits = keywordSearch(kwFor(l), query, topK * 3, undefined, qLang, o?.prefix, o?.navBoost);
         return capPerPage(hits, o?.maxPerPage ?? 3).slice(0, topK);
       },
-      tokensOf: (query, locale) => kwFor(scope(locale)).tokensOf(query, locale ?? opts.defaultLocale),
+      tokensOf: (query, locale) => kwFor(scope(locale)).tokensOf(query, lang(locale)),
     };
   }
   const embedder = opts.embedder;
@@ -392,7 +396,7 @@ export function createSearch(opts: {
     const depth = topK * 4; // over-fetch from each side so RRF has rank signal to fuse
     // Keyword-only fast path (typeahead): BM25 alone, no embed (~200ms) on the request thread.
     const l = scope(o?.locale);
-    const qLang = o?.locale ?? opts.defaultLocale; // query tokenization language (see keyword-only path)
+    const qLang = lang(o?.locale); // query tokenization language (see keyword-only path)
     if (o?.mode === "keyword") {
       const hits = keywordSearch(kwFor(l), query, topK * 3, depth, qLang, o?.prefix, o?.navBoost);
       return capPerPage(hits, maxPerPage).slice(0, topK);
@@ -416,5 +420,5 @@ export function createSearch(opts: {
     return capPerPage(fused, maxPerPage).slice(0, topK);
   };
 
-  return { getKb, search, tokensOf: (query, locale) => kwFor(scope(locale)).tokensOf(query, locale ?? opts.defaultLocale) };
+  return { getKb, search, tokensOf: (query, locale) => kwFor(scope(locale)).tokensOf(query, lang(locale)) };
 }

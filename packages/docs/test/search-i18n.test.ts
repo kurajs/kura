@@ -165,3 +165,14 @@ describe("hybrid scoping (S05/S06)", () => {
   });
 });
 
+
+describe("tokenization-locale normalization (review follow-up)", () => {
+  test("with DECLARED locales, an unknown tag tokenizes as unset (no arbitrary tokenizer-cache keys)", () => {
+    const s = createSearch({ entries: EN, ...I18N });
+    assert.deepEqual(s.tokensOf("向量搜尋引擎", "bogus-tag"), s.tokensOf("向量搜尋引擎", undefined));
+  });
+  test("WITHOUT declarations (legacy callers), the raw locale still drives tokenization", () => {
+    const s = createSearch({ entries: EN });
+    assert.ok(s.tokensOf("向量搜尋引擎", "zh-TW").length >= 2); // CJK segmentation preserved
+  });
+});
