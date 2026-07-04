@@ -43,6 +43,7 @@ export function detectRepo(
   if (!remote) return { url: null, reason: "no git remote detected" };
   const m =
     /^git@github\.com:([^/]+\/[^/]+?)(?:\.git)?$/.exec(remote) ??
+    /^ssh:\/\/git@github\.com\/([^/]+\/[^/]+?)(?:\.git)?\/?$/.exec(remote) ??
     /^https?:\/\/github\.com\/([^/]+\/[^/]+?)(?:\.git)?\/?$/.exec(remote);
   if (m) return { url: `https://github.com/${m[1]}`, reason: "git remote" };
   return { url: null, reason: `non-GitHub remote (${remote.replace(/^[a-z+]+:\/\//i, "").split(/[/:]/)[0]})` };
@@ -77,7 +78,9 @@ export function sourceMapOf(env: Record<string, string | undefined> = process.en
     const parsed = JSON.parse(env.KURA_SOURCE_MAP) as unknown;
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
       const out: SourceMap = {};
-      for (const [k, v] of Object.entries(parsed)) if (typeof v === "string") out[posix(k)] = posix(v).replace(/\/+$/, "");
+      // values are repo-RELATIVE bases: strip accidental leading slashes too, or every mapped
+      // path would come out absolute and poison the blob URLs.
+      for (const [k, v] of Object.entries(parsed)) if (typeof v === "string") out[posix(k)] = posix(v).replace(/^\/+|\/+$/g, "");
       return out;
     }
   } catch {

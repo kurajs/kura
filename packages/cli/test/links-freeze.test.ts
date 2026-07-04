@@ -79,12 +79,12 @@ describe("collectSourcePaths — walk + slug rule + locale mirrors", () => {
   test("default tree + locale mirror, index/README collapse, repo-relative paths", () => {
     const to = repoPathMapper(dir, null, { "content/docs": "docs" });
     const { sourcePaths, localeSourcePaths } = collectSourcePaths(dir, [], new Set(["ja"]), to);
-    assert.deepEqual(sourcePaths, {
+    assert.deepEqual({ ...sourcePaths }, {
       "": "docs/README.md",
       guide: "docs/guide.md",
       "adr/0001-x": "docs/adr/0001-x.md",
     });
-    assert.deepEqual(localeSourcePaths, { ja: { guide: "docs/ja/guide.md" } });
+    assert.deepEqual(JSON.parse(JSON.stringify(localeSourcePaths)), { ja: { guide: "docs/ja/guide.md" } });
   });
   after(() => rmSync(dir, { recursive: true, force: true }));
 });
@@ -170,3 +170,9 @@ describe("collectSourcePaths — prototype-named slugs survive the walk", () => 
     assert.equal(sourcePaths["__proto__"], "docs/__proto__.md");
   });
 });
+
+test("detectRepo: ssh:// remote form parses", () =>
+  assert.equal(detectRepo(undefined, {}, () => "ssh://git@github.com/o/r.git").url, "https://github.com/o/r"));
+
+test("sourceMapOf: leading slashes in values are stripped (bases are repo-relative)", () =>
+  assert.deepEqual(sourceMapOf({ KURA_SOURCE_MAP: '{"content/docs":"/docs/"}' }), { "content/docs": "docs" }));
