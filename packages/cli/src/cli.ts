@@ -625,6 +625,8 @@ switch (cmd) {
     const dargs = ["deploy"];
     for (const f of ["dry-run", "prod", "skip-migrate", "allow-destructive"]) if (flag(f)) dargs.push(`--${f}`);
     const code = await runJune(cwd, dargs);
+    // Static `june deploy` is BUILD-ONLY (deployStatic: no platform CLI; CI publishes dist/static
+    // afterwards) — so copying here completes the local artifact BEFORE anything uploads it.
     if (!code && dcfg.staticTarget) copyContentAssets(cwd, dcfg.contentSources, readFrozenAssetFiles(cwd));
     process.exit(code);
     break;
