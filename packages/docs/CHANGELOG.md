@@ -1,5 +1,11 @@
 # @kurajs/docs
 
+## 0.0.53
+
+### Patch Changes
+
+- [#73](https://github.com/kurajs/kura/pull/73) [`bfc113b`](https://github.com/kurajs/kura/commit/bfc113bf2633d17d82d97761153962baacef259c) Thanks [@linyiru](https://github.com/linyiru)! - Long sidebars reveal the active page on load: the shell's sync script scrolls the sidebar's own container (never the page) so the current item is centered when it is out of view — a full page load no longer resets a long nav to the top. No-ops when the item is already visible (soft-nav keeps its scroll) and on mobile; runs after active-folder expansion so measurements see the final layout.
+
 ## 0.0.52
 
 ### Patch Changes
