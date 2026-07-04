@@ -64,8 +64,8 @@ function setup(opts: InitSearchOptions): void {
         fetch(endpoint, { headers: { accept: "application/json" } }),
       ]);
       if (!res.ok) throw new Error(`search index ${res.status}`);
-      const data = (await res.json()) as { index?: DocLike[] };
-      return createSearch({ entries: data.index ?? [] });
+      const data = (await res.json()) as { index?: DocLike[]; defaultLocale?: string };
+      return createSearch({ entries: data.index ?? [], defaultLocale: data.defaultLocale });
     })());
 
   let tokens: string[] = []; // the engine's matched terms, for exact (CJK-correct) highlight
