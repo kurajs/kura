@@ -80,7 +80,7 @@
       "dependencies": {
         "@junejs/cli": ">=0.0.50 <0.1.0",
         "@kurajs/core": ">=0.0.1 <0.1.0",
-        "@kurajs/docs": ">=0.0.49",
+        "@kurajs/docs": ">=0.0.52",
         "smol-toml": "^1.7.0",
       },
       "devDependencies": {
@@ -89,7 +89,7 @@
         "typescript": "^5.7.0",
       },
       "peerDependencies": {
-        "@kurajs/docs": ">=0.0.49",
+        "@kurajs/docs": ">=0.0.52",
         "@kurajs/transformers": ">=0.0.1 <0.1.0",
       },
       "optionalPeers": [
@@ -1178,6 +1178,8 @@
     "@arethetypeswrong/core/typescript": ["typescript@5.6.1-rc", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-E3b2+1zEFu84jB0YQi9BORDjz9+jGbwwy1Zi3G0LUNw7a7cePUrHMRNy8aPh53nXpkFGVHSxIZo5vKTfYaFiBQ=="],
 
     "@junejs/server/@momiji-rs/sparkdown": ["@momiji-rs/sparkdown@0.0.4", "", {}, "sha512-AVy2A/D623xI+wG1HFpNymrJz6onDQlw3HnkaqyLXSgTEA13LVeFgXNGWBaAl4kR1105I3k/YSOWrihpnF+IXA=="],
+
+    "@kurajs/cli/@kurajs/docs": ["@kurajs/docs@0.0.52", "", { "dependencies": { "@junejs/og": "^0.0.4", "@kurajs/core": ">=0.0.1 <0.1.0", "@kurajs/ctrlk": ">=0.0.3", "@kurajs/search": ">=0.0.2", "@kurajs/tokenizers": ">=0.0.1 <0.1.0", "@mdx-js/mdx": "^3.1.0", "@momiji-rs/sparkdown": "^0.0.6", "@shikijs/rehype": "^4.2.0", "@tailwindcss/typography": "^0.5.20", "remark-gfm": "^4.0.0", "shiki": "^4.2.0" }, "peerDependencies": { "@junejs/core": ">=0.0.48 <0.1.0", "@junejs/db": "*", "react": "^19", "react-dom": "^19" }, "optionalPeers": ["@junejs/core", "@junejs/db", "react", "react-dom"] }, "sha512-XIyUr7+laLi7cp24XhDV9N29bMFAm5CIVV+i1Majs6lOYE5QaxpsJWALFRsLInEe4Rx+vKrOZnOboBgGQKrMJA=="],
 
     "@manypkg/find-root/@types/node": ["@types/node@12.20.55", "", {}, "sha512-J8xLz7q2OFulZ2cyGTLE1TbbZcjpno7FaN6zdJNrgAdrJ+DZzh/uFR6YrTb4C+nXakvud8Q4+rbhoIWlYQbUFQ=="],
 

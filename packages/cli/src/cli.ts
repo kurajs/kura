@@ -10,6 +10,7 @@ import { docsRoute, pruneStaleDocsRoutes } from "./routes.js";
 import { loadCliConfig } from "./config-load.js";
 import { collectMeta, collectLastUpdated, discoverLocales } from "./content-walk.js";
 import { repoRootOf, detectRepo, gitOriginUrl, linkRef, sourceMapOf, repoPathMapper, collectSourcePaths, gitTrackedFiles, collectRepoTargets, renderLinksTs } from "./links-freeze.js";
+import { contentTrees, contentPathMapper, collectImageRefs, renderAssetsTs, copyContentAssets, readFrozenAssetFiles, renderAssetsRoute } from "./assets-freeze.js";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -135,6 +136,35 @@ async function cmdIndex(): Promise<void> {
       console.warn(`kura index: links — no repo path for ${missing.length} doc(s) (${missing.slice(0, 4).join(", ")}${missing.length > 4 ? "…" : ""}); their links use legacy matching only. Outside the git repo? Set KURA_REPO_ROOT / KURA_SOURCE_MAP.`);
     }
   }
+
+  // Frozen content-asset manifest (app/_assets.ts) — ALWAYS written, like _links.ts. Content-tree
+  // coordinates (derivable in isolated builds), corpus-filtered to images docs actually reference.
+  {
+    const trees = contentTrees(cwd, contentSources);
+    const toContentPath = contentPathMapper(trees);
+    const { sourcePaths: contentPaths, localeSourcePaths: localeContentPaths } =
+      collectSourcePaths(cwd, contentSources, declaredLocales, toContentPath);
+    const ownOf = (o: Record<string, string> | undefined, k: string): string | undefined =>
+      o && Object.hasOwn(o, k) ? o[k] : undefined;
+    const files = collectImageRefs(
+      allEntries.map((e) => ({
+        original: e.original,
+        bases: [
+          e.locale ? ownOf(localeContentPaths[e.locale], e.slug) : undefined,
+          ownOf(contentPaths, e.slug),
+        ].filter((b): b is string => b != null),
+      })),
+      trees,
+    );
+    writeIfChanged(path.join(cwd, "app", "_assets.ts"),
+      renderAssetsTs({ contentPaths, localeContentPaths, files }));
+    if (files.length) console.log(`kura index: assets — ${files.length} referenced image(s) frozen`);
+    const clash = DOCS.filter((d) => d.slug === "assets" || d.slug.startsWith("assets/")).map((d) => d.slug);
+    if (clash.length) {
+      console.warn(`kura index: assets — ${clash.length} doc slug(s) under the reserved /assets/ namespace (${clash.slice(0, 3).join(", ")}…): pages there are shadowed by the asset route.`);
+    }
+  }
+
   // Sort keys so the frozen output is deterministic regardless of readdir order (stable writeIfChanged).
   const datesSorted = Object.fromEntries(Object.entries(lastUpdated).sort(([a], [b]) => a.localeCompare(b)));
   writeIfChanged(datesTs,
@@ -447,6 +477,7 @@ function generateJuneConfig(cwd: string): void {
     'import { META, META_LOCALES } from "../../app/_meta";\n' +
     'import { LAST_UPDATED } from "../../app/_dates";\n' +
     'import { LINKS } from "../../app/_links";\n' +
+    'import { ASSETS } from "../../app/_assets";\n' +
     "\nexport const kura = createDocs({\n" +
     "  content: { DOCS, doc, docs },\n" +
     "  mdxHtml: MDX,\n" +
@@ -454,6 +485,7 @@ function generateJuneConfig(cwd: string): void {
     "  metaLocales: META_LOCALES,\n" +
     "  lastUpdated: LAST_UPDATED,\n" +
     "  links: LINKS,\n" +
+    "  assets: ASSETS,\n" +
     "  config: kuraConfig,\n" +
     "});\n",
   );
@@ -502,6 +534,22 @@ function generateJuneConfig(cwd: string): void {
     "export default kura.searchRoute.View;\n",
   );
 
+  // .june/routes/assets/[[...path]]/route.ts — referenced content images, served from disk in
+  // dev (static builds copy them to dist/static/assets/; worker targets 404 — the computed fs
+  // import fails harmlessly and never enters the bundle graph).
+  {
+    const assetsDir = path.join(routesDir, "assets", "[[...path]]");
+    fs.mkdirSync(assetsDir, { recursive: true });
+    const rel = (abs: string) => path.relative(assetsDir, abs).split(path.sep).join("/");
+    const trees = [
+      { root: rel(path.join(cwd, "content", "docs")), mount: "" },
+      ...cfg.contentSources
+        .filter((s2) => s2.collection === "docs")
+        .map((s2) => ({ root: rel(path.resolve(cwd, s2.dir)), mount: s2.mount ?? "" })),
+    ];
+    writeIfChanged(path.join(assetsDir, "route.ts"), HEADER + renderAssetsRoute(trees));
+  }
+
   // .june/routes/og/[[...slug]]/route.ts — OG image (catch-all → nested slugs resolve).
   // Omitted on a static target (no server to render images; og:image tags are dropped too).
   if (!staticTarget) {
@@ -543,23 +591,38 @@ switch (cmd) {
     await freeze(cwd);
     process.exit(await runJune(cwd, ["dev", ...passthrough()]));
     break;
-  case "build":
+  case "build": {
     await freeze(cwd);
-    process.exit(await runJune(cwd, ["build", ...passthrough()]));
+    const code = await runJune(cwd, ["build", ...passthrough()]);
+    const bcfg = loadCliConfig(cwd);
+    if (!code && bcfg.staticTarget) {
+      const n = copyContentAssets(cwd, bcfg.contentSources, readFrozenAssetFiles(cwd));
+      if (n) console.log(`kura build: assets — copied ${n} image(s) to dist/static/assets/`);
+    }
+    process.exit(code);
     break;
+  }
   case "preview": {
     // Build the Worker, then serve it locally with wrangler — a production-faithful preview.
     await freeze(cwd);
     const code = await runJune(cwd, ["build", ...passthrough()]);
     if (code) process.exit(code);
+    const pcfg = loadCliConfig(cwd);
+    if (pcfg.staticTarget) copyContentAssets(cwd, pcfg.contentSources, readFrozenAssetFiles(cwd));
     process.exit(await runWrangler(path.join(cwd, "dist"), ["dev", "worker.js", "--config", "wrangler.jsonc", ...passthrough()]));
     break;
   }
   case "deploy": {
     await freeze(cwd);
+    const dcfg = loadCliConfig(cwd);
+    if (!dcfg.staticTarget && readFrozenAssetFiles(cwd).length) {
+      console.warn("kura deploy: assets — content images are served on static targets only in this version; other targets keep authored srcs.");
+    }
     const dargs = ["deploy"];
     for (const f of ["dry-run", "prod", "skip-migrate", "allow-destructive"]) if (flag(f)) dargs.push(`--${f}`);
-    process.exit(await runJune(cwd, dargs));
+    const code = await runJune(cwd, dargs);
+    if (!code && dcfg.staticTarget) copyContentAssets(cwd, dcfg.contentSources, readFrozenAssetFiles(cwd));
+    process.exit(code);
     break;
   }
   default:
