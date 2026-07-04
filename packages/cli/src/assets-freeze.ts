@@ -132,10 +132,14 @@ export function copyContentAssets(cwd: string, sources: readonly ContentSource[]
   for (const rel of files) {
     const src = contentFileOf(trees, rel);
     if (!src) continue; // vanished since the freeze — skip, never fail the build
-    const dest = path.join(staticDir, "assets", ...rel.split("/"));
-    fs.mkdirSync(path.dirname(dest), { recursive: true });
-    fs.copyFileSync(src, dest);
-    copied++;
+    try {
+      const dest = path.join(staticDir, "assets", ...rel.split("/"));
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.copyFileSync(src, dest);
+      copied++;
+    } catch {
+      /* racing fs / permissions — skip this file, never fail the build */
+    }
   }
   return copied;
 }

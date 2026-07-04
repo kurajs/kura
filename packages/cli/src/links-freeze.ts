@@ -90,11 +90,11 @@ export function sourceMapOf(env: Record<string, string | undefined> = process.en
   return {};
 }
 
-/** Map an absolute file to its repo-relative path: an explicit KURA_SOURCE_MAP tree wins (copied
- *  trees), else relative-to-repo-root when the file is inside it, else undefined (unmappable). */
 /** True when a path.relative result leaves the base (exact segment boundary — "..dots" is a name). */
 const escapesBase = (rel: string): boolean => rel === ".." || rel.startsWith(".." + path.sep) || path.isAbsolute(rel);
 
+/** Map an absolute file to its repo-relative path: an explicit KURA_SOURCE_MAP tree wins (copied
+ *  trees), else relative-to-repo-root when the file is inside it, else undefined (unmappable). */
 export function repoPathMapper(
   cwd: string,
   repoRoot: string | null,

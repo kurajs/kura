@@ -598,10 +598,12 @@ switch (cmd) {
   case "build": {
     await freeze(cwd);
     const code = await runJune(cwd, ["build", ...passthrough()]);
-    const bcfg = loadCliConfig(cwd);
-    if (!code && bcfg.staticTarget) {
-      const n = copyContentAssets(cwd, bcfg.contentSources, readFrozenAssetFiles(cwd));
-      if (n) console.log(`kura build: assets — copied ${n} image(s) to dist/static/assets/`);
+    if (!code) {
+      const bcfg = loadCliConfig(cwd);
+      if (bcfg.staticTarget) {
+        const n = copyContentAssets(cwd, bcfg.contentSources, readFrozenAssetFiles(cwd));
+        if (n) console.log(`kura build: assets — copied ${n} image(s) to dist/static/assets/`);
+      }
     }
     process.exit(code);
     break;
