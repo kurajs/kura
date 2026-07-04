@@ -154,3 +154,19 @@ test("renderLinksTs: a __proto__ slug survives as an own property (JSON.parse, n
   assert.equal(Object.hasOwn(data.sourcePaths, "__proto__"), true);
   assert.equal(Object.getPrototypeOf(data.sourcePaths) === Object.prototype, true);
 });
+
+describe("collectSourcePaths — prototype-named slugs survive the walk", () => {
+  let dir: string;
+  before(() => {
+    dir = mkdtempSync(path.join(tmpdir(), "kura-proto-"));
+    mkdirSync(path.join(dir, "content", "docs"), { recursive: true });
+    writeFileSync(path.join(dir, "content", "docs", "__proto__.md"), "# P\n");
+  });
+  after(() => rmSync(dir, { recursive: true, force: true }));
+  test("__proto__.md lands as an own key", () => {
+    const to = repoPathMapper(dir, null, { "content/docs": "docs" });
+    const { sourcePaths } = collectSourcePaths(dir, [], new Set(), to);
+    assert.equal(Object.hasOwn(sourcePaths, "__proto__"), true);
+    assert.equal(sourcePaths["__proto__"], "docs/__proto__.md");
+  });
+});

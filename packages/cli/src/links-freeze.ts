@@ -120,8 +120,10 @@ export function collectSourcePaths(
   locales: ReadonlySet<string>,
   toRepoPath: (absFile: string) => string | undefined,
 ): { sourcePaths: Record<string, string>; localeSourcePaths: Record<string, Record<string, string>> } {
-  const sourcePaths: Record<string, string> = {};
-  const localeSourcePaths: Record<string, Record<string, string>> = {};
+  // Null-prototype maps: assigning a "__proto__" slug to a plain object silently sets the
+  // prototype (the doc would vanish); with no prototype it is just a key.
+  const sourcePaths: Record<string, string> = Object.create(null);
+  const localeSourcePaths: Record<string, Record<string, string>> = Object.create(null);
   const slugOf = (rel: string) => rel.replace(/\.(md|mdx)$/, "").replace(/(^|\/)(index|README)$/i, "");
   const walk = (dir: string, rel: string, top: boolean, into: Record<string, string>) => {
     if (!fs.existsSync(dir)) return;
@@ -149,7 +151,7 @@ export function collectSourcePaths(
     for (const locale of locales) {
       const mirror = path.join(t.root, locale);
       if (!fs.existsSync(mirror)) continue;
-      localeSourcePaths[locale] ??= {};
+      localeSourcePaths[locale] ??= Object.create(null);
       walk(mirror, t.mount ?? "", false, localeSourcePaths[locale]!);
     }
   }
