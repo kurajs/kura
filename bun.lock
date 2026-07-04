@@ -80,6 +80,7 @@
       "dependencies": {
         "@junejs/cli": ">=0.0.50 <0.1.0",
         "@kurajs/core": ">=0.0.1 <0.1.0",
+        "@kurajs/docs": ">=0.0.47",
         "smol-toml": "^1.7.0",
       },
       "devDependencies": {
