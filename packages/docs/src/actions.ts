@@ -35,11 +35,12 @@ export function docsActions(opts: {
       properties: {
         query: { type: "string", description: "A natural-language question or keywords." },
         topK: { type: "integer", description: "Number of results to return (default 5)." },
+        locale: { type: "string", description: "Optional locale — scopes results to that locale's view (its translations plus untranslated defaults)." },
       },
       required: ["query"],
     },
-    async run(input: { query: string; topK?: number }) {
-      return opts.search.search(input.query, { topK: input.topK ?? 5 });
+    async run(input: { query: string; topK?: number; locale?: string }) {
+      return opts.search.search(input.query, { topK: input.topK ?? 5, locale: input.locale });
     },
   });
 

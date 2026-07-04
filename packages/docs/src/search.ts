@@ -182,7 +182,7 @@ export interface SearchHandle {
 // into the indexed text; a snippet is cut around the first query hit for display.
 type KeywordData = { slug: string; title: string; section: string; body: string; locale?: string; headingId?: string; heading?: string; html?: string };
 
-function buildKeywordIndex(entries: readonly DocLike[], tokenizer: TokenizerResolver): Bm25<KeywordData> {
+function buildKeywordIndex(entries: readonly DocLike[], tokenizer: TokenizerResolver, defaultLocale?: string): Bm25<KeywordData> {
   // One BM25 record per heading-anchored section so a keyword hit ranks (and deep-links to) the
   // most relevant heading, not just the page. The page title + section heading are folded into
   // each record's text, so searching a page's title still surfaces it via its sections.
@@ -197,7 +197,7 @@ function buildKeywordIndex(entries: readonly DocLike[], tokenizer: TokenizerReso
     return secs.map((sec) => ({
       id: `${e.locale ?? "_"}:${e.slug}#${sec.headingId}`,
       text: `${title}\n${sec.heading}\n${sec.text}`,
-      lang: e.locale, // tokenize each doc by its own locale
+      lang: e.locale ?? defaultLocale, // tokenize each doc by its own locale (default-locale entries carry none)
       data: {
         slug: e.slug, title, section, body: sec.text,
         ...(sec.html ? { html: sec.html } : {}),
@@ -313,32 +313,66 @@ export function createSearch(opts: {
   warm?: boolean;
   /** Per-locale keyword tokenizer. Default {@link defaultTokenizer} (CJK via Intl.Segmenter). */
   tokenizer?: TokenizerResolver;
+  /** i18n: the default locale. Locale-less entries/chunks belong to it (tokenization + scoping). */
+  defaultLocale?: string;
+  /** i18n: the merged entry set for a locale (variant-else-default — June's `docs(locale)` lister).
+   *  With it, a search scoped to a locale runs over that locale's own corpus: translated pages match
+   *  in their language, untranslated pages stay findable via the default text. */
+  entriesFor?: (locale: string) => readonly DocLike[];
+  /** i18n: the DECLARED locale tags. Anything else is treated as unset — bounds the per-locale
+   *  index cache (MCP callers pass arbitrary strings) and keeps behavior deterministic. */
+  knownLocales?: readonly string[];
 }): SearchHandle {
   const tokenizer = opts.tokenizer ?? defaultTokenizer();
+  const known = opts.knownLocales?.length ? new Set(opts.knownLocales) : null;
+  // Normalize a requested locale: only declared tags scope the search; unknown/absent → default view.
+  const scope = (l?: string): string | undefined => (l && known?.has(l) ? l : undefined);
+  const entriesOf = (l?: string): readonly DocLike[] =>
+    l && opts.entriesFor ? opts.entriesFor(l) : opts.entries;
+  // One keyword index per SCOPED locale (bounded by knownLocales), built lazily. Key "" = default.
+  const kwCache = new Map<string, Bm25<KeywordData>>();
+  const kwFor = (l?: string): Bm25<KeywordData> => {
+    const key = l ?? "";
+    let idx = kwCache.get(key);
+    if (!idx) kwCache.set(key, (idx = buildKeywordIndex(entriesOf(l), tokenizer, opts.defaultLocale)));
+    return idx;
+  };
+  // Slugs that HAVE a variant in a locale — the merged semantics for chunk filtering: a translated
+  // slug's default-language chunks must not surface in that locale's results.
+  const variantCache = new Map<string, Set<string>>();
+  const variantSlugsFor = (l: string): Set<string> => {
+    let set = variantCache.get(l);
+    if (!set) variantCache.set(l, (set = new Set(entriesOf(l).filter((e) => e.locale === l).map((e) => e.slug))));
+    return set;
+  };
+  /** Keep a chunk in locale `l`'s view: its own variant, or the default text of an untranslated slug. */
+  const inLocaleView = (l: string, chunkLocale: string | undefined, slug: string): boolean =>
+    chunkLocale === l || ((chunkLocale ?? opts.defaultLocale) === opts.defaultLocale && !variantSlugsFor(l).has(slug));
   // No embedder → BM25 keyword mode. The index is built lazily from the bundled
   // entries on first search and cached; building is cheap at docs scale.
   if (!opts.embedder) {
-    let index: Bm25<KeywordData> | null = null;
-    const idx = () => (index ??= buildKeywordIndex(opts.entries, tokenizer));
     return {
       getKb: async () => null,
       search: async (query, o) => {
         const topK = o?.topK ?? 8;
         // Over-fetch sections, cap per page so one doc can't crowd the list, then take topK.
-        const hits = keywordSearch(idx(), query, topK * 3, undefined, o?.locale, o?.prefix, o?.navBoost);
+        const l = scope(o?.locale);
+        // The QUERY tokenizes in the request locale, defaulting to the site's default locale — a
+        // locale-less request on a CJK-default site must segment like its index did.
+        const qLang = o?.locale ?? opts.defaultLocale;
+        const hits = keywordSearch(kwFor(l), query, topK * 3, undefined, qLang, o?.prefix, o?.navBoost);
         return capPerPage(hits, o?.maxPerPage ?? 3).slice(0, topK);
       },
-      tokensOf: (query, locale) => idx().tokensOf(query, locale),
+      tokensOf: (query, locale) => kwFor(scope(locale)).tokensOf(query, locale ?? opts.defaultLocale),
     };
   }
   const embedder = opts.embedder;
   let building: Promise<Kb<SearchData>> | null = null;
-  let keyword: Bm25<KeywordData> | null = null;
   const getKb = () =>
     (building ??= opts.indexBytes?.length
       ? Promise.resolve(Kb.load<SearchData>(opts.indexBytes, { embedder }))
       : indexKb(opts.entries, embedder)); // no/empty index bytes (e.g. --no-embed) → build from entries
-  const getKeyword = () => (keyword ??= buildKeywordIndex(opts.entries, tokenizer));
+  // (per-locale keyword indexes come from kwFor above; `keyword` kept the old single-index slot)
 
   if (opts.warm !== false) {
     // Kick the KB build off in the background so the first real query is fast. GUARDED: createDocs()
@@ -357,13 +391,21 @@ export function createSearch(opts: {
     const maxPerPage = o?.maxPerPage ?? 3;
     const depth = topK * 4; // over-fetch from each side so RRF has rank signal to fuse
     // Keyword-only fast path (typeahead): BM25 alone, no embed (~200ms) on the request thread.
+    const l = scope(o?.locale);
+    const qLang = o?.locale ?? opts.defaultLocale; // query tokenization language (see keyword-only path)
     if (o?.mode === "keyword") {
-      const hits = keywordSearch(getKeyword(), query, topK * 3, depth, o?.locale, o?.prefix, o?.navBoost);
+      const hits = keywordSearch(kwFor(l), query, topK * 3, depth, qLang, o?.prefix, o?.navBoost);
       return capPerPage(hits, maxPerPage).slice(0, topK);
     }
     const kb = await getKb();
-    const semantic = collapseSemantic(await kb.searchText(query, { topK: depth }), o?.locale);
-    const keywordHits = keywordSearch(getKeyword(), query, depth, depth, o?.locale); // caller already over-fetched
+    // Locale scope on the vector side: the frozen index is majority-default-language, so a scoped
+    // query OVER-FETCHES (a flat floor of 64, cheap at docs scale) before filtering — otherwise a
+    // locale's chunks ranked below the unscoped depth cutoff would vanish (recall collapse).
+    const vecDepth = l ? Math.max(depth, 64) : depth;
+    const rawChunks = await kb.searchText(query, { topK: vecDepth });
+    const scoped = l ? rawChunks.filter((h) => inLocaleView(l, h.data.locale, h.data.slug)) : rawChunks;
+    const semantic = collapseSemantic(scoped.slice(0, depth), o?.locale);
+    const keywordHits = keywordSearch(kwFor(l), query, depth, depth, qLang); // caller already over-fetched
     // Hybrid: keyword precision (exact terms) + semantic / cross-lingual recall, fused by
     // rank so BM25 scores and cosine similarities don't need to be comparable. Keyword first
     // so a section found by both lists keeps the query-term snippet; semantic-only hits keep their chunk.
@@ -374,5 +416,5 @@ export function createSearch(opts: {
     return capPerPage(fused, maxPerPage).slice(0, topK);
   };
 
-  return { getKb, search, tokensOf: (query, locale) => getKeyword().tokensOf(query, locale) };
+  return { getKb, search, tokensOf: (query, locale) => kwFor(scope(locale)).tokensOf(query, locale ?? opts.defaultLocale) };
 }

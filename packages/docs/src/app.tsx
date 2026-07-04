@@ -149,7 +149,17 @@ export function createDocs<T extends DocLike>(opts: {
       );
 
   const site: SiteInfo = { name: opts.config.site?.name, brand: opts.config.site?.brand };
-  const search = createSearch({ entries: DOCS, embedder: opts.config.embedder, indexBytes: opts.indexBytes, tokenizer: opts.config.tokenizer });
+  // i18n search scope: the merged variant-else-default set per locale (June's `docs` lister), the
+  // declared tags (bounds per-locale caches), and the default locale (locale-less text belongs to it).
+  const search = createSearch({
+    entries: DOCS,
+    embedder: opts.config.embedder,
+    indexBytes: opts.indexBytes,
+    tokenizer: opts.config.tokenizer,
+    ...(i18n && docs
+      ? { defaultLocale, entriesFor: (l: string) => docs(l), knownLocales: Object.keys(i18n.locales) }
+      : {}),
+  });
   const actions = docsActions({ search, entries: DOCS, doc, sourcePaths: opts.links?.sourcePaths, localeSourcePaths: opts.links?.localeSourcePaths });
 
   // Folder nav metadata for a locale: the default `meta`, with this locale's per-folder overrides
@@ -472,16 +482,32 @@ export function createDocs<T extends DocLike>(opts: {
   // each section's HTML for a rich, formatted preview (tables/code render, no raw markdown syntax).
   // Computed once; titles use the config.nav override so client hits match the sidebar labels. Null
   // on server targets (they query per request), so /search.json stays lean there.
-  const searchCorpus = isStatic
-    ? DOCS.map((e) => ({
-        slug: e.slug,
-        // With LinkData, palette previews carry resolved hrefs too (bound per entry: its own slug
-        // for the source path, its own locale for the URL prefix). Without it, verbatim as before.
-        html: opts.links ? rewriteDocLinks(e.html, docLinkResolver(e.locale ?? defaultLocale, { slug: e.slug, locale: e.locale })) : e.html,
-        data: { title: navTitle.get(e.slug) ?? e.data.title ?? e.slug },
-        ...(e.locale ? { locale: e.locale } : {}),
-      }))
-    : null;
+  // Static search corpus, PER LOCALE: each locale's search.json carries its own merged set
+  // (variant-else-default — the same pages the reader browses), so translated pages match in their
+  // language and untranslated ones stay findable. Without i18n this is exactly the old DOCS map
+  // (docs(undefined) === DOCS by the generated lister), byte-identical. Memoized per locale.
+  const corpusCache = new Map<string, ReturnType<typeof buildCorpus>>();
+  function buildCorpus(locale?: string) {
+    const base = i18n && docs ? docs(locale) : DOCS;
+    return base.map((e) => ({
+      slug: e.slug,
+      // With LinkData, palette previews carry resolved hrefs too. The URL locale is the CORPUS
+      // locale (a fallback entry in the ja corpus must link with the /ja prefix, matching viewOf);
+      // the SOURCE stays the entry's own file (slug + its own locale).
+      html: opts.links
+        ? rewriteDocLinks(e.html, docLinkResolver(locale ?? e.locale ?? defaultLocale, { slug: e.slug, locale: e.locale }))
+        : e.html,
+      data: { title: navTitle.get(e.slug) ?? e.data.title ?? e.slug },
+      ...(e.locale ? { locale: e.locale } : {}),
+    }));
+  }
+  const corpusFor = (locale?: string) => {
+    if (!isStatic) return null;
+    const key = locale ?? "";
+    let c = corpusCache.get(key);
+    if (!c) corpusCache.set(key, (c = buildCorpus(locale)));
+    return c;
+  };
 
   const searchRoute = {
     loader: async (ctx: SearchCtx): Promise<{ q: string; hits: SearchHit[]; tokens: string[]; locale?: string }> => {
@@ -499,7 +525,18 @@ export function createDocs<T extends DocLike>(opts: {
         <SearchResults query={d.q} hits={d.hits} basePath={basePath} labels={labelsFor(d.locale)} href={hrefFor(d.locale)} />
       </main>
     ),
-    json: (d: { q: string; hits: SearchHit[]; tokens: string[] }) => ({ q: d.q, hits: d.hits, tokens: d.tokens, ...(searchCorpus ? { index: searchCorpus } : {}) }),
+    json: (d: { q: string; hits: SearchHit[]; tokens: string[]; locale?: string }) => {
+      const index = corpusFor(d.locale);
+      return {
+        q: d.q,
+        hits: d.hits,
+        tokens: d.tokens,
+        ...(index ? { index } : {}),
+        // The client needs the default locale to tokenize locale-less corpus entries correctly.
+        // i18n sites carry it in EVERY search.json (root included); no-i18n envelopes are unchanged.
+        ...(index && i18n ? { defaultLocale } : {}),
+      };
+    },
     metadata: { title: "Search" },
   };
 
