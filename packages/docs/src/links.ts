@@ -277,26 +277,11 @@ export function resolveLink(
 // The .md/.json projections and the search corpus ship AUTHORED markdown; agents follow its links
 // too. Rewrite inline `[t](target)` and reference definitions `[label]: target` with the SAME
 // resolver, but never inside fenced code blocks or inline code spans (transcripts and examples in
-// real docs contain link-shaped text), and never images (`![](…)` stays authored).
+// real docs contain link-shaped text). Images stay authored UNLESS an asset resolver is bound
+// (`opts.resolveImage`, the content-image pipeline).
 
 const INLINE_LINK = /(!?)\[((?:[^[\]]|\[[^\]]*\])*)\]\(([^()\s]+)((?:[ \t]+"[^"]*")?)\)/g;
 const REF_DEF = /^([ \t]{0,3}\[(?!\^)[^\]]+\]:[ \t]*)(\S+)/;
-
-function rewriteSegment(
-  seg: string,
-  resolve: (href: string) => string | null,
-  resolveImage?: (src: string) => string | null,
-): string {
-  return seg.replace(INLINE_LINK, (m, bang: string, text: string, target: string, title: string) => {
-    if (bang) {
-      // Images stay authored unless an asset resolver is bound (the content-image pipeline).
-      const u = resolveImage?.(target) ?? null;
-      return u == null ? m : `![${text}](${u}${title})`;
-    }
-    const u = resolve(target);
-    return u == null ? m : `[${text}](${u}${title})`;
-  });
-}
 
 /** Rewrite link targets in markdown, fence/code-span aware. Pure; used per agent surface.
  *  `opts.resolveImage` additionally rewrites image targets (absent → images stay authored). */
