@@ -120,13 +120,26 @@ export function buildLinkContext(
   };
 }
 
-// Join an authored relative target onto the linking file's repo directory, pure-POSIX. Returns null
-// when the path escapes the repo root (`../../..` beyond top) — those can't be proven, tier 3.
-// Mid-path ".." and "." segments are normalized ("planning/../SECURITY.md" → "SECURITY.md").
-function repoPathOf(fromPath: string, target: string): string | null {
+/** Join an authored relative target onto the linking file's repo directory, pure-POSIX. Returns
+ *  null when the path escapes the repo root (`../../..` beyond top) — those can't be proven,
+ *  tier 3. Escapes decode PER SEGMENT (an authored %2F can't become a separator), and mid-path
+ *  ".." / "." normalize ("planning/../SECURITY.md" → "SECURITY.md"). Exported for the CLI's
+ *  corpus scan, so candidate extraction and runtime resolution share one implementation. */
+export function resolveRepoPath(fromPath: string, target: string): string | null {
+  const decoded = target
+    .split("/")
+    .map((seg) => {
+      try {
+        const dec = decodeURIComponent(seg); // authored "%20" etc. → the on-disk name
+        return dec.includes("/") ? seg : dec;
+      } catch {
+        return seg; // malformed escape → match the raw spelling
+      }
+    })
+    .join("/");
   const base = fromPath.split("/").slice(0, -1); // dirname
   const out: string[] = [...base];
-  for (const seg of target.split("/")) {
+  for (const seg of decoded.split("/")) {
     if (seg === "" || seg === ".") continue;
     if (seg === "..") {
       if (out.length === 0) return null; // escapes the repo
@@ -161,20 +174,7 @@ export function resolveLink(
   // Path tiers — only for relative targets with a known source location. Site-absolute hrefs
   // ("/guide.md") keep their historical legacy treatment (leading slashes stripped there).
   if (fromPath && ctx.slugByPath && !rawPath.startsWith("/")) {
-    // Decode PER SEGMENT so an escape can't change path boundaries (an authored %2F must not
-    // become a separator); a segment whose decode introduces "/" keeps its raw spelling.
-    const p = rawPath
-      .split("/")
-      .map((seg) => {
-        try {
-          const dec = decodeURIComponent(seg); // authored "%20" etc. → the on-disk name
-          return dec.includes("/") ? seg : dec;
-        } catch {
-          return seg; // malformed escape → match the raw spelling
-        }
-      })
-      .join("/");
-    const norm = repoPathOf(fromPath, p);
+    const norm = resolveRepoPath(fromPath, rawPath);
     if (norm != null) {
       // tier 1: the target IS a page on this site (file path first, then folder page).
       const slug = ctx.slugByPath.get(norm) ?? ctx.dirSlugByPath?.get(norm);
