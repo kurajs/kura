@@ -1,5 +1,11 @@
 # @kurajs/docs
 
+## 0.0.49
+
+### Patch Changes
+
+- [#61](https://github.com/kurajs/kura/pull/61) [`27b1e0a`](https://github.com/kurajs/kura/commit/27b1e0a9e449579355712b3514e995154969e465) Thanks [@linyiru](https://github.com/linyiru)! - Own-key lookups for the frozen link maps: a slug named like an Object.prototype member ("toString", "constructor") now misses cleanly instead of resolving an inherited function.
+
 ## 0.0.48
 
 ### Patch Changes
