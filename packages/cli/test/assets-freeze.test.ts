@@ -169,3 +169,8 @@ test("a ..-segment contentRel never even stats outside the tree root", () => {
   writeFileSync(path.join(dir, "outside.png"), "X");
   assert.equal(contentFileOf(contentTrees(dir, []), "../outside.png"), null);
 });
+
+test("the generated route rejects traversal segments regardless of the manifest", () => {
+  const route = renderAssetsRoute([{ root: "../../../../content/docs", mount: "" }]);
+  assert.match(route, /s === "\.\."/);
+});

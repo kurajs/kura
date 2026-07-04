@@ -160,7 +160,8 @@ export function renderAssetsRoute(relTreesFromRouteDir: readonly { root: string;
     "const FILES = new Set(ASSETS.files);\n" +
     "export default async (_req: Request, ctx: { params: Record<string, string | undefined> }): Promise<Response> => {\n" +
     "  const rel = ctx.params.path ?? \"\";\n" +
-    "  if (!FILES.has(rel)) return new Response(null, { status: 404 });\n" +
+    "  // defense in depth: even a poisoned manifest entry can't traverse out\n" +
+    "  if (rel.split(\"/\").some((s) => s === \"..\" || s === \"\") || !FILES.has(rel)) return new Response(null, { status: 404 });\n" +
     "  try {\n" +
     "    const fsMod = \"node:fs/promises\";\n" +
     "    const { readFile } = await import(/* @vite-ignore */ fsMod); // computed: stays out of worker graphs\n" +
