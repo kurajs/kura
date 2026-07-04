@@ -389,3 +389,9 @@ describe("content assets (images) — I21-I26", () => {
     assert.ok(out.includes("```\n![q](./images/01-001.png)\n```")); // fence untouched
   });
 });
+
+test("asset src with a fragment (SVG sprite) resolves the path and keeps the fragment", () => {
+  const ctx = buildAssetContext({ contentPaths: { page: "page.md" }, files: ["icons.svg"] })!;
+  assert.equal(resolveAsset("./icons.svg#logo", { slug: "page" }, ctx, (r) => "/assets/" + r), "/assets/icons.svg#logo");
+  assert.equal(resolveAsset("./missing.svg#logo", { slug: "page" }, ctx, (r) => "/assets/" + r), null);
+});

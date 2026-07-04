@@ -100,13 +100,19 @@ export function resolveAsset(
 ): string | null {
   if (/^[a-z][a-z0-9+.-]*:/i.test(src) || src.startsWith("//") || src.startsWith("/") || src.startsWith("#") || src === "")
     return null; // schemes (incl. data:), protocol-relative, site-absolute, anchors: authored
+  // A fragment travels with the URL, not the file: "./icons.svg#logo" (SVG sprites) must resolve
+  // the PATH against the oracle and re-append "#logo" to the rewritten src.
+  const hashAt = src.indexOf("#");
+  const path = hashAt >= 0 ? src.slice(0, hashAt) : src;
+  const hash = hashAt >= 0 ? src.slice(hashAt) : "";
+  if (path === "") return null;
   const bases = [
     entry.locale ? own(ctx.localeContentPaths?.[entry.locale], entry.slug) : undefined,
     own(ctx.contentPaths, entry.slug),
   ].filter((b): b is string => b != null);
   for (const base of bases) {
-    const cand = resolveRepoPath(base, src); // same pure path join + per-segment decoding
-    if (cand != null && ctx.files.has(cand)) return toAssetHref(cand);
+    const cand = resolveRepoPath(base, path); // same pure path join + per-segment decoding
+    if (cand != null && ctx.files.has(cand)) return toAssetHref(cand) + hash;
   }
   return null;
 }
