@@ -308,3 +308,16 @@ test("a slug named like an Object.prototype member misses cleanly in the frozen 
   // must fall through the path tiers (and legacy) instead of resolving an inherited function.
   assert.equal(r("toString.md", "API"), null);
 });
+
+describe("link TEXT containing code spans (the rustbgpd .toml shape)", () => {
+  const resolve = (h: string): string | null =>
+    h.startsWith("../") ? "https://github.com/o/r/blob/HEAD/" + h.slice(3) : null;
+  test("[`file`](../file) rewrites — a code-span TEXT does not disqualify the link", () =>
+    assert.equal(
+      rewriteMarkdownLinks("See [`tests/x.toml`](../tests/x.toml) and [`KNOWN_ISSUES.md`](../KNOWN_ISSUES.md).", resolve),
+      "See [`tests/x.toml`](https://github.com/o/r/blob/HEAD/tests/x.toml) and [`KNOWN_ISSUES.md`](https://github.com/o/r/blob/HEAD/KNOWN_ISSUES.md).",
+    ));
+  test("a quoted example fully inside a span still stays verbatim", () =>
+    assert.equal(rewriteMarkdownLinks("Use `[x](../real.md)` then [x](../real.md)", resolve),
+      "Use `[x](../real.md)` then [x](https://github.com/o/r/blob/HEAD/real.md)"));
+});
