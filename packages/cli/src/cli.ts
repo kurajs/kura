@@ -9,6 +9,7 @@ import { buildIndex } from "@kurajs/docs/search";
 import { docsRoute, pruneStaleDocsRoutes } from "./routes.js";
 import { loadCliConfig } from "./config-load.js";
 import { collectMeta, collectLastUpdated, discoverLocales } from "./content-walk.js";
+import { repoRootOf, detectRepo, gitOriginUrl, linkRef, sourceMapOf, repoPathMapper, collectSourcePaths, gitTrackedFiles, collectRepoTargets, renderLinksTs } from "./links-freeze.js";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -96,6 +97,42 @@ async function cmdIndex(): Promise<void> {
     console.log(`kura index: lastUpdated — ${Object.keys(lastUpdated).length} git date(s), ${DOCS.length - missing.length}/${DOCS.length} docs covered`);
     if (missing.length) {
       console.warn(`kura index: lastUpdated — no git date for ${missing.length} doc(s) (${missing.slice(0, 4).join(", ")}${missing.length > 4 ? "…" : ""}). Uncommitted, or a shallow CI clone — set checkout fetch-depth: 0.`);
+    }
+  }
+
+  // Frozen link-resolution data (app/_links.ts) — ALWAYS written, like _dates.ts, so the generated
+  // _kura.ts can import it unconditionally. Source paths let each page resolve authored links from
+  // its own file; the repo oracle is corpus-filtered (only targets links actually reach).
+  {
+    const repoRoot = repoRootOf(cwd);
+    const toRepoPath = repoPathMapper(cwd, repoRoot, sourceMapOf());
+    const { sourcePaths, localeSourcePaths } = collectSourcePaths(cwd, contentSources, declaredLocales, toRepoPath);
+    // The remote lookup runs where the repo actually is — the checkout root when the build tree
+    // is a copy (KURA_REPO_ROOT), else the project cwd.
+    const { url: repoUrl, reason } = detectRepo(cfg.repo, process.env, () => gitOriginUrl(repoRoot ?? cwd));
+    let repoFiles: string[] = [];
+    let repoDirs: string[] = [];
+    let oracleNote = "";
+    if (repoUrl && repoRoot) {
+      const tracked = gitTrackedFiles(repoRoot);
+      if (tracked) {
+        const own = (o: Record<string, string> | undefined, k: string): string | undefined =>
+          o && Object.hasOwn(o, k) ? o[k] : undefined; // plain objects: a "toString" slug must miss cleanly
+        const fromOf = (e: Entry): string | undefined =>
+          (e.locale ? own(localeSourcePaths[e.locale], e.slug) : undefined) ?? own(sourcePaths, e.slug);
+        const targets = collectRepoTargets(allEntries.map((e) => ({ original: e.original, fromPath: fromOf(e) })), tracked);
+        repoFiles = targets.repoFiles;
+        repoDirs = targets.repoDirs;
+        oracleNote = `, ${repoFiles.length + repoDirs.length} repo target(s)`;
+      } else oracleNote = ", repo oracle off (git ls-files failed)";
+    }
+    writeIfChanged(path.join(cwd, "app", "_links.ts"),
+      renderLinksTs({ repoUrl, ref: linkRef(), sourcePaths, localeSourcePaths, repoFiles, repoDirs }));
+    const covered = DOCS.filter((d) => Object.hasOwn(sourcePaths, d.slug)).length;
+    console.log(`kura index: links — repo=${repoUrl ?? `none (${reason})`}, sourcePaths cover ${covered}/${DOCS.length} docs${oracleNote}`);
+    if (covered < DOCS.length) {
+      const missing = DOCS.filter((d) => !Object.hasOwn(sourcePaths, d.slug)).map((d) => d.slug);
+      console.warn(`kura index: links — no repo path for ${missing.length} doc(s) (${missing.slice(0, 4).join(", ")}${missing.length > 4 ? "…" : ""}); their links use legacy matching only. Outside the git repo? Set KURA_REPO_ROOT / KURA_SOURCE_MAP.`);
     }
   }
   // Sort keys so the frozen output is deterministic regardless of readdir order (stable writeIfChanged).
@@ -409,12 +446,14 @@ function generateJuneConfig(cwd: string): void {
     'import { MDX } from "../../app/_mdx";\n' +
     'import { META, META_LOCALES } from "../../app/_meta";\n' +
     'import { LAST_UPDATED } from "../../app/_dates";\n' +
+    'import { LINKS } from "../../app/_links";\n' +
     "\nexport const kura = createDocs({\n" +
     "  content: { DOCS, doc, docs },\n" +
     "  mdxHtml: MDX,\n" +
     "  meta: META,\n" +
     "  metaLocales: META_LOCALES,\n" +
     "  lastUpdated: LAST_UPDATED,\n" +
+    "  links: LINKS,\n" +
     "  config: kuraConfig,\n" +
     "});\n",
   );

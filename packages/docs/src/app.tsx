@@ -129,11 +129,15 @@ export function createDocs<T extends DocLike>(opts: {
   // The SOURCE is the entry actually rendered: a locale variant lives one directory deeper
   // (content/docs/<locale>/…), so it must resolve relative links from its OWN path — the default
   // path only when no variant path is frozen (fallback entries ARE the default file).
+  // Own-key lookups only: the frozen maps are plain objects, and a slug like "toString" or
+  // "constructor" must miss cleanly instead of returning an inherited function.
+  const own = (o: Record<string, string> | undefined, k: string): string | undefined =>
+    o && Object.hasOwn(o, k) ? o[k] : undefined;
   const fromPathOf = (src?: { slug: string; locale?: string }): string | undefined =>
     src === undefined
       ? undefined
-      : (src.locale ? opts.links?.localeSourcePaths?.[src.locale]?.[src.slug] : undefined) ??
-        opts.links?.sourcePaths[src.slug];
+      : (src.locale ? own(opts.links?.localeSourcePaths?.[src.locale], src.slug) : undefined) ??
+        own(opts.links?.sourcePaths, src.slug);
   // `locale` localizes the emitted URL; `src` locates the linking file; `flavor` picks the tier-1
   // target shape: the rendered page for HTML, the sibling `.md` projection for agent-facing
   // markdown surfaces (an agent crawling markdown stays in markdown).

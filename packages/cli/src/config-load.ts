@@ -27,6 +27,7 @@ export type CliConfig = {
   basePathSegments: string[]; // where the docs catch-all route is placed
   hasNav: boolean; // config.nav (virtual navigation) present
   lastUpdated: boolean; // show a git-derived "Last updated on …" line per page
+  repo?: string | false; // pins the repo for link fallback ("owner/name"|url); false disables it
   siteName?: string; // [site].name — used for the default landing page (toml projects)
   siteDescription?: string;
   raw?: Record<string, unknown>; // the parsed kura.toml — materialized into .june/kura.gen.ts
@@ -62,6 +63,7 @@ export function loadCliConfig(cwd: string): CliConfig {
       basePathSegments: basePathToSegments(raw.base_path as string | undefined),
       hasNav: !!raw.nav,
       lastUpdated: raw.last_updated === true,
+      ...(raw.repo === false || typeof raw.repo === "string" ? { repo: raw.repo } : {}),
     };
   }
   const cfgPath = path.join(cwd, "kura.config.ts");
@@ -79,5 +81,11 @@ export function loadCliConfig(cwd: string): CliConfig {
     basePathSegments: parseBasePath(txt),
     hasNav: /\bnav\s*:\s*\{/.test(txt),
     lastUpdated: /\blastUpdated\s*:\s*true\b/.test(txt),
+    ...(() => {
+      // repo: false | "owner/name" | "https://…" — read as TEXT like the other fields.
+      const m = /\brepo\s*:\s*(false|"([^"]*)"|'([^']*)')/.exec(txt);
+      if (!m) return {};
+      return { repo: m[1] === "false" ? (false as const) : (m[2] ?? m[3])! };
+    })(),
   };
 }
