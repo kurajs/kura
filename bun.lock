@@ -131,6 +131,7 @@
         "@junejs/core": ">=0.0.48 <0.1.0",
         "@types/react": "^19.2.0",
         "@types/react-dom": "^19.2.0",
+        "happy-dom": "^20.10.6",
         "react": "^19.2.0",
         "react-dom": "^19.2.0",
         "typescript": "^5.7.0",
