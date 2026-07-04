@@ -9,6 +9,9 @@ import {
   rewriteMarkdownLinks,
   buildLinkContext,
   normalizeRepoUrl,
+  buildAssetContext,
+  resolveAsset,
+  rewriteImgSrcs,
   type LinkData,
 } from "../src/links.ts";
 import type { DocLike } from "../src/nav.ts";
@@ -320,4 +323,69 @@ describe("link TEXT containing code spans (the rustbgpd .toml shape)", () => {
   test("a quoted example fully inside a span still stays verbatim", () =>
     assert.equal(rewriteMarkdownLinks("Use `[x](../real.md)` then [x](../real.md)", resolve),
       "Use `[x](../real.md)` then [x](https://github.com/o/r/blob/HEAD/real.md)"));
+});
+
+describe("content assets (images) — I21-I26", () => {
+  const ACTX = buildAssetContext({
+    contentPaths: {
+      "user-guide/01-getting-started": "user-guide/01-getting-started.md",
+      "user-guide": "user-guide/README.md",
+      reference: "reference.md",
+    },
+    localeContentPaths: { "zh-cn": { "user-guide/01-getting-started": "zh-cn/user-guide/01-getting-started.md" } },
+    files: ["user-guide/images/01-001.png", "shared/logo.svg"],
+  })!;
+  const toHref = (rel: string) => "/assets/" + rel;
+  const toHrefPrefixed = (rel: string) => "/mc/assets/" + rel;
+
+  test("I21 same-dir image resolves to the absolute asset URL (deploy prefix via the href builder)", () => {
+    assert.equal(
+      resolveAsset("./images/01-001.png", { slug: "user-guide/01-getting-started" }, ACTX, toHref),
+      "/assets/user-guide/images/01-001.png",
+    );
+    assert.equal(
+      resolveAsset("images/01-001.png", { slug: "user-guide/01-getting-started" }, ACTX, toHrefPrefixed),
+      "/mc/assets/user-guide/images/01-001.png",
+    );
+  });
+  test("I22 variant two-step: the zh mirror's ../images ref falls back to the DEFAULT tree", () => {
+    // From zh-cn/user-guide/x.md, "../images/…" is zh-cn/images/… (missing); the default entry's
+    // path (user-guide/x.md) resolves it to user-guide/images/… (present).
+    assert.equal(
+      resolveAsset("./images/01-001.png", { slug: "user-guide/01-getting-started", locale: "zh-cn" }, ACTX, toHref),
+      "/assets/user-guide/images/01-001.png",
+    );
+  });
+  test("I23 collapsed README entry resolves from its folder; a root-level doc from the root", () => {
+    assert.equal(resolveAsset("images/01-001.png", { slug: "user-guide" }, ACTX, toHref), "/assets/user-guide/images/01-001.png");
+    assert.equal(resolveAsset("shared/logo.svg", { slug: "reference" }, ACTX, toHref), "/assets/shared/logo.svg");
+  });
+  test("I25 declines: schemes, data:, protocol-relative, site-absolute, unknown files — authored", () => {
+    for (const src of ["https://x/y.png", "data:image/png;base64,xx", "//cdn/y.png", "/abs.png", "./missing.png", ""]) {
+      assert.equal(resolveAsset(src, { slug: "user-guide/01-getting-started" }, ACTX, toHref), null, src);
+    }
+  });
+  test("I24 byte-parity gate: an empty manifest builds NO context", () => {
+    assert.equal(buildAssetContext({ contentPaths: {}, files: [] }), undefined);
+    assert.equal(buildAssetContext(undefined), undefined);
+  });
+  test("rewriteImgSrcs rewrites only <img src>, leaves misses byte-identical", () => {
+    const html = '<img src="./images/01-001.png" alt="x"><img src="https://cdn/y.png"><a href="./images/01-001.png">dl</a>';
+    const out = rewriteImgSrcs(html, (s) =>
+      resolveAsset(s, { slug: "user-guide/01-getting-started" }, ACTX, toHref),
+    );
+    assert.ok(out.includes('src="/assets/user-guide/images/01-001.png"'));
+    assert.ok(out.includes('src="https://cdn/y.png"')); // declined stays authored
+    assert.ok(out.includes('href="./images/01-001.png"')); // <a> untouched by the img pass
+  });
+  test("I26 markdown images rewrite ONLY when the asset resolver is bound (pinned default intact)", () => {
+    const md = "![shot](./images/01-001.png) and ![ext](https://cdn/y.png)\n```\n![q](./images/01-001.png)\n```";
+    const resolve = () => null;
+    const img = (s: string) => resolveAsset(s, { slug: "user-guide/01-getting-started" }, ACTX, toHref);
+    assert.equal(rewriteMarkdownLinks(md, resolve), md); // no resolver → byte-identical
+    const out = rewriteMarkdownLinks(md, resolve, { resolveImage: img });
+    assert.ok(out.includes("![shot](/assets/user-guide/images/01-001.png)"));
+    assert.ok(out.includes("![ext](https://cdn/y.png)"));
+    assert.ok(out.includes("```\n![q](./images/01-001.png)\n```")); // fence untouched
+  });
 });

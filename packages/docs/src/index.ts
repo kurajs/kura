@@ -9,5 +9,5 @@ export { createSearch, buildIndex, chunk } from "./search.ts";
 export type { SearchData, SearchHit, SearchHandle } from "./search.ts";
 export { createDocs } from "./app.tsx";
 export { stripMdx } from "./util.ts";
-export { resolveLink, rewriteMarkdownLinks, buildLinkContext, legacyMaps, normalizeRepoUrl, resolveRepoPath } from "./links.ts";
-export type { LinkData, LinkContext } from "./links.ts";
+export { resolveLink, rewriteMarkdownLinks, buildLinkContext, legacyMaps, normalizeRepoUrl, resolveRepoPath, buildAssetContext, resolveAsset, rewriteImgSrcs } from "./links.ts";
+export type { LinkData, LinkContext, AssetData, AssetContext } from "./links.ts";

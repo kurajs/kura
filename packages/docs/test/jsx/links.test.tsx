@@ -63,3 +63,27 @@ test("with frozen LinkData: tier 2 sends a pruned-doc link to the repo blob, tie
   expect(html).toContain('href="https://github.com/o/r/blob/abc123/docs/RECEIPTS.md#keep"');
   expect(html).toContain('href="/openab/docs/features/search/semantic"');
 });
+
+test("T7/I27 assets: rendered html + static corpus rewrite <img> to /assets/…; absent manifest is byte-identical", () => {
+  const DOCS_IMG = DOCS.map((e) =>
+    e.slug === "features/search" ? { ...e, html: '<p><img src="./images/shot.png" alt="s"></p>' } : e,
+  );
+  const content = {
+    DOCS: DOCS_IMG as never,
+    doc: ((s: string) => DOCS_IMG.find((d) => d.slug === s) ?? null) as never,
+  };
+  const cfg = { basePath: "", deploy: { target: "github-pages", basePath: "/mc" } } as never;
+  const assets = {
+    contentPaths: { "features/search": "features/search/index.md" },
+    files: ["features/search/images/shot.png"],
+  };
+  const withAssets = createDocs({ content, config: cfg, assets });
+  const html = (withAssets.docRoute.loader({ params: { slug: "features/search" } } as never) as { doc: { html: string } }).doc.html;
+  expect(html).toContain('src="/mc/assets/features/search/images/shot.png"');
+  const corpus = (withAssets.searchRoute.json({ q: "", hits: [], tokens: [] }) as { index?: { slug: string; html: string }[] }).index!;
+  expect(corpus.find((e) => e.slug === "features/search")!.html).toContain("/mc/assets/features/search/images/shot.png");
+  // byte-parity without the manifest
+  const plain = createDocs({ content, config: cfg });
+  const html2 = (plain.docRoute.loader({ params: { slug: "features/search" } } as never) as { doc: { html: string } }).doc.html;
+  expect(html2).toContain('src="./images/shot.png"');
+});

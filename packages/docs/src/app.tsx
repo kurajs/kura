@@ -14,7 +14,7 @@ import { docsActions } from "./actions.ts";
 import { DocsLayoutShell, DocBody, SearchResults, type SiteInfo, type SidebarGroup, type SidebarNode, type DocView, type Href, type LocaleLink, type TabLink, type NavTab } from "./ui.tsx";
 import type { KuraConfig } from "./config.ts";
 import { resolveLabels, pickLabel, type Labels } from "./labels.ts";
-import { buildLinkContext, resolveLink, rewriteMarkdownLinks, type LinkData } from "./links.ts";
+import { buildLinkContext, resolveLink, rewriteMarkdownLinks, buildAssetContext, resolveAsset, rewriteImgSrcs, type LinkData, type AssetData } from "./links.ts";
 import { localeHref, type I18nConfig } from "@junejs/core/i18n";
 import { JuneOutlet } from "@junejs/core/outlet";
 import { currentLocale } from "@junejs/db";
@@ -57,6 +57,9 @@ export function createDocs<T extends DocLike>(opts: {
    *  `kura index`. Absent (older CLI / direct callers) → link handling is byte-identical to the
    *  legacy slug/basename matching. See links.ts. */
   links?: LinkData;
+  /** Frozen content-asset manifest (referenced images), from app/_assets.ts by `kura index`.
+   *  Absent or empty → image handling is byte-identical (srcs stay authored). See links.ts. */
+  assets?: AssetData;
 }) {
   const { DOCS, doc, docs } = opts.content;
   // embedder is OPTIONAL: with one, search is semantic (over the frozen index); without one,
@@ -147,6 +150,26 @@ export function createDocs<T extends DocLike>(opts: {
       resolveLink(href, fromPathOf(src), linkCtx, (slug) =>
         hrefFor(locale)(flavor === "md" ? docPath(basePath, `${slug}.md`) : docPath(basePath, slug)),
       );
+  // Content assets (images). URLs are language-less and mount-less: deployPrefix + /assets/<content-
+  // relative path> — locale mirrors share the default tree's files, and /assets/ is a reserved
+  // namespace (file extensions also keep it disjoint from page URLs). Inert without a frozen manifest.
+  const assetCtx = buildAssetContext(opts.assets);
+  const toAssetHref = (rel: string): string =>
+    deployPrefix + "/assets/" + rel.split("/").map(encodeURIComponent).join("/");
+  const assetResolverFor = (entry: { slug: string; locale?: string }) => (src: string): string | null =>
+    assetCtx ? resolveAsset(src, entry, assetCtx, toAssetHref) : null;
+  // An <a href> pointing at an on-site-copied asset goes to the SITE copy, not the repo blob: the
+  // asset resolver runs first, then the normal 3-tier link resolution.
+  const contentLinkResolver = (
+    locale?: string,
+    src?: { slug: string; locale?: string },
+    flavor: "html" | "md" = "html",
+  ): ((href: string) => string | null) => {
+    const links = docLinkResolver(locale, src, flavor);
+    if (!assetCtx || !src) return links;
+    const asset = assetResolverFor(src);
+    return (href) => asset(href) ?? links(href);
+  };
 
   const site: SiteInfo = { name: opts.config.site?.name, brand: opts.config.site?.brand };
   // i18n search scope: the merged variant-else-default set per locale (June's `docs` lister), the
@@ -350,7 +373,9 @@ export function createDocs<T extends DocLike>(opts: {
 
   const viewOf = (e: T, locale?: string): DocView => {
     const { html: anchored, toc } = processHtml(mdxFor(e));
-    const html = rewriteDocLinks(anchored, docLinkResolver(locale, { slug: e.slug, locale: e.locale })); // repo-relative links → doc/repo URLs
+    const entrySrc = { slug: e.slug, locale: e.locale };
+    let html = rewriteDocLinks(anchored, contentLinkResolver(locale, entrySrc)); // repo-relative links → doc/repo/asset URLs
+    if (assetCtx) html = rewriteImgSrcs(html, assetResolverFor(entrySrc)); // content images → /assets/…
     const { prev, next } = prevNextOf(e.slug, locale);
     // A non-default locale that resolved to a non-variant entry fell back to default.
     const notTranslated = !!(locale && defaultLocale && locale !== defaultLocale && e.locale !== locale);
@@ -399,8 +424,15 @@ export function createDocs<T extends DocLike>(opts: {
   // Agent-facing markdown: with LinkData, rewrite authored link targets with the same resolver
   // (md flavor — tier 1 lands on the sibling .md projections; fences/code spans stay untouched).
   // Without it, verbatim as before.
-  const agentMd = (raw: string, e: { slug: string; locale?: string }, urlLocale?: string): string =>
-    opts.links ? rewriteMarkdownLinks(raw, docLinkResolver(urlLocale, { slug: e.slug, locale: e.locale }, "md")) : raw;
+  const agentMd = (raw: string, e: { slug: string; locale?: string }, urlLocale?: string): string => {
+    if (!opts.links && !assetCtx) return raw;
+    const entrySrc = { slug: e.slug, locale: e.locale };
+    // Without LinkData, only IMAGES rewrite (link handling stays raw, exactly as before assets).
+    const linkResolve = opts.links ? contentLinkResolver(urlLocale, entrySrc, "md") : () => null;
+    return rewriteMarkdownLinks(raw, linkResolve, {
+      ...(assetCtx ? { resolveImage: assetResolverFor(entrySrc) } : {}),
+    });
+  };
   const md = (d: DocPage) => {
     const e = doc(d.doc.slug, d.locale);
     return e ? agentMd(stripMdx(e.original ?? ""), { slug: d.doc.slug, locale: e.locale }, d.locale) : "";
@@ -494,9 +526,12 @@ export function createDocs<T extends DocLike>(opts: {
       // With LinkData, palette previews carry resolved hrefs too. The URL locale is the CORPUS
       // locale (a fallback entry in the ja corpus must link with the /ja prefix, matching viewOf);
       // the SOURCE stays the entry's own file (slug + its own locale).
-      html: opts.links
-        ? rewriteDocLinks(e.html, docLinkResolver(locale ?? e.locale ?? defaultLocale, { slug: e.slug, locale: e.locale }))
-        : e.html,
+      html: (() => {
+        const entrySrc = { slug: e.slug, locale: e.locale };
+        let h = opts.links ? rewriteDocLinks(e.html, contentLinkResolver(locale ?? e.locale ?? defaultLocale, entrySrc)) : e.html;
+        if (assetCtx) h = rewriteImgSrcs(h, assetResolverFor(entrySrc)); // ctrlk previews render <img>
+        return h;
+      })(),
       data: { title: navTitle.get(e.slug) ?? e.data.title ?? e.slug },
       ...(e.locale ? { locale: e.locale } : {}),
     }));
