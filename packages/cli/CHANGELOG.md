@@ -1,5 +1,14 @@
 # @kurajs/cli
 
+## 0.0.27
+
+### Patch Changes
+
+- [#61](https://github.com/kurajs/kura/pull/61) [`e2dbc15`](https://github.com/kurajs/kura/commit/e2dbc15c1ed9641998575a5850df871ad44e6ae6) Thanks [@linyiru](https://github.com/linyiru)! - `kura index` freezes app/\_links.ts — the LinkData behind the 3-tier link resolver: per-doc repo-relative source paths (default tree + locale mirrors; KURA_REPO_ROOT/KURA_SOURCE_MAP for copied-tree builds), the detected repo URL (config `repo` > GITHUB_REPOSITORY > the GitHub origin remote, read at the repo root) with the exact CI sha as the ref, and a corpus-filtered git-tracked oracle (only targets authored links reach). The generated \_kura.ts passes `links` into createDocs, and every `kura index` prints a one-line status (repo, coverage X/Y, target count). Requires @kurajs/docs >=0.0.48 (the ./links subpath).
+
+- Updated dependencies [[`27b1e0a`](https://github.com/kurajs/kura/commit/27b1e0a9e449579355712b3514e995154969e465)]:
+  - @kurajs/docs@0.0.49
+
 ## 0.0.26
 
 ### Patch Changes
