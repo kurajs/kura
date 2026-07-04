@@ -2,7 +2,7 @@
 // copy, and the generated dev route's bundle safety. mkdtemp fixture pattern from links-freeze.
 import { test, describe, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync, existsSync, readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync, existsSync, readFileSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import {
@@ -131,7 +131,6 @@ describe("review follow-ups", () => {
     writeFileSync(outside, "SECRET");
     const link = path.join(dir, "content", "docs", "user-guide", "images", "leak.png");
     try {
-      const { symlinkSync } = require("node:fs") as typeof import("node:fs");
       symlinkSync(outside, link);
     } catch {
       return; // symlinks unavailable on this fs — nothing to assert

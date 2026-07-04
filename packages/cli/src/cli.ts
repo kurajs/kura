@@ -146,16 +146,21 @@ async function cmdIndex(): Promise<void> {
       collectSourcePaths(cwd, contentSources, declaredLocales, toContentPath);
     const ownOf = (o: Record<string, string> | undefined, k: string): string | undefined =>
       o && Object.hasOwn(o, k) ? o[k] : undefined;
-    const files = collectImageRefs(
-      allEntries.map((e) => ({
-        original: e.original,
-        bases: [
-          e.locale ? ownOf(localeContentPaths[e.locale], e.slug) : undefined,
-          ownOf(contentPaths, e.slug),
-        ].filter((b): b is string => b != null),
-      })),
-      trees,
-    );
+    // Image serving is STATIC-target-only in this version (the copy step + on-disk files). On
+    // other targets the manifest freezes EMPTY, so the docs-side rewrites stay inert and pages
+    // keep their authored srcs — matching the deploy-time note.
+    const files = cfg.staticTarget
+      ? collectImageRefs(
+          allEntries.map((e) => ({
+            original: e.original,
+            bases: [
+              e.locale ? ownOf(localeContentPaths[e.locale], e.slug) : undefined,
+              ownOf(contentPaths, e.slug),
+            ].filter((b): b is string => b != null),
+          })),
+          trees,
+        )
+      : [];
     writeIfChanged(path.join(cwd, "app", "_assets.ts"),
       renderAssetsTs({ contentPaths, localeContentPaths, files }));
     if (files.length) console.log(`kura index: assets — ${files.length} referenced image(s) frozen`);
