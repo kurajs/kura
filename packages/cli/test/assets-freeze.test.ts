@@ -152,3 +152,15 @@ test("readFrozenAssetFiles tolerates a corrupted manifest (non-array files)", ()
   assert.deepEqual(readFrozenAssetFiles(bad), []);
   rmSync(bad, { recursive: true, force: true });
 });
+
+test("a legitimate ..-prefixed NAME is not an escape (contentPathMapper boundary)", () => {
+  const trees = [{ root: path.join(dir, "content", "docs"), mount: "" }];
+  mkdirSync(path.join(dir, "content", "docs", "..dots"), { recursive: true });
+  writeFileSync(path.join(dir, "content", "docs", "..dots", "y.md"), "y");
+  assert.equal(contentPathMapper(trees)(path.join(dir, "content", "docs", "..dots", "y.md")), "..dots/y.md");
+});
+
+test("the generated route percent-encodes path segments in the file URL", () => {
+  const route = renderAssetsRoute([{ root: "../../../../content/docs", mount: "" }]);
+  assert.match(route, /encodeURIComponent/);
+});

@@ -53,7 +53,8 @@ export function contentPathMapper(trees: readonly Tree[]): (absFile: string) => 
   return (absFile) => {
     for (const t of trees) {
       const rel = path.relative(t.root, absFile);
-      if (!rel.startsWith("..") && !path.isAbsolute(rel)) return t.mount ? `${t.mount}/${posix(rel)}` : posix(rel);
+      const escapes = rel === ".." || rel.startsWith(".." + path.sep) || path.isAbsolute(rel);
+      if (!escapes) return t.mount ? `${t.mount}/${posix(rel)}` : posix(rel);
     }
     return undefined;
   };
@@ -161,7 +162,8 @@ export function renderAssetsRoute(relTreesFromRouteDir: readonly { root: string;
     "      const sub = t.mount ? (rel.startsWith(t.mount + \"/\") ? rel.slice(t.mount.length + 1) : null) : rel;\n" +
     "      if (sub == null) continue;\n" +
     "      try {\n" +
-    "        const bytes = await readFile(new URL(t.root + \"/\" + sub, import.meta.url));\n" +
+    "        const enc = sub.split(\"/\").map(encodeURIComponent).join(\"/\");\n" +
+    "        const bytes = await readFile(new URL(t.root + \"/\" + enc, import.meta.url));\n" +
     "        const ext = rel.split(\".\").pop()?.toLowerCase() ?? \"\";\n" +
     "        return new Response(bytes, { headers: { \"content-type\": TYPES[ext] ?? \"application/octet-stream\" } });\n" +
     "      } catch { /* try the next tree */ }\n" +

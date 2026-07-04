@@ -159,7 +159,10 @@ async function cmdIndex(): Promise<void> {
     writeIfChanged(path.join(cwd, "app", "_assets.ts"),
       renderAssetsTs({ contentPaths, localeContentPaths, files }));
     if (files.length) console.log(`kura index: assets — ${files.length} referenced image(s) frozen`);
-    const clash = DOCS.filter((d) => d.slug === "assets" || d.slug.startsWith("assets/")).map((d) => d.slug);
+    // Only a ROOT docs mount can shadow /assets/ (under a basePath the pages live at /<base>/assets/…).
+    const clash = cfg.basePathSegments.length
+      ? []
+      : DOCS.filter((d) => d.slug === "assets" || d.slug.startsWith("assets/")).map((d) => d.slug);
     if (clash.length) {
       const preview = clash.slice(0, 3).join(", ") + (clash.length > 3 ? "…" : "");
       console.warn(`kura index: assets — ${clash.length} doc slug(s) under the reserved /assets/ namespace (${preview}): pages there are shadowed by the asset route.`);

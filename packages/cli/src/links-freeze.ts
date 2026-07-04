@@ -103,13 +103,14 @@ export function repoPathMapper(
     .map(([tree, base]) => ({ abs: path.resolve(cwd, tree), base }))
     .sort((a, b) => b.abs.length - a.abs.length);
   return (absFile) => {
+    const escapes = (rel: string): boolean => rel === ".." || rel.startsWith(".." + path.sep) || path.isAbsolute(rel);
     for (const t of treeAbs) {
       const rel = path.relative(t.abs, absFile);
-      if (!rel.startsWith("..") && !path.isAbsolute(rel)) return t.base ? `${t.base}/${posix(rel)}` : posix(rel);
+      if (!escapes(rel)) return t.base ? `${t.base}/${posix(rel)}` : posix(rel);
     }
     if (repoRoot) {
       const rel = path.relative(repoRoot, absFile);
-      if (!rel.startsWith("..") && !path.isAbsolute(rel)) return posix(rel);
+      if (!escapes(rel)) return posix(rel);
     }
     return undefined;
   };
