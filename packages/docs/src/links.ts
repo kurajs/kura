@@ -251,33 +251,25 @@ export function rewriteMarkdownLinks(md: string, resolve: (href: string) => stri
       out.push(u == null ? line : line.slice(0, ref[1]!.length) + u + line.slice(ref[1]!.length + ref[2]!.length));
       continue;
     }
-    out.push(rewriteOutsideCodeSpans(line, resolve));
+    out.push(rewriteLineLinks(line, resolve));
   }
   return out.join("\n");
 }
 
-// Rewrite a line's links only OUTSIDE inline code spans, per CommonMark: an opener of N backticks
-// is closed by the NEXT run of exactly N (so a span can contain shorter/longer runs), and an
-// unmatched run is literal text. Line-scoped: multi-line spans are rare in docs and the fence pass
-// above already guards the common multi-line code shapes.
-function rewriteOutsideCodeSpans(line: string, resolve: (href: string) => string | null): string {
-  let out = "";
-  let plain = ""; // pending rewritable text
-  const flush = () => {
-    out += rewriteSegment(plain, resolve);
-    plain = "";
-  };
+/** CommonMark code spans in a line: an opener of N backticks is closed by the NEXT run of exactly
+ *  N (a span can contain shorter/longer runs); an unmatched run is literal text. Line-scoped:
+ *  multi-line spans are rare in docs and the fence pass above guards the multi-line code shapes. */
+function codeSpansOf(line: string): { start: number; end: number }[] {
+  const spans: { start: number; end: number }[] = [];
   let i = 0;
   while (i < line.length) {
     if (line[i] !== "`") {
-      plain += line[i];
       i++;
       continue;
     }
     let n = i;
     while (n < line.length && line[n] === "`") n++;
     const runLen = n - i;
-    // Find the next backtick run of EXACTLY runLen — that closes the span.
     let j = n;
     let close = -1;
     while (j < line.length) {
@@ -292,14 +284,26 @@ function rewriteOutsideCodeSpans(line: string, resolve: (href: string) => string
       } else j++;
     }
     if (close >= 0) {
-      flush();
-      out += line.slice(i, close); // the whole span, verbatim
+      spans.push({ start: i, end: close });
       i = close;
-    } else {
-      plain += line.slice(i, n); // unmatched run: literal text
-      i = n;
-    }
+    } else i = n; // unmatched run: literal text
   }
-  flush();
-  return out;
+  return spans;
+}
+
+// Rewrite a line's links unless the TARGET sits inside a code span. The span rule is about quoting:
+// a link-shaped example inside code (a whole link inside backticks) must stay verbatim — but a real link whose TEXT
+// is code (backticked file names as link text, everywhere in real docs) is still a link and must rewrite.
+// Splitting the line around spans broke exactly that shape (the "](target)" lost its "[text").
+function rewriteLineLinks(line: string, resolve: (href: string) => string | null): string {
+  const spans = codeSpansOf(line);
+  const inSpan = (pos: number): boolean => spans.some((sp) => pos >= sp.start && pos < sp.end);
+  return line.replace(INLINE_LINK, (m, bang: string, _text: string, target: string, title: string, offset: number) => {
+    if (bang) return m; // image — leave authored
+    // The target's absolute position: the match ends `(target[ title])`.
+    const targetStart = offset + m.length - 1 - title.length - target.length;
+    if (inSpan(targetStart)) return m; // quoted example inside a code span
+    const u = resolve(target);
+    return u == null ? m : m.slice(0, targetStart - offset) + u + m.slice(targetStart - offset + target.length);
+  });
 }
