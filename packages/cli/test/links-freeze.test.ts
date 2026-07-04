@@ -1,6 +1,6 @@
 // The app/_links.ts freeze — repo detection, path mapping, the source-path walk, and the
 // corpus-filtered oracle. Pure parts are injected (env, remote, dates) like content-walk tests.
-import { test, describe } from "node:test";
+import { test, describe, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -67,7 +67,7 @@ describe("sourceMapOf + repoPathMapper", () => {
 
 describe("collectSourcePaths — walk + slug rule + locale mirrors", () => {
   let dir: string;
-  test("setup", () => {
+  before(() => {
     dir = mkdtempSync(path.join(tmpdir(), "kura-links-"));
     mkdirSync(path.join(dir, "content", "docs", "adr"), { recursive: true });
     mkdirSync(path.join(dir, "content", "docs", "ja"), { recursive: true });
@@ -86,7 +86,7 @@ describe("collectSourcePaths — walk + slug rule + locale mirrors", () => {
     });
     assert.deepEqual(localeSourcePaths, { ja: { guide: "docs/ja/guide.md" } });
   });
-  test("cleanup", () => rmSync(dir, { recursive: true, force: true }));
+  after(() => rmSync(dir, { recursive: true, force: true }));
 });
 
 describe("collectRepoTargets — corpus scan against the tracked set", () => {
