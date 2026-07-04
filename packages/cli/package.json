@@ -1,6 +1,6 @@
 {
   "name": "@kurajs/cli",
-  "version": "0.0.27",
+  "version": "0.0.28",
   "type": "module",
   "description": "Kura CLI — dev, build, deploy, and index a Kura docs app (one surface over June).",
   "bin": {
