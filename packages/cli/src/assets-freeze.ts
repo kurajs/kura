@@ -26,13 +26,24 @@ export function contentTrees(cwd: string, sources: readonly ContentSource[]): Tr
   ];
 }
 
-/** Locate a content-relative path on disk (first tree whose mount prefixes it), or null. */
+/** Locate a content-relative path on disk (first tree whose mount prefixes it), or null. The
+ *  oracle is CONFINED to the tree: the real path (symlinks resolved) must stay under the tree
+ *  root, so a symlink can't pull files from outside the content root into the manifest/copy.
+ *  Transient stat races read as absent — never a throw. */
 export function contentFileOf(trees: readonly Tree[], contentRel: string): string | null {
   for (const t of trees) {
     const rel = t.mount ? (contentRel === t.mount ? "" : contentRel.startsWith(t.mount + "/") ? contentRel.slice(t.mount.length + 1) : null) : contentRel;
     if (rel == null) continue;
-    const abs = path.join(t.root, ...rel.split("/"));
-    if (fs.existsSync(abs) && fs.statSync(abs).isFile()) return abs;
+    try {
+      const abs = path.join(t.root, ...rel.split("/"));
+      if (!fs.statSync(abs).isFile()) continue;
+      const real = fs.realpathSync(abs);
+      const rootReal = fs.realpathSync(t.root);
+      if (real !== rootReal && !real.startsWith(rootReal + path.sep)) continue; // symlink escape
+      return abs;
+    } catch {
+      /* absent or racing — try the next tree */
+    }
   }
   return null;
 }
@@ -139,9 +150,10 @@ export function renderAssetsRoute(relTreesFromRouteDir: readonly { root: string;
     'import { ASSETS } from "../../../../app/_assets";\n' +
     "const TYPES: Record<string, string> = { png: \"image/png\", jpg: \"image/jpeg\", jpeg: \"image/jpeg\", gif: \"image/gif\", svg: \"image/svg+xml\", webp: \"image/webp\", avif: \"image/avif\", ico: \"image/x-icon\" };\n" +
     `const TREES: { root: string; mount: string }[] = ${trees};\n` +
+    "const FILES = new Set(ASSETS.files);\n" +
     "export default async (_req: Request, ctx: { params: Record<string, string | undefined> }): Promise<Response> => {\n" +
     "  const rel = ctx.params.path ?? \"\";\n" +
-    "  if (!ASSETS.files.includes(rel)) return new Response(null, { status: 404 });\n" +
+    "  if (!FILES.has(rel)) return new Response(null, { status: 404 });\n" +
     "  try {\n" +
     "    const fsMod = \"node:fs/promises\";\n" +
     "    const { readFile } = await import(/* @vite-ignore */ fsMod); // computed: stays out of worker graphs\n" +

@@ -124,3 +124,23 @@ describe("generated dev route — T9 bundle safety", () => {
     assert.match(route, /status: 404/);
   });
 });
+
+describe("review follow-ups", () => {
+  test("a symlink escaping the content tree is not an oracle hit (no outside file enters the copy)", () => {
+    const outside = path.join(dir, "outside-secret.png");
+    writeFileSync(outside, "SECRET");
+    const link = path.join(dir, "content", "docs", "user-guide", "images", "leak.png");
+    try {
+      const { symlinkSync } = require("node:fs") as typeof import("node:fs");
+      symlinkSync(outside, link);
+    } catch {
+      return; // symlinks unavailable on this fs — nothing to assert
+    }
+    assert.equal(contentFileOf(contentTrees(dir, []), "user-guide/images/leak.png"), null);
+  });
+  test("the generated route uses a Set membership check", () => {
+    const route = renderAssetsRoute([{ root: "../../../../content/docs", mount: "" }]);
+    assert.match(route, /new Set\(ASSETS\.files\)/);
+    assert.match(route, /FILES\.has\(rel\)/);
+  });
+});
