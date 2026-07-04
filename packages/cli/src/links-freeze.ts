@@ -93,7 +93,11 @@ export function repoPathMapper(
   repoRoot: string | null,
   map: SourceMap,
 ): (absFile: string) => string | undefined {
-  const treeAbs = Object.entries(map).map(([tree, base]) => ({ abs: path.resolve(cwd, tree), base }));
+  // Most-specific tree first: with overlapping roots ("content" and "content/docs"), the deeper
+  // one must win regardless of object-key order.
+  const treeAbs = Object.entries(map)
+    .map(([tree, base]) => ({ abs: path.resolve(cwd, tree), base }))
+    .sort((a, b) => b.abs.length - a.abs.length);
   return (absFile) => {
     for (const t of treeAbs) {
       const rel = path.relative(t.abs, absFile);

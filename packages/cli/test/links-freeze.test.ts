@@ -134,3 +134,9 @@ describe("renderLinksTs — deterministic freeze", () => {
     assert.ok(!out.includes('"repoFiles"'));
   });
 });
+
+test("repoPathMapper: overlapping map roots — the most specific tree wins regardless of key order", () => {
+  const to = repoPathMapper("/tmp/site", null, { content: "stuff", "content/docs": "docs" });
+  assert.equal(to("/tmp/site/content/docs/guide.md"), "docs/guide.md");
+  assert.equal(to("/tmp/site/content/other.md"), "stuff/other.md");
+});
