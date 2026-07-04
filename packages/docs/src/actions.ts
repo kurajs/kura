@@ -59,8 +59,9 @@ export function docsActions(opts: {
       if (e) {
         // The pairing invariant: source.path always describes the BYTES returned — the variant's
         // own file when a locale variant is served, the default file otherwise (incl. fallback).
-        const path =
-          (e.locale ? opts.localeSourcePaths?.[e.locale]?.[e.slug] : undefined) ?? opts.sourcePaths?.[e.slug];
+        const own = (o: Record<string, string> | undefined, k: string): string | undefined =>
+          o && Object.hasOwn(o, k) ? o[k] : undefined; // plain objects: a "toString" slug must miss cleanly
+        const path = (e.locale ? own(opts.localeSourcePaths?.[e.locale], e.slug) : undefined) ?? own(opts.sourcePaths, e.slug);
         return {
           slug: e.slug,
           title: String(e.data.title ?? e.slug),

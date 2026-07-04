@@ -302,3 +302,9 @@ test("an authored %2F cannot change path boundaries", () => {
   // "notes%2Fguide.md" is NOT "notes/guide.md" — it must not resolve to the tracked file.
   assert.equal(r("notes%2Fguide.md", "API"), null);
 });
+
+test("a slug named like an Object.prototype member misses cleanly in the frozen maps", () => {
+  // Plain-object lookups must be own-key only: no entry named "toString" exists, so a link to it
+  // must fall through the path tiers (and legacy) instead of resolving an inherited function.
+  assert.equal(r("toString.md", "API"), null);
+});

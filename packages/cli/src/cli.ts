@@ -116,8 +116,10 @@ async function cmdIndex(): Promise<void> {
     if (repoUrl && repoRoot) {
       const tracked = gitTrackedFiles(repoRoot);
       if (tracked) {
+        const own = (o: Record<string, string> | undefined, k: string): string | undefined =>
+          o && Object.hasOwn(o, k) ? o[k] : undefined; // plain objects: a "toString" slug must miss cleanly
         const fromOf = (e: Entry): string | undefined =>
-          (e.locale ? localeSourcePaths[e.locale]?.[e.slug] : undefined) ?? sourcePaths[e.slug];
+          (e.locale ? own(localeSourcePaths[e.locale], e.slug) : undefined) ?? own(sourcePaths, e.slug);
         const targets = collectRepoTargets(allEntries.map((e) => ({ original: e.original, fromPath: fromOf(e) })), tracked);
         repoFiles = targets.repoFiles;
         repoDirs = targets.repoDirs;
@@ -126,10 +128,10 @@ async function cmdIndex(): Promise<void> {
     }
     writeIfChanged(path.join(cwd, "app", "_links.ts"),
       renderLinksTs({ repoUrl, ref: linkRef(), sourcePaths, localeSourcePaths, repoFiles, repoDirs }));
-    const covered = DOCS.filter((d) => d.slug in sourcePaths).length;
+    const covered = DOCS.filter((d) => Object.hasOwn(sourcePaths, d.slug)).length;
     console.log(`kura index: links — repo=${repoUrl ?? `none (${reason})`}, sourcePaths cover ${covered}/${DOCS.length} docs${oracleNote}`);
     if (covered < DOCS.length) {
-      const missing = DOCS.filter((d) => !(d.slug in sourcePaths)).map((d) => d.slug);
+      const missing = DOCS.filter((d) => !Object.hasOwn(sourcePaths, d.slug)).map((d) => d.slug);
       console.warn(`kura index: links — no repo path for ${missing.length} doc(s) (${missing.slice(0, 4).join(", ")}${missing.length > 4 ? "…" : ""}); their links use legacy matching only. Outside the git repo? Set KURA_REPO_ROOT / KURA_SOURCE_MAP.`);
     }
   }
