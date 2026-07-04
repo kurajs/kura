@@ -9,7 +9,7 @@ import { buildIndex } from "@kurajs/docs/search";
 import { docsRoute, pruneStaleDocsRoutes } from "./routes.js";
 import { loadCliConfig } from "./config-load.js";
 import { collectMeta, collectLastUpdated, discoverLocales } from "./content-walk.js";
-import { repoRootOf, detectRepo, linkRef, sourceMapOf, repoPathMapper, collectSourcePaths, gitTrackedFiles, collectRepoTargets, renderLinksTs } from "./links-freeze.js";
+import { repoRootOf, detectRepo, gitOriginUrl, linkRef, sourceMapOf, repoPathMapper, collectSourcePaths, gitTrackedFiles, collectRepoTargets, renderLinksTs } from "./links-freeze.js";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -107,7 +107,9 @@ async function cmdIndex(): Promise<void> {
     const repoRoot = repoRootOf(cwd);
     const toRepoPath = repoPathMapper(cwd, repoRoot, sourceMapOf());
     const { sourcePaths, localeSourcePaths } = collectSourcePaths(cwd, contentSources, declaredLocales, toRepoPath);
-    const { url: repoUrl, reason } = detectRepo(cfg.repo);
+    // The remote lookup runs where the repo actually is — the checkout root when the build tree
+    // is a copy (KURA_REPO_ROOT), else the project cwd.
+    const { url: repoUrl, reason } = detectRepo(cfg.repo, process.env, () => gitOriginUrl(repoRoot ?? cwd));
     let repoFiles: string[] = [];
     let repoDirs: string[] = [];
     let oracleNote = "";

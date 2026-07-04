@@ -33,7 +33,7 @@ export function repoRootOf(cwd: string, env: Record<string, string | undefined> 
 export function detectRepo(
   configRepo: string | false | undefined,
   env: Record<string, string | undefined> = process.env,
-  remoteUrlOf: () => string | null = gitOriginUrl,
+  remoteUrlOf: () => string | null = () => gitOriginUrl(),
 ): { url: string | null; reason: string } {
   if (configRepo === false) return { url: null, reason: "disabled by config (repo = false)" };
   if (typeof configRepo === "string") return { url: normalizeRepoUrl(configRepo), reason: "config" };
@@ -47,9 +47,12 @@ export function detectRepo(
   return { url: null, reason: `non-GitHub remote (${remote.replace(/^[a-z+]+:\/\//i, "").split(/[/:]/)[0]})` };
 }
 
-function gitOriginUrl(): string | null {
+/** The origin remote URL, read from `cwd` — pass the REPO ROOT when the build runs in a copied
+ *  tree (the checkout is elsewhere; running git in the build dir would find nothing). */
+export function gitOriginUrl(cwd?: string): string | null {
   try {
     const out = execFileSync("git", ["remote", "get-url", "origin"], {
+      ...(cwd ? { cwd } : {}),
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     }).trim();
