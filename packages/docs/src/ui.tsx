@@ -125,7 +125,7 @@ export type NavTab = { key: string; title: string; href: string; groups: Sidebar
 // swap). The layout can't know the current page, so the client derives active state from the URL:
 // aria-current on the matching sidebar/tab link, the active tab's groups shown (others hidden),
 // and the <details> folder containing the active page expanded. Survives morph (delegated/observed).
-const SIDEBAR_SYNC_JS = `(function(){
+export const SIDEBAR_SYNC_JS = `(function(){
   function trim(p){return p.length>1&&p.endsWith('/')?p.slice(0,-1):p;}
   function sync(){
     var path=trim(location.pathname), tab=null;
@@ -144,6 +144,15 @@ const SIDEBAR_SYNC_JS = `(function(){
     // and expand nothing. forEach opens each link's folder chain; tab links are harmless no-ops.
     document.querySelectorAll('.sidebar a[aria-current="page"]').forEach(function(cur){
       var d=cur.closest('details.folder');while(d){d.open=true;d=d.parentElement&&d.parentElement.closest('details.folder');}});
+    // reveal the active item inside the sidebar's OWN scroll container (long navs reset to the top
+    // on every full page load). Rect math against #docs-nav only — never scrollIntoView, which
+    // would also scroll ancestor containers (the page) and fight #anchor deep links. Runs after
+    // the folder expansion above so measurements see the final layout; no-op when already visible
+    // (soft-nav keeps its scroll) and on mobile (hidden sidebar measures all-zero rects).
+    var nav=document.getElementById('docs-nav');
+    if(nav){var cur2=nav.querySelector('a[aria-current="page"]');
+      if(cur2){var nr=nav.getBoundingClientRect(),ir=cur2.getBoundingClientRect();
+        if(ir.height>0&&(ir.top<nr.top||ir.bottom>nr.bottom))nav.scrollTop+=ir.top-nr.top-(nav.clientHeight-ir.height)/2;}}
     // rewrite the locale-switch links to THIS page's equivalent path (swap the locale prefix)
     var ll=document.querySelectorAll('[data-locale-home]');
     if(ll.length){var lc=document.querySelector('[data-locale-home][data-locale-active]'),cp=lc?lc.getAttribute('data-locale-home'):'/';cp=cp==='/'?'':cp;
