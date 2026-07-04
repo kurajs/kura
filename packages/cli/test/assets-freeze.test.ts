@@ -164,3 +164,8 @@ test("the generated route percent-encodes path segments in the file URL", () => 
   const route = renderAssetsRoute([{ root: "../../../../content/docs", mount: "" }]);
   assert.match(route, /encodeURIComponent/);
 });
+
+test("a ..-segment contentRel never even stats outside the tree root", () => {
+  writeFileSync(path.join(dir, "outside.png"), "X");
+  assert.equal(contentFileOf(contentTrees(dir, []), "../outside.png"), null);
+});

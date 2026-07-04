@@ -35,10 +35,12 @@ export function contentFileOf(trees: readonly Tree[], contentRel: string): strin
     const rel = t.mount ? (contentRel === t.mount ? "" : contentRel.startsWith(t.mount + "/") ? contentRel.slice(t.mount.length + 1) : null) : contentRel;
     if (rel == null) continue;
     try {
-      const abs = path.join(t.root, ...rel.split("/"));
+      const abs = path.resolve(t.root, ...rel.split("/"));
+      const root = path.resolve(t.root);
+      if (abs !== root && !abs.startsWith(root + path.sep)) continue; // ..-segments: no fs call outside the root
       if (!fs.statSync(abs).isFile()) continue;
       const real = fs.realpathSync(abs);
-      const rootReal = fs.realpathSync(t.root);
+      const rootReal = fs.realpathSync(root);
       if (real !== rootReal && !real.startsWith(rootReal + path.sep)) continue; // symlink escape
       return abs;
     } catch {
