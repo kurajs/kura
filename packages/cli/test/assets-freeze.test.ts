@@ -144,3 +144,11 @@ describe("review follow-ups", () => {
     assert.match(route, /FILES\.has\(rel\)/);
   });
 });
+
+test("readFrozenAssetFiles tolerates a corrupted manifest (non-array files)", () => {
+  const bad = mkdtempSync(path.join(tmpdir(), "kura-badassets-"));
+  mkdirSync(path.join(bad, "app"), { recursive: true });
+  writeFileSync(path.join(bad, "app", "_assets.ts"), 'export const ASSETS = JSON.parse("{\\"files\\":\\"oops\\"}");\n');
+  assert.deepEqual(readFrozenAssetFiles(bad), []);
+  rmSync(bad, { recursive: true, force: true });
+});

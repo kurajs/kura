@@ -179,8 +179,8 @@ export function readFrozenAssetFiles(cwd: string): string[] {
     const txt = fs.readFileSync(path.join(cwd, "app", "_assets.ts"), "utf8");
     const m = /JSON\.parse\((".*")\)/.exec(txt);
     if (!m) return [];
-    const data = JSON.parse(JSON.parse(m[1]!)) as { files?: string[] };
-    return data.files ?? [];
+    const data = JSON.parse(JSON.parse(m[1]!)) as { files?: unknown };
+    return Array.isArray(data.files) ? data.files.filter((f): f is string => typeof f === "string") : [];
   } catch {
     return [];
   }
