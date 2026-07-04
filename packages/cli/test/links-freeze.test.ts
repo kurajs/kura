@@ -129,7 +129,8 @@ describe("renderLinksTs — deterministic freeze", () => {
       repoDirs: [],
     });
     assert.match(out, /import type \{ LinkData \} from "@kurajs\/docs\/links";/);
-    assert.match(out, /"sourcePaths":\{"a":"docs\/a\.md","b":"docs\/b\.md"\}/);
+    const parsed = JSON.parse(JSON.parse(/JSON\.parse\((".*")\)/.exec(out)![1]!)) as { sourcePaths: Record<string, string> };
+    assert.deepEqual(Object.keys(parsed.sourcePaths), ["a", "b"]); // sorted
     assert.ok(!out.includes('"localeSourcePaths"'));
     assert.ok(!out.includes('"repoFiles"'));
   });
@@ -139,4 +140,17 @@ test("repoPathMapper: overlapping map roots — the most specific tree wins rega
   const to = repoPathMapper("/tmp/site", null, { content: "stuff", "content/docs": "docs" });
   assert.equal(to("/tmp/site/content/docs/guide.md"), "docs/guide.md");
   assert.equal(to("/tmp/site/content/other.md"), "stuff/other.md");
+});
+
+test("detectRepo: an empty/whitespace repo string falls through to detection", () => {
+  assert.equal(detectRepo("  ", { GITHUB_REPOSITORY: "o/r" }, () => null).url, "https://github.com/o/r");
+});
+
+test("renderLinksTs: a __proto__ slug survives as an own property (JSON.parse, not a literal)", () => {
+  const out = renderLinksTs({ repoUrl: null, ref: "HEAD", sourcePaths: { ["__proto__"]: "docs/p.md", a: "docs/a.md" } as Record<string, string> });
+  const m = /JSON\.parse\((".*")\)/.exec(out);
+  assert.ok(m, "emits JSON.parse");
+  const data = JSON.parse(JSON.parse(m![1]!)) as { sourcePaths: Record<string, string> };
+  assert.equal(Object.hasOwn(data.sourcePaths, "__proto__"), true);
+  assert.equal(Object.getPrototypeOf(data.sourcePaths) === Object.prototype, true);
 });
