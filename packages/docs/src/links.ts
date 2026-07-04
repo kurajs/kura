@@ -55,6 +55,76 @@ export type LinkContext = {
   repoDirs?: ReadonlySet<string>;
 };
 
+// ── Content assets (images) ──────────────────────────────────────────────────────────────────────
+// Images referenced by docs live in the CONTENT tree (docs/user-guide/images/x.png). The CLI freezes
+// an asset manifest in CONTENT-relative coordinates (always derivable — repo paths can be absent in
+// isolated builds), the build copies the referenced files under /assets/<content-rel>, and the
+// renderer rewrites <img src> (and markdown image targets) to that absolute URL. Assets are language-
+// less: locale mirrors share the default tree's files, so URLs never carry a locale prefix.
+
+/** Frozen by `kura index` as app/_assets.ts; absent on older CLIs → image handling stays authored. */
+export type AssetData = {
+  /** slug → content-relative source path of the entry's default file ("user-guide/x.md"). */
+  contentPaths: Record<string, string>;
+  /** locale → slug → the variant's own content-relative path ("zh-cn/user-guide/x.md"). */
+  localeContentPaths?: Record<string, Record<string, string>>;
+  /** Content-relative paths of REFERENCED image files that exist on disk (corpus-filtered). */
+  files: readonly string[];
+};
+
+export type AssetContext = {
+  files: ReadonlySet<string>;
+  contentPaths: Record<string, string>;
+  localeContentPaths?: Record<string, Record<string, string>>;
+};
+
+export function buildAssetContext(assets?: AssetData): AssetContext | undefined {
+  if (!assets || !assets.files.length) return undefined;
+  return { files: new Set(assets.files), contentPaths: assets.contentPaths, localeContentPaths: assets.localeContentPaths };
+}
+
+const own = (o: Record<string, string> | undefined, k: string): string | undefined =>
+  o && Object.hasOwn(o, k) ? o[k] : undefined;
+
+/**
+ * Resolve an authored image src for the entry (slug + its own locale) to the site's asset URL, or
+ * null (= leave authored). Resolution is two-step for locale variants: the variant's own content
+ * path first, then the DEFAULT entry's (mirrors are one directory deeper, but share the default
+ * tree's asset files). `toAssetHref` prepends the deploy prefix — never a locale prefix.
+ */
+export function resolveAsset(
+  src: string,
+  entry: { slug: string; locale?: string },
+  ctx: AssetContext,
+  toAssetHref: (contentRelPath: string) => string,
+): string | null {
+  if (/^[a-z][a-z0-9+.-]*:/i.test(src) || src.startsWith("//") || src.startsWith("/") || src.startsWith("#") || src === "")
+    return null; // schemes (incl. data:), protocol-relative, site-absolute, anchors: authored
+  // A fragment travels with the URL, not the file: "./icons.svg#logo" (SVG sprites) must resolve
+  // the PATH against the oracle and re-append "#logo" to the rewritten src.
+  const hashAt = src.indexOf("#");
+  const path = hashAt >= 0 ? src.slice(0, hashAt) : src;
+  const hash = hashAt >= 0 ? src.slice(hashAt) : "";
+  if (path === "") return null;
+  const bases = [
+    entry.locale ? own(ctx.localeContentPaths?.[entry.locale], entry.slug) : undefined,
+    own(ctx.contentPaths, entry.slug),
+  ].filter((b): b is string => b != null);
+  for (const base of bases) {
+    const cand = resolveRepoPath(base, path); // same pure path join + per-segment decoding
+    if (cand != null && ctx.files.has(cand)) return toAssetHref(cand) + hash;
+  }
+  return null;
+}
+
+/** Rewrite <img src="…"> attributes (the <a href> side stays rewriteDocLinks' job). */
+export function rewriteImgSrcs(html: string, resolve: (src: string) => string | null): string {
+  return html.replace(/(<img\b[^>]*?\ssrc=")([^"]*)(")/gi, (m, pre: string, src: string, post: string) => {
+    const u = resolve(src);
+    return u == null ? m : pre + u + post;
+  });
+}
+
 /** "owner/name" shorthand or a full URL → a normalized web URL (no trailing slash / .git). */
 export function normalizeRepoUrl(repo: string): string {
   const r = repo.trim().replace(/\/+$/, "").replace(/\.git$/, "");
@@ -207,21 +277,19 @@ export function resolveLink(
 // The .md/.json projections and the search corpus ship AUTHORED markdown; agents follow its links
 // too. Rewrite inline `[t](target)` and reference definitions `[label]: target` with the SAME
 // resolver, but never inside fenced code blocks or inline code spans (transcripts and examples in
-// real docs contain link-shaped text), and never images (`![](…)` stays authored).
+// real docs contain link-shaped text). Images stay authored UNLESS an asset resolver is bound
+// (`opts.resolveImage`, the content-image pipeline).
 
 const INLINE_LINK = /(!?)\[((?:[^[\]]|\[[^\]]*\])*)\]\(([^()\s]+)((?:[ \t]+"[^"]*")?)\)/g;
 const REF_DEF = /^([ \t]{0,3}\[(?!\^)[^\]]+\]:[ \t]*)(\S+)/;
 
-function rewriteSegment(seg: string, resolve: (href: string) => string | null): string {
-  return seg.replace(INLINE_LINK, (m, bang: string, text: string, target: string, title: string) => {
-    if (bang) return m; // image — leave authored
-    const u = resolve(target);
-    return u == null ? m : `[${text}](${u}${title})`;
-  });
-}
-
-/** Rewrite link targets in markdown, fence/code-span aware. Pure; used per agent surface. */
-export function rewriteMarkdownLinks(md: string, resolve: (href: string) => string | null): string {
+/** Rewrite link targets in markdown, fence/code-span aware. Pure; used per agent surface.
+ *  `opts.resolveImage` additionally rewrites image targets (absent → images stay authored). */
+export function rewriteMarkdownLinks(
+  md: string,
+  resolve: (href: string) => string | null,
+  opts?: { resolveImage?: (src: string) => string | null },
+): string {
   const out: string[] = [];
   let inFence = false;
   let fenceMark = "";
@@ -251,7 +319,7 @@ export function rewriteMarkdownLinks(md: string, resolve: (href: string) => stri
       out.push(u == null ? line : line.slice(0, ref[1]!.length) + u + line.slice(ref[1]!.length + ref[2]!.length));
       continue;
     }
-    out.push(rewriteLineLinks(line, resolve));
+    out.push(rewriteLineLinks(line, resolve, opts?.resolveImage));
   }
   return out.join("\n");
 }
@@ -295,15 +363,18 @@ function codeSpansOf(line: string): { start: number; end: number }[] {
 // a link-shaped example inside code (a whole link inside backticks) must stay verbatim — but a real link whose TEXT
 // is code (backticked file names as link text, everywhere in real docs) is still a link and must rewrite.
 // Splitting the line around spans broke exactly that shape (the "](target)" lost its "[text").
-function rewriteLineLinks(line: string, resolve: (href: string) => string | null): string {
+function rewriteLineLinks(
+  line: string,
+  resolve: (href: string) => string | null,
+  resolveImage?: (src: string) => string | null,
+): string {
   const spans = codeSpansOf(line);
   const inSpan = (pos: number): boolean => spans.some((sp) => pos >= sp.start && pos < sp.end);
   return line.replace(INLINE_LINK, (m, bang: string, _text: string, target: string, title: string, offset: number) => {
-    if (bang) return m; // image — leave authored
     // The target's absolute position: the match ends `(target[ title])`.
     const targetStart = offset + m.length - 1 - title.length - target.length;
     if (inSpan(targetStart)) return m; // quoted example inside a code span
-    const u = resolve(target);
+    const u = bang ? (resolveImage?.(target) ?? null) : resolve(target);
     return u == null ? m : m.slice(0, targetStart - offset) + u + m.slice(targetStart - offset + target.length);
   });
 }
