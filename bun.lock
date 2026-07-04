@@ -80,7 +80,7 @@
       "dependencies": {
         "@junejs/cli": ">=0.0.50 <0.1.0",
         "@kurajs/core": ">=0.0.1 <0.1.0",
-        "@kurajs/docs": ">=0.0.47",
+        "@kurajs/docs": ">=0.0.48",
         "smol-toml": "^1.7.0",
       },
       "devDependencies": {
@@ -89,7 +89,7 @@
         "typescript": "^5.7.0",
       },
       "peerDependencies": {
-        "@kurajs/docs": ">=0.0.41",
+        "@kurajs/docs": ">=0.0.48",
         "@kurajs/transformers": ">=0.0.1 <0.1.0",
       },
       "optionalPeers": [
