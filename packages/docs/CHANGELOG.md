@@ -1,5 +1,18 @@
 # @kurajs/docs
 
+## 0.0.54
+
+### Patch Changes
+
+- [#75](https://github.com/kurajs/kura/pull/75) [`f8d586d`](https://github.com/kurajs/kura/commit/f8d586d4bc535d4c1e3b17e69601af589a660ef8) Thanks [@linyiru](https://github.com/linyiru)! - Widen the `@junejs/og` dependency from `^0.0.4` to `>=0.0.5 <0.1.0`
+
+  `^0.0.4` is an exact pin (npm caret on a `0.0.z` version allows only that z), so `@kurajs/docs`
+  dragged in `@junejs/og@0.0.4`, whose edge backend STATICALLY re-exports `@vercel/og` — its
+  top-level `./yoga.wasm?module` import can't be bundled, breaking Vercel/serverless builds that
+  carry the OG route. `@junejs/og@0.0.5` lazy-loads `@vercel/og` and fixes this. Widening to a
+  range lets consumers resolve `0.0.5+` (the lazy backend) transitively, so they no longer need a
+  `pnpm.overrides` pin to escape the broken `0.0.4`.
+
 ## 0.0.53
 
 ### Patch Changes
