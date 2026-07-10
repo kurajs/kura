@@ -10,3 +10,5 @@ app/_mdx.ts
 app/_meta.ts
 app/_dates.ts
 app/_islands.gen.ts
+app/_links.ts
+app/_assets.ts
