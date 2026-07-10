@@ -1,6 +1,6 @@
 {
   "name": "@kurajs/tokenizers",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "type": "module",
   "description": "Kura — pluggable CJK / multilingual tokenizers for @kurajs/search (bigram + native Intl.Segmenter).",
   "exports": {
@@ -28,7 +28,7 @@
   "homepage": "https://kura.build",
   "license": "MIT",
   "dependencies": {
-    "@kurajs/search": ">=0.0.1 <0.2.0"
+    "@kurajs/search": ">=0.1.0"
   },
   "devDependencies": {
     "typescript": "^5.7.0"
