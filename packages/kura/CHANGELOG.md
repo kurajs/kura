@@ -1,4 +1,4 @@
-# @kurajs/ctrlk
+# @kurajs/core
 
 ## 0.1.0
 
@@ -7,9 +7,3 @@
 - [`4c25d3c`](https://github.com/kurajs/kura/commit/4c25d3c9beb26df25d7849fe7326d629d453d9e3) Thanks [@linyiru](https://github.com/linyiru)! - Kura 0.1.0 — adopt the June 0.1.0 line
 
   June released `@junejs/core` and `@junejs/server` 0.1.0 (the `@junejs/cli` orchestrator stays 0.0.51 but now depends on `>=0.1.0`, so the whole runtime resolves to the 0.1.0 line). `@kurajs/docs` now peers `@junejs/core` at `>=0.1.0 <0.2.0` (was `<0.1.0`) — a required, consumer-visible move, since a project on June 0.0.x must upgrade. June 0.1.0 is additive at Kura's import surface (every subpath Kura uses — `route`, `config`, `agent`, `i18n`, `outlet`, `islands-client` — still exists), and the full suite is green on it: all package builds, 302 tests, `examples/docs` build, and a running dev server serving HTML / `.md` / i18n / `/search` / `/mcp`. The whole `@kurajs/*` set moves to 0.1.0 together so the Kura version line tracks June's.
-
-## 0.0.3
-
-### Patch Changes
-
-- [#53](https://github.com/kurajs/kura/pull/53) [`047db53`](https://github.com/kurajs/kura/commit/047db53c3ffa2ce6e60bbea819d51137bb0459ed) Thanks [@linyiru](https://github.com/linyiru)! - Rich HTML search previews. Previews showed raw markdown (`|table|`, code fences, `**bold**`) — now the search index is built from the rendered HTML: clean text for BM25 (`htmlToText`) and each section's HTML for a formatted preview (tables, code, lists, links render instead of markdown syntax). The static corpus ships HTML only (client derives index text with a cheap regex, no parser; ~360 KB gz, +6%), per-query payload unchanged. `@kurajs/ctrlk` items gain `excerptHtml` (rendered via innerHTML after a DOM-based sanitize that drops scripts, event handlers, and `javascript:` URLs). Relevance is unchanged.

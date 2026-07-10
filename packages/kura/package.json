@@ -1,6 +1,6 @@
 {
   "name": "@kurajs/core",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "type": "module",
   "description": "Kura — the knowledgebase for humans and agents. Portable pure-JS vector retrieval engine (f32 brute-force + binary prefilter + rerank).",
   "exports": {
