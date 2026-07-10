@@ -16,13 +16,13 @@
   "license": "MIT",
   "dependencies": {
     "@junejs/cli": ">=0.0.50 <0.1.0",
-    "@kurajs/core": ">=0.0.1 <0.1.0",
+    "@kurajs/core": ">=0.0.1 <0.2.0",
     "smol-toml": "^1.7.0",
     "@kurajs/docs": ">=0.0.52"
   },
   "peerDependencies": {
     "@kurajs/docs": ">=0.0.52",
-    "@kurajs/transformers": ">=0.0.1 <0.1.0"
+    "@kurajs/transformers": ">=0.0.1 <0.2.0"
   },
   "peerDependenciesMeta": {
     "@kurajs/transformers": {
@@ -30,7 +30,7 @@
     }
   },
   "devDependencies": {
-    "@kurajs/transformers": ">=0.0.1 <0.1.0",
+    "@kurajs/transformers": ">=0.0.1 <0.2.0",
     "@types/node": "^22.0.0",
     "typescript": "^5.7.0"
   },

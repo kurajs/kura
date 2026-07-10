@@ -25,11 +25,11 @@
   "homepage": "https://kura.build",
   "license": "MIT",
   "peerDependencies": {
-    "@kurajs/core": ">=0.0.1 <0.1.0",
+    "@kurajs/core": ">=0.0.1 <0.2.0",
     "@huggingface/transformers": ">=3"
   },
   "devDependencies": {
-    "@kurajs/core": ">=0.0.1 <0.1.0",
+    "@kurajs/core": ">=0.0.1 <0.2.0",
     "@huggingface/transformers": "3.8.1",
     "typescript": "^5.7.0"
   },

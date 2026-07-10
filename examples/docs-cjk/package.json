@@ -10,7 +10,7 @@
     "verify": "node verify.mjs"
   },
   "dependencies": {
-    "@junejs/server": ">=0.0.45 <0.1.0",
+    "@junejs/server": ">=0.1.0 <0.2.0",
     "@kurajs/docs": "workspace:*",
     "@kurajs/search": "workspace:*",
     "@kurajs/tokenizers": "workspace:*",
