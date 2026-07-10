@@ -30,12 +30,13 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 24 # bundles npm 11.16 — recent enough for OIDC trusted publishing (needs >= 11.5.1)
           registry-url: https://registry.npmjs.org
 
-      # Trusted publishing needs a recent npm (>= 11.5). Node + npm stay only for the publish step
-      # below — `npm publish --provenance` (bun has no provenance support yet).
-      - run: npm install -g npm@latest
+      # NOTE: do NOT `npm install -g npm@latest` here. Upgrading the toolcache npm in place prunes its
+      # bundled `sigstore` dep, which `npm publish --provenance` loads — the publish then dies with
+      # "Cannot find module 'sigstore'". Node 24's bundled npm is both recent AND complete, so use it
+      # as-is. bun still builds the packages below; node/npm are only for the provenance publish.
 
       - uses: oven-sh/setup-bun@v2
         with:
