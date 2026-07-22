@@ -1,5 +1,12 @@
 # @kurajs/example-docs
 
+## 0.0.28
+
+### Patch Changes
+
+- Updated dependencies [[`ceb342e`](https://github.com/kurajs/kura/commit/ceb342e4e3989e42af71ea9d7d67c8b5ab54ad44)]:
+  - @kurajs/docs@0.1.1
+
 ## 0.0.27
 
 ### Patch Changes
