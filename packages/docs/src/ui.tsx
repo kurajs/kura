@@ -131,10 +131,10 @@ export const SIDEBAR_SYNC_JS = `(function(){
     var path=trim(location.pathname), tab=null;
     var links=document.querySelectorAll('.sidebar a[href],[data-tabbar] a[href]');
     for(var i=0;i<links.length;i++){var a=links[i],on=trim(a.getAttribute('href'))===path;
-      if(on){a.setAttribute('aria-current','page');var g=a.closest('[data-tab]');if(g)tab=g.getAttribute('data-tab');}
+      if(on){a.setAttribute('aria-current','page');var g=a.closest('[data-nav-tab]');if(g)tab=g.getAttribute('data-nav-tab');}
       else a.removeAttribute('aria-current');}
     if(tab!=null){
-      document.querySelectorAll('[data-tab]').forEach(function(g){g.hidden=g.getAttribute('data-tab')!==tab;});
+      document.querySelectorAll('[data-nav-tab]').forEach(function(g){g.hidden=g.getAttribute('data-nav-tab')!==tab;});
       document.querySelectorAll('[data-tabbar] a').forEach(function(a){
         if(a.getAttribute('data-tab-key')===tab)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');});
     }
@@ -235,9 +235,11 @@ export function DocsLayoutShell({ site, navTabs, basePath = "/docs", labels = DE
               ))}
             </div>
           )}
-          {/* Every tab's groups are rendered; the client shows only the active tab's (data-tab). */}
+          {/* Every tab's groups are rendered; the client shows only the active tab's (data-nav-tab).
+              Deliberately NOT data-tab — the content <Tabs> component owns that attribute, and the
+              sync() document-wide query would hide its buttons/panels (attribute collision). */}
           {navTabs.map((t, ti) => (
-            <div data-tab={t.key} hidden={navTabs.length > 1 && ti !== 0} key={t.key}>
+            <div data-nav-tab={t.key} hidden={navTabs.length > 1 && ti !== 0} key={t.key}>
               {t.groups.map((s, i) => (
                 <div className="mb-5" key={s.title || `g${i}`}>
                   {s.title && <p className="mb-1.5 ml-2 text-sm font-semibold text-fg">{s.title}</p>}
