@@ -19,6 +19,35 @@ test("template declares the kura runtime deps", () => {
   assert.ok(tpl.devDependencies["@kurajs/cli"], "needs @kurajs/cli (dev)");
 });
 
+// The template pins published ranges (not workspace:*), so a release that bumps
+// @kurajs/docs or @kurajs/cli past the template's caret range would scaffold apps
+// on stale majors. Caret semantics (npm): the leftmost non-zero segment is fixed —
+// ^x.y.z admits x.*, ^0.y.z admits 0.y.*, ^0.0.z admits only 0.0.z.
+const caretCovers = (range: string, version: string) => {
+  if (!range.startsWith("^")) return false;
+  const [bMaj, bMin, bPat] = range.slice(1).split(".").map(Number);
+  const [vMaj, vMin, vPat] = version.split(".").map(Number);
+  if (vMaj !== bMaj) return false;
+  if (bMaj === 0 && bMin === 0) return vMin === 0 && vPat === bPat;
+  if (bMaj === 0) return vMin === bMin && vPat! >= bPat!;
+  return vMin! > bMin! || (vMin === bMin && vPat! >= bPat!);
+};
+
+test("template ranges cover the workspace versions of @kurajs/docs and @kurajs/cli", () => {
+  for (const [dep, dir, deps] of [
+    ["@kurajs/docs", "docs", tpl.dependencies],
+    ["@kurajs/cli", "cli", tpl.devDependencies],
+  ] as const) {
+    const { version } = JSON.parse(read(`../../${dir}/package.json`));
+    const range = deps[dep];
+    assert.ok(typeof range === "string", `template must declare ${dep} — no range found`);
+    assert.ok(
+      caretCovers(range, version),
+      `template's ${dep} range "${range}" does not cover the workspace version ${version} — bump the template`,
+    );
+  }
+});
+
 test("every `npm run X` in the quickstart maps to a real template script", () => {
   const scripts = new Set(Object.keys(tpl.scripts ?? {}));
   const qs = read("../template/content/docs/quickstart.md");
