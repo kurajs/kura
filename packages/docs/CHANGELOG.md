@@ -1,5 +1,16 @@
 # @kurajs/docs
 
+## 0.1.1
+
+### Patch Changes
+
+- [#81](https://github.com/kurajs/kura/pull/81) [`ceb342e`](https://github.com/kurajs/kura/commit/ceb342e4e3989e42af71ea9d7d67c8b5ab54ad44) Thanks [@linyiru](https://github.com/linyiru)! - Fix sidebar nav-tab sync hiding content `<Tabs>` on load: the shell's tab groups
+  now use `data-nav-tab` instead of `data-tab`, which the content Tabs component owns
+  for its buttons/panels. Previously, on any site with root-meta nav tabs, `sync()`'s
+  document-wide `[data-tab]` query set `hidden` on every content tab button and panel
+  (none match the active nav-tab key), collapsing each `<Tabs>` block to an empty box —
+  and the outlet MutationObserver re-applied it after every soft-nav.
+
 ## 0.1.0
 
 ### Minor Changes
