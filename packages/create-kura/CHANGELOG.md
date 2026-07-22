@@ -1,5 +1,11 @@
 # create-kura
 
+## 0.0.18
+
+### Patch Changes
+
+- [#79](https://github.com/kurajs/kura/pull/79) [`f97bd04`](https://github.com/kurajs/kura/commit/f97bd047380f8194262920f6a8eaad2ef88e584a) Thanks [@linyiru](https://github.com/linyiru)! - Scaffolded apps now depend on the current Kura packages (`@kurajs/docs` ^0.1.0, `@kurajs/cli` ^0.1.0) — the template still pointed at the pre-0.1.0 ranges after the Kura 0.1.0 release, so `create-kura` produced apps on the stale majors. A new test asserts the template's caret ranges cover the workspace versions, so the template can no longer silently fall behind a release.
+
 ## 0.0.17
 
 ### Patch Changes
