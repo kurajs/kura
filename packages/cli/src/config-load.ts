@@ -37,6 +37,23 @@ export type CliConfig = {
 
 const isStatic = (t?: string) => t === "github-pages" || t === "static";
 
+/** Resolve the user MDX-components module (KuraConfig.mdxComponents). An explicit config path wins
+ *  (relative to cwd) and MUST exist — a missing one is a config error the caller surfaces loudly.
+ *  Otherwise the Next.js-style `app/mdx-components.{ts,tsx,js,jsx,mjs}` convention when present.
+ *  Pure (no process.exit) so it's unit-testable and cli.ts owns the failure handling: returns
+ *  `{ path }` when resolved, `{ error }` for a missing explicit path, or `{}` when neither applies. */
+export function resolveComponentsModule(cwd: string, configured?: string): { path?: string; error?: string } {
+  if (configured) {
+    const p = path.resolve(cwd, configured);
+    return fs.existsSync(p) ? { path: p } : { error: `mdxComponents "${configured}" not found (resolved ${p})` };
+  }
+  for (const ext of ["ts", "tsx", "js", "jsx", "mjs"]) {
+    const conv = path.join(cwd, "app", `mdx-components.${ext}`);
+    if (fs.existsSync(conv)) return { path: conv };
+  }
+  return {};
+}
+
 export function loadCliConfig(cwd: string): CliConfig {
   const tomlPath = path.join(cwd, "kura.toml");
   if (fs.existsSync(tomlPath)) {

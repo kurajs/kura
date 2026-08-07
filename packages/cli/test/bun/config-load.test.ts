@@ -2,7 +2,7 @@ import { test, expect } from "bun:test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { loadCliConfig } from "../../src/config-load.ts";
+import { loadCliConfig, resolveComponentsModule } from "../../src/config-load.ts";
 
 // All of loadCliConfig runs under `bun test`: the kura.toml path needs Bun's native TOML loader, and
 // config-load's internal `.js` specifiers only resolve to `.ts` under Bun (not node --strip-types).
@@ -81,5 +81,68 @@ test("loadCliConfig: neither config file → source 'none', safe defaults", asyn
   expect(cfg.contentSources).toEqual([]);
   expect(cfg.basePathSegments).toEqual(["docs"]);
   expect(cfg.staticTarget).toBe(false);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+// ── mdxComponents: config surfacing (kura.toml + kura.config.ts) ──────────────────────────────────
+test("loadCliConfig: mdxComponents path is read from kura.toml (mdx_components)", async () => {
+  const dir = tmp('mdx_components = "./app/mdx-components.ts"\n');
+  const cfg = await loadCliConfig(dir);
+  expect(cfg.mdxComponents).toBe("./app/mdx-components.ts");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("loadCliConfig: mdxComponents path is text-scanned from kura.config.ts", async () => {
+  const dir = tmp({
+    "kura.config.ts":
+      'import { defineKura } from "@kurajs/docs";\n' +
+      'export default defineKura({ mdxComponents: "./app/mdx-components.tsx" });\n',
+  });
+  const cfg = await loadCliConfig(dir);
+  expect(cfg.mdxComponents).toBe("./app/mdx-components.tsx");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("loadCliConfig: no mdxComponents → undefined", async () => {
+  const dir = tmp('markdown = "commonmark"\n');
+  const cfg = await loadCliConfig(dir);
+  expect(cfg.mdxComponents).toBeUndefined();
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+// ── resolveComponentsModule: explicit path + convention detection ─────────────────────────────────
+test("resolveComponentsModule: an explicit path that exists resolves to an absolute path", () => {
+  const dir = tmp({ "app/mdx-components.ts": "export default {};\n" });
+  const r = resolveComponentsModule(dir, "./app/mdx-components.ts");
+  expect(r.error).toBeUndefined();
+  expect(r.path).toBe(path.join(dir, "app", "mdx-components.ts"));
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("resolveComponentsModule: an explicit path that is missing is a loud error, not a silent skip", () => {
+  const dir = tmp({});
+  const r = resolveComponentsModule(dir, "./app/nope.ts");
+  expect(r.path).toBeUndefined();
+  expect(r.error).toContain("nope.ts");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("resolveComponentsModule: auto-detects the app/mdx-components.* convention (tsx too)", () => {
+  const dir = tmp({ "app/mdx-components.tsx": "export default {};\n" });
+  const r = resolveComponentsModule(dir); // no explicit path → convention
+  expect(r.path).toBe(path.join(dir, "app", "mdx-components.tsx"));
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("resolveComponentsModule: explicit config path wins over the convention file", () => {
+  const dir = tmp({ "app/mdx-components.ts": "export default {};\n", "custom/comp.ts": "export default {};\n" });
+  const r = resolveComponentsModule(dir, "./custom/comp.ts");
+  expect(r.path).toBe(path.join(dir, "custom", "comp.ts"));
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("resolveComponentsModule: nothing configured and no convention file → {} (no override)", () => {
+  const dir = tmp({});
+  expect(resolveComponentsModule(dir)).toEqual({});
   fs.rmSync(dir, { recursive: true, force: true });
 });
