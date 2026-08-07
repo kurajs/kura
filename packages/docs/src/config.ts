@@ -88,6 +88,19 @@ export interface KuraConfig {
    */
   markdown?: "mdx" | "commonmark";
   /**
+   * A module PATH whose default export is a components map, merged OVER Kura's curated defaults
+   * (Callout, Card, Cards, Steps, Step, Tabs, Tab) for every `mdxToHtml` call — build, dev, and the
+   * runtime fallback all read the same precompiled HTML, so an override reaches every surface. The
+   * common case is an `img` override (resolve a CDN URL + width/height + a blur placeholder from a
+   * manifest at build) but any tag or curated component can be replaced. Give a path, not an inline
+   * map: `kura index` reads this config as TEXT (never executes it), then dynamically imports the
+   * module — so a declarative string is the only thing that survives. When omitted, an
+   * `app/mdx-components.ts` file is auto-detected (Next.js-style convention). **MDX mode only** — in
+   * `markdown: "commonmark"` there is no JSX/component layer, so components are ignored (use a
+   * rehype-level transform for HTML rewrites there).
+   */
+  mdxComponents?: string;
+  /**
    * Syntax highlighting. `langs` adds shiki-bundled grammar names (e.g. "hcl", "dockerfile",
    * "kotlin") on top of Kura's curated set — for DSL/code fences the defaults don't cover. Read as
    * text by `kura index` (config is never executed at build), so use plain string literals here.
@@ -173,6 +186,7 @@ export function fromKuraToml(raw: Record<string, unknown>): KuraConfig {
   const cfg: Record<string, unknown> = {};
   if (r.site) cfg.site = rename(r.site, { title_template: "titleTemplate" });
   if (r.markdown) cfg.markdown = r.markdown;
+  if (r.mdx_components !== undefined) cfg.mdxComponents = r.mdx_components;
   if (r.base_path !== undefined) cfg.basePath = r.base_path;
   if (r.sections) cfg.sections = r.sections;
   if (r.highlight) cfg.highlight = r.highlight;
