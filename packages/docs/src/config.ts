@@ -186,7 +186,7 @@ export function fromKuraToml(raw: Record<string, unknown>): KuraConfig {
   const cfg: Record<string, unknown> = {};
   if (r.site) cfg.site = rename(r.site, { title_template: "titleTemplate" });
   if (r.markdown) cfg.markdown = r.markdown;
-  if (r.mdx_components !== undefined) cfg.mdxComponents = r.mdx_components;
+  if (typeof r.mdx_components === "string") cfg.mdxComponents = r.mdx_components; // other types: ignored, not coerced
   if (r.base_path !== undefined) cfg.basePath = r.base_path;
   if (r.sections) cfg.sections = r.sections;
   if (r.highlight) cfg.highlight = r.highlight;
