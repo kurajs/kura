@@ -98,3 +98,10 @@ test("fromKuraToml: repo accepts a string or false, ignores other types", () => 
   assert.equal(fromKuraToml({ repo: true } as never).repo, undefined);
   assert.equal(fromKuraToml({}).repo, undefined);
 });
+
+test("fromKuraToml: mdx_components accepts a string only, ignores other types", () => {
+  assert.equal(fromKuraToml({ mdx_components: "./app/mdx-components.tsx" }).mdxComponents, "./app/mdx-components.tsx");
+  assert.equal(fromKuraToml({ mdx_components: 42 } as never).mdxComponents, undefined);
+  assert.equal(fromKuraToml({ mdx_components: true } as never).mdxComponents, undefined);
+  assert.equal(fromKuraToml({}).mdxComponents, undefined);
+});

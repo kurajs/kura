@@ -13,6 +13,7 @@ import {
   parseContentSources,
   parseI18nLocales,
   parseDeployTarget,
+  parseMdxComponents,
   type ContentSource,
 } from "./config-read.js";
 import { parseBasePath, basePathToSegments } from "./routes.js";
@@ -23,6 +24,7 @@ export type CliConfig = {
   locales: string[];
   commonmark: boolean;
   highlightLangs: string[];
+  mdxComponents?: string; // module path whose default export merges over the curated MDX components
   staticTarget: boolean; // github-pages / static → drop the dynamic OG route, prerender to files
   basePathSegments: string[]; // where the docs catch-all route is placed
   hasNav: boolean; // config.nav (virtual navigation) present
@@ -34,6 +36,27 @@ export type CliConfig = {
 };
 
 const isStatic = (t?: string) => t === "github-pages" || t === "static";
+
+/** Resolve the user MDX-components module (KuraConfig.mdxComponents). An explicit config path wins
+ *  (relative to cwd) and MUST exist — a missing one is a config error the caller surfaces loudly.
+ *  Otherwise the Next.js-style `app/mdx-components.{ts,tsx,js,jsx,mjs}` convention when present.
+ *  Pure (no process.exit) so it's unit-testable and cli.ts owns the failure handling: returns
+ *  `{ path }` when resolved, `{ error }` for a missing explicit path, or `{}` when neither applies. */
+export function resolveComponentsModule(cwd: string, configured?: string): { path?: string; error?: string } {
+  // Must be a FILE, not merely an existing path — a directory would pass existsSync and only fail
+  // later at dynamic import with a far less actionable error.
+  const isFile = (p: string) => fs.existsSync(p) && fs.statSync(p).isFile();
+  if (configured) {
+    const p = path.resolve(cwd, configured);
+    if (isFile(p)) return { path: p };
+    return { error: `mdxComponents "${configured}" ${fs.existsSync(p) ? "is not a file" : "not found"} (resolved ${p})` };
+  }
+  for (const ext of ["ts", "tsx", "js", "jsx", "mjs"]) {
+    const conv = path.join(cwd, "app", `mdx-components.${ext}`);
+    if (isFile(conv)) return { path: conv };
+  }
+  return {};
+}
 
 export function loadCliConfig(cwd: string): CliConfig {
   const tomlPath = path.join(cwd, "kura.toml");
@@ -59,6 +82,7 @@ export function loadCliConfig(cwd: string): CliConfig {
       locales,
       commonmark: raw.markdown === "commonmark",
       highlightLangs: (raw.highlight as { langs?: string[] } | undefined)?.langs ?? [],
+      ...(typeof raw.mdx_components === "string" ? { mdxComponents: raw.mdx_components } : {}),
       staticTarget: isStatic((raw.deploy as { target?: string } | undefined)?.target),
       basePathSegments: basePathToSegments(raw.base_path as string | undefined),
       hasNav: !!raw.nav,
@@ -77,6 +101,7 @@ export function loadCliConfig(cwd: string): CliConfig {
     locales: parseI18nLocales(txt),
     commonmark: isCommonmark(txt),
     highlightLangs: parseHighlightLangs(txt),
+    ...(() => { const p = parseMdxComponents(txt); return p ? { mdxComponents: p } : {}; })(),
     staticTarget: isStatic(parseDeployTarget(txt)),
     basePathSegments: parseBasePath(txt),
     hasNav: /\bnav\s*:\s*\{/.test(txt),

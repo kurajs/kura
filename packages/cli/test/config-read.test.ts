@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { stripConfigComments, isCommonmark, parseHighlightLangs, parseContentSources, parseI18nLocales, parseDeployTarget, isStaticTarget } from "../src/config-read.ts";
+import { stripConfigComments, isCommonmark, parseHighlightLangs, parseContentSources, parseI18nLocales, parseDeployTarget, isStaticTarget, parseMdxComponents } from "../src/config-read.ts";
 
 // The CLI reads kura.config.ts as TEXT (never executes it). These pure parsers are the risky part —
 // regexes over user source — so they're pinned here directly (cli.ts can't be imported: it dispatches
@@ -8,6 +8,7 @@ import { stripConfigComments, isCommonmark, parseHighlightLangs, parseContentSou
 const parse = (src: string) => parseHighlightLangs(stripConfigComments(src));
 const cm = (src: string) => isCommonmark(stripConfigComments(src));
 const sources = (src: string) => parseContentSources(stripConfigComments(src));
+const mdxComp = (src: string) => parseMdxComponents(stripConfigComments(src));
 
 test("parseContentSources: pulls dir/collection/mount from content.sources; collection defaults to docs", () => {
   const src = `export default defineKura({
@@ -30,6 +31,17 @@ test("parseContentSources: no content block / empty sources / dir-less object �
   assert.deepEqual(sources(`export default { markdown: "commonmark" };`), []);
   assert.deepEqual(sources(`export default { content: { sources: [] } };`), []);
   assert.deepEqual(sources(`export default { content: { sources: [{ mount: "x" }] } };`), []);
+});
+
+test("parseMdxComponents: pulls the module path from a double- or single-quoted string", () => {
+  assert.equal(mdxComp(`export default defineKura({ mdxComponents: "./app/mdx-components.ts" });`), "./app/mdx-components.ts");
+  assert.equal(mdxComp(`export default { mdxComponents: '../shared/components.tsx' };`), "../shared/components.tsx");
+});
+
+test("parseMdxComponents: absent → undefined; a commented-out setting must NOT take effect", () => {
+  assert.equal(mdxComp(`export default { markdown: "commonmark" };`), undefined);
+  assert.equal(mdxComp(`export default {\n  // mdxComponents: "./app/mdx-components.ts"\n};`), undefined);
+  assert.equal(mdxComp(`export default {\n  /* mdxComponents: "./x.ts" */\n};`), undefined);
 });
 
 test("parseI18nLocales: defaultLocale + locales keys, bare and quoted, nested values walked over", () => {

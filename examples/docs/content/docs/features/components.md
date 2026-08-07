@@ -63,3 +63,52 @@ Wrap an ordered list in `<Steps>` for a guided sequence.
     Run `bun install` to add dependencies.
   </Tab>
 </Tabs>
+
+## Custom components
+
+Override any tag or curated component with your own. Point `mdxComponents` at a module whose default
+export is a components map — or just drop an `app/mdx-components.ts` file and Kura auto-detects it
+(Next.js-style). Your exports merge **over** the curated defaults, so the built-ins keep working
+unless you replace them.
+
+```ts
+// kura.config.ts
+import { defineKura } from "@kurajs/docs";
+
+export default defineKura({
+  mdxComponents: "./app/mdx-components.ts",
+});
+```
+
+```ts
+// app/mdx-components.ts — resolve every Markdown image against a CDN/asset manifest at build time
+import { createElement } from "react";
+import manifest from "./image-manifest.json";
+
+export default {
+  img: (props: { src?: string; alt?: string }) => {
+    const asset = manifest[props.src ?? ""];
+    return createElement("img", {
+      src: asset?.url ?? props.src,
+      alt: props.alt,
+      width: asset?.width,
+      height: asset?.height,
+      style: asset?.placeholder ? { background: asset.placeholder } : undefined,
+    });
+  },
+};
+```
+
+The override runs everywhere the docs render — `kura build`, `kura dev`, and the runtime fallback all
+read the same precompiled HTML. A few things to know:
+
+<Callout type="note" title="Module path, not an inline map">
+  `mdxComponents` is a **path** (a string). `kura index` reads your config as text and never executes
+  it, then imports the module itself — so an inline object wouldn't survive. `kura.toml` projects use
+  `mdx_components = "./app/mdx-components.ts"`.
+</Callout>
+
+<Callout type="warning" title="MDX mode only">
+  Components are a JSX/MDX feature. In `markdown: "commonmark"` there is no component layer, so the
+  map is ignored — use a rehype-level transform there instead.
+</Callout>

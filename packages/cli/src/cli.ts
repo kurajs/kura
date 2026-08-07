@@ -7,7 +7,7 @@
 //     A content hash short-circuits re-embedding when nothing changed (cheap to run pre-dev).
 import { buildIndex } from "@kurajs/docs/search";
 import { docsRoute, pruneStaleDocsRoutes } from "./routes.js";
-import { loadCliConfig } from "./config-load.js";
+import { loadCliConfig, resolveComponentsModule } from "./config-load.js";
 import { collectMeta, collectLastUpdated, discoverLocales } from "./content-walk.js";
 import { repoRootOf, detectRepo, gitOriginUrl, linkRef, sourceMapOf, repoPathMapper, collectSourcePaths, gitTrackedFiles, collectRepoTargets, renderLinksTs } from "./links-freeze.js";
 import { contentTrees, contentPathMapper, collectImageRefs, renderAssetsTs, copyContentAssets, readFrozenAssetFiles, renderAssetsRoute } from "./assets-freeze.js";
@@ -198,9 +198,21 @@ async function cmdIndex(): Promise<void> {
   // so projects can highlight DSL fences the defaults miss (e.g. "hcl", "dockerfile").
   const highlightLangs = cfg.highlightLangs;
 
+  // User MDX components (KuraConfig.mdxComponents, or the app/mdx-components.* convention): a module
+  // whose default export merges OVER the curated defaults for every render (build, dev, and the
+  // runtime fallback all read the same frozen _mdx.ts, so an override reaches every surface). Its
+  // SOURCE feeds the content hash below, so editing the module triggers a rebuild; it's dynamically
+  // imported at precompile time. Ignored in commonmark mode — no JSX/component layer exists there.
+  const componentsModule = commonmark ? undefined : (() => {
+    const r = resolveComponentsModule(cwd, cfg.mdxComponents);
+    if (r.error) { console.error(`kura index: ${r.error}. Fix the path in your kura config.`); process.exit(1); }
+    return r.path;
+  })();
+  const componentsSrc = componentsModule ? fs.readFileSync(componentsModule, "utf8") : "";
+
   // Content hash — skip rebuilds when nothing changed, so `kura index` is cheap to run before
-  // every dev/build. Covers the mode + format + model + locale/slug/body of every entry.
-  const hashInput = JSON.stringify([model, noEmbed, format, highlightLangs, contentSources, [...declaredLocales].sort(), allEntries.map((e) => [e.locale ?? "", e.slug, e.body])]);
+  // every dev/build. Covers the mode + format + model + components override + locale/slug/body of every entry.
+  const hashInput = JSON.stringify([model, noEmbed, format, highlightLangs, componentsSrc, contentSources, [...declaredLocales].sort(), allEntries.map((e) => [e.locale ?? "", e.slug, e.body])]);
   const contentHash = crypto.createHash("sha256").update(hashInput).digest("hex").slice(0, 16);
   const stamp = `// content-hash: ${contentHash}\n`;
   const hashOf = (f: string) => (fs.existsSync(f) ? fs.readFileSync(f, "utf8").match(/content-hash: (\S+)/)?.[1] : undefined);
@@ -254,13 +266,33 @@ async function cmdIndex(): Promise<void> {
   // Bucketed by locale: "default" for the flat (default-locale) files, plus one per variant locale.
   // renderMdxBuckets collects per-page failures instead of throwing (the silent-drop guard lives in
   // @kurajs/docs so it's unit-tested there).
-  const { renderMdxBuckets } = await import("@kurajs/docs/mdx");
+  const { renderMdxBuckets, mdxComponents } = await import("@kurajs/docs/mdx");
+  // Merge the user components module (if any) OVER the curated defaults, once — the same object is
+  // reused for every page, so the identity-keyed mdxToHtml cache still hits across the whole build.
+  let components: Record<string, unknown> | undefined;
+  if (componentsModule) {
+    let mod: { default?: unknown };
+    try {
+      mod = await import(pathToFileURL(componentsModule).href);
+    } catch (err) {
+      console.error(`kura index: failed to import mdxComponents "${path.relative(cwd, componentsModule)}" — ${(err as Error).message}`);
+      console.error("  (JSX under plain Node needs precompiling; use `createElement` in a .ts module, or run under a JSX-capable runtime.)");
+      process.exit(1);
+    }
+    const userComponents = mod.default;
+    if (!userComponents || typeof userComponents !== "object") {
+      console.error(`kura index: mdxComponents "${path.relative(cwd, componentsModule)}" must default-export a components map (object). Got ${userComponents === undefined ? "no default export" : typeof userComponents}.`);
+      process.exit(1);
+    }
+    components = { ...mdxComponents, ...(userComponents as Record<string, unknown>) };
+    console.log(`kura index: mdxComponents — merged ${Object.keys(userComponents as object).length} override(s) from ${path.relative(cwd, componentsModule)}`);
+  }
   const byLocale = new Map<string, Entry[]>();
   for (const e of variants) byLocale.set(e.locale!, [...(byLocale.get(e.locale!) ?? []), e]);
   const { map, failures } = await renderMdxBuckets([
     { bucket: "default", entries: DOCS },
     ...[...byLocale].map(([bucket, entries]) => ({ bucket, entries })),
-  ], undefined, format, highlightLangs);
+  ], components, format, highlightLangs);
   fs.writeFileSync(
     mdxTs,
     stamp +
