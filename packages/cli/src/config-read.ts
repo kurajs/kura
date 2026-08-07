@@ -15,6 +15,13 @@ export function isCommonmark(strippedCfg: string): boolean {
   return /\bmarkdown\s*:\s*["']commonmark["']/.test(strippedCfg);
 }
 
+/** The user MDX-components module PATH from `mdxComponents: "…"`, or undefined. A string literal
+ *  (a module path) — never an inline object — because `kura index` reads config as text and can't
+ *  evaluate a components map; the CLI dynamically imports this path instead. */
+export function parseMdxComponents(strippedCfg: string): string | undefined {
+  return strippedCfg.match(/\bmdxComponents\s*:\s*["']([^"']+)["']/)?.[1];
+}
+
 /** The deploy target from `deploy: { target: "…" }`, or undefined. The deploy block is flat
  *  (target/name/domain/basePath — no nesting), so a `[^}]*` scan to the target key is safe. */
 export function parseDeployTarget(strippedCfg: string): string | undefined {

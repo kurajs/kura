@@ -13,6 +13,7 @@ import {
   parseContentSources,
   parseI18nLocales,
   parseDeployTarget,
+  parseMdxComponents,
   type ContentSource,
 } from "./config-read.js";
 import { parseBasePath, basePathToSegments } from "./routes.js";
@@ -23,6 +24,7 @@ export type CliConfig = {
   locales: string[];
   commonmark: boolean;
   highlightLangs: string[];
+  mdxComponents?: string; // module path whose default export merges over the curated MDX components
   staticTarget: boolean; // github-pages / static → drop the dynamic OG route, prerender to files
   basePathSegments: string[]; // where the docs catch-all route is placed
   hasNav: boolean; // config.nav (virtual navigation) present
@@ -59,6 +61,7 @@ export function loadCliConfig(cwd: string): CliConfig {
       locales,
       commonmark: raw.markdown === "commonmark",
       highlightLangs: (raw.highlight as { langs?: string[] } | undefined)?.langs ?? [],
+      ...(typeof raw.mdx_components === "string" ? { mdxComponents: raw.mdx_components } : {}),
       staticTarget: isStatic((raw.deploy as { target?: string } | undefined)?.target),
       basePathSegments: basePathToSegments(raw.base_path as string | undefined),
       hasNav: !!raw.nav,
@@ -77,6 +80,7 @@ export function loadCliConfig(cwd: string): CliConfig {
     locales: parseI18nLocales(txt),
     commonmark: isCommonmark(txt),
     highlightLangs: parseHighlightLangs(txt),
+    ...(() => { const p = parseMdxComponents(txt); return p ? { mdxComponents: p } : {}; })(),
     staticTarget: isStatic(parseDeployTarget(txt)),
     basePathSegments: parseBasePath(txt),
     hasNav: /\bnav\s*:\s*\{/.test(txt),
