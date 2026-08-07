@@ -43,13 +43,17 @@ const isStatic = (t?: string) => t === "github-pages" || t === "static";
  *  Pure (no process.exit) so it's unit-testable and cli.ts owns the failure handling: returns
  *  `{ path }` when resolved, `{ error }` for a missing explicit path, or `{}` when neither applies. */
 export function resolveComponentsModule(cwd: string, configured?: string): { path?: string; error?: string } {
+  // Must be a FILE, not merely an existing path — a directory would pass existsSync and only fail
+  // later at dynamic import with a far less actionable error.
+  const isFile = (p: string) => fs.existsSync(p) && fs.statSync(p).isFile();
   if (configured) {
     const p = path.resolve(cwd, configured);
-    return fs.existsSync(p) ? { path: p } : { error: `mdxComponents "${configured}" not found (resolved ${p})` };
+    if (isFile(p)) return { path: p };
+    return { error: `mdxComponents "${configured}" ${fs.existsSync(p) ? "is not a file" : "not found"} (resolved ${p})` };
   }
   for (const ext of ["ts", "tsx", "js", "jsx", "mjs"]) {
     const conv = path.join(cwd, "app", `mdx-components.${ext}`);
-    if (fs.existsSync(conv)) return { path: conv };
+    if (isFile(conv)) return { path: conv };
   }
   return {};
 }

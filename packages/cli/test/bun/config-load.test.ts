@@ -146,3 +146,17 @@ test("resolveComponentsModule: nothing configured and no convention file → {} 
   expect(resolveComponentsModule(dir)).toEqual({});
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test("resolveComponentsModule: an explicit path that is a DIRECTORY is a loud error, not a module", () => {
+  const dir = tmp({ "custom/comp.ts/keep": "" }); // makes custom/comp.ts a directory
+  const r = resolveComponentsModule(dir, "./custom/comp.ts");
+  expect(r.path).toBeUndefined();
+  expect(r.error).toContain("is not a file");
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("resolveComponentsModule: a convention path that is a DIRECTORY is skipped, not resolved", () => {
+  const dir = tmp({ "app/mdx-components.ts/keep": "" });
+  expect(resolveComponentsModule(dir)).toEqual({});
+  fs.rmSync(dir, { recursive: true, force: true });
+});
