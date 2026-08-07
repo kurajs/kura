@@ -115,6 +115,19 @@ async function getHighlighter(extraLangs: readonly string[] = []): Promise<Highl
 
 const cache = new Map<string, string>();
 
+// Each distinct components map gets a stable numeric id (WeakMap-backed), folded into the MDX cache
+// key. This lets a CUSTOM components map (KuraConfig.mdxComponents) cache correctly — a build uses a
+// single merged map for every page, so all its calls share one id and hit the cache — while never
+// colliding with another map's output (different identity → different key). The curated default map
+// is just another identity. WeakMap keys let unused maps be GC'd.
+let _componentsSeq = 0;
+const componentsIds = new WeakMap<object, number>();
+function componentsId(components: Record<string, unknown>): number {
+  let id = componentsIds.get(components);
+  if (id === undefined) { id = _componentsSeq++; componentsIds.set(components, id); }
+  return id;
+}
+
 // --- CommonMark path (markdown: "commonmark" / --commonmark): render with the sparkdown-gfm wasm
 // (fast, CommonMark-strict so a literal `{…}` is text, GFM tables/strikethrough/task-lists/autolinks),
 // then highlight code blocks with the SAME shiki highlighter the MDX path uses — so both modes get
@@ -166,7 +179,7 @@ async function renderCommonmark(source: string, langs: readonly string[] = []): 
   return highlightCommonmark(commonmarkToHtmlSync(source), highlighter);
 }
 
-/** Compile a doc to a static HTML string. Cached (default components only — see below).
+/** Compile a doc to a static HTML string. Cached per (components-identity, format, source).
  *  `format`: "mdx" (default) parses JS expressions `{…}` and JSX `<Tag/>` via @mdx-js, so the curated
  *  components (Callout/Tabs/…) render; "md" is plain CommonMark + GFM via the sparkdown-gfm wasm — no
  *  MDX/JSX parsing, so a literal `{…}` is text (a literal `<tag>` is still raw HTML) and the curated JSX
@@ -178,13 +191,12 @@ export async function mdxToHtml(
   format: "mdx" | "md" = "mdx",
   langs: readonly string[] = [],
 ): Promise<string> {
-  // The cache key is format+source — it can't capture the `components` mapping identity, so only use
-  // the cache for the default components (the only mapping any caller passes in practice). Custom
-  // components bypass the cache to stay correct. `langs` is build-global (fixes the highlighter
-  // singleton on first call), so it doesn't vary within a process and needn't be in the key.
-  const cacheable = components === mdxComponents;
-  const key = `${format}\0${source}`;
-  if (cacheable) { const hit = cache.get(key); if (hit !== undefined) return hit; }
+  // Key on the components-map IDENTITY (see componentsId) so a custom map caches correctly across a
+  // build yet never collides with another map's output. CommonMark ("md") ignores components, so its
+  // key omits the id — one entry per source regardless of the map passed. `langs` is build-global
+  // (fixes the highlighter singleton on first call), so it needn't be in the key.
+  const key = format === "md" ? `md\0${source}` : `mdx\0${componentsId(components)}\0${source}`;
+  { const hit = cache.get(key); if (hit !== undefined) return hit; }
   let html: string;
   if (format === "md") {
     html = await renderCommonmark(source, langs); // sparkdown-gfm + shiki; components are irrelevant in CommonMark
@@ -205,7 +217,7 @@ export async function mdxToHtml(
     const Content = (mod as { default: (props: { components?: unknown }) => unknown }).default;
     html = renderToStaticMarkup(createElement(Content as never, { components }) as never);
   }
-  if (cacheable) cache.set(key, html);
+  cache.set(key, html);
   return html;
 }
 
