@@ -1,5 +1,11 @@
 # create-kura
 
+## 0.0.19
+
+### Patch Changes
+
+- [#87](https://github.com/kurajs/kura/pull/87) [`6061ee2`](https://github.com/kurajs/kura/commit/6061ee2833bf3ea0148d497b09f17aa975e8a854) Thanks [@linyiru](https://github.com/linyiru)! - The scaffolded project now depends on `@kurajs/docs ^0.2.0` and `@kurajs/cli ^0.2.0`. The 0.2.0 release bumped both packages but left the template on `^0.1.0`, which a 0.x caret does not extend to — a fresh `create-kura` app installed the previous minor, and the template guard test has been failing on `main` since.
+
 ## 0.0.18
 
 ### Patch Changes
