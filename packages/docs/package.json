@@ -82,7 +82,7 @@
     "shiki": "^4.2.0"
   },
   "peerDependencies": {
-    "@junejs/core": ">=0.1.0 <0.2.0",
+    "@junejs/core": ">=0.1.0 <0.3.0 || >=0.2.0-0 <0.3.0",
     "react": "^19",
     "react-dom": "^19",
     "@junejs/db": "*"
@@ -102,7 +102,7 @@
     }
   },
   "devDependencies": {
-    "@junejs/core": ">=0.1.0 <0.2.0",
+    "@junejs/core": ">=0.1.0 <0.3.0 || >=0.2.0-0 <0.3.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "happy-dom": "^20.10.6",
