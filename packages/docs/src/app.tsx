@@ -174,13 +174,22 @@ export function createDocs<T extends DocLike>(opts: {
   const site: SiteInfo = { name: opts.config.site?.name, brand: opts.config.site?.brand };
   // i18n search scope: the merged variant-else-default set per locale (June's `docs` lister), the
   // declared tags (bounds per-locale caches), and the default locale (locale-less text belongs to it).
+  // MDX html for an entry: its own locale bucket → the default bucket → plain markdown html.
+  const mdxFor = (e: T): string =>
+    opts.mdxHtml?.[e.locale ?? "default"]?.[e.slug] ?? opts.mdxHtml?.default?.[e.slug] ?? e.html;
+  // Search indexes the html the page RENDERS (mdxFor), not the entry's own html: the page's heading
+  // anchors come from it (processHtml), so a hit's headingId must too, or deep links miss.
+  const rendered = (e: T): T => {
+    const html = mdxFor(e);
+    return html === e.html ? e : { ...e, html };
+  };
   const search = createSearch({
-    entries: DOCS,
+    entries: DOCS.map(rendered),
     embedder: opts.config.embedder,
     indexBytes: opts.indexBytes,
     tokenizer: opts.config.tokenizer,
     ...(i18n && docs
-      ? { defaultLocale, entriesFor: (l: string) => docs(l), knownLocales: Object.keys(i18n.locales) }
+      ? { defaultLocale, entriesFor: (l: string) => docs(l).map(rendered), knownLocales: Object.keys(i18n.locales) }
       : {}),
   });
   const actions = docsActions({ search, entries: DOCS, doc, sourcePaths: opts.links?.sourcePaths, localeSourcePaths: opts.links?.localeSourcePaths });
@@ -367,10 +376,6 @@ export function createDocs<T extends DocLike>(opts: {
     );
   };
 
-  // MDX html for an entry: its own locale bucket → the default bucket → plain markdown html.
-  const mdxFor = (e: T): string =>
-    opts.mdxHtml?.[e.locale ?? "default"]?.[e.slug] ?? opts.mdxHtml?.default?.[e.slug] ?? e.html;
-
   const viewOf = (e: T, locale?: string): DocView => {
     const { html: anchored, toc } = processHtml(mdxFor(e));
     const entrySrc = { slug: e.slug, locale: e.locale };
@@ -528,7 +533,8 @@ export function createDocs<T extends DocLike>(opts: {
       // the SOURCE stays the entry's own file (slug + its own locale).
       html: (() => {
         const entrySrc = { slug: e.slug, locale: e.locale };
-        let h = opts.links ? rewriteDocLinks(e.html, contentLinkResolver(locale ?? e.locale ?? defaultLocale, entrySrc)) : e.html;
+        const html = mdxFor(e); // what the page renders, so the client's headingIds match its anchors
+        let h = opts.links ? rewriteDocLinks(html, contentLinkResolver(locale ?? e.locale ?? defaultLocale, entrySrc)) : html;
         if (assetCtx) h = rewriteImgSrcs(h, assetResolverFor(entrySrc)); // ctrlk previews render <img>
         return h;
       })(),
