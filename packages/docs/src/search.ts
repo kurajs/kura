@@ -6,7 +6,7 @@ import { Bm25, rrfScored, latinTokenizer } from "@kurajs/search";
 import type { Tokenizer, TokenizerResolver } from "@kurajs/search";
 import { cjkSegmenter } from "@kurajs/tokenizers";
 import type { DocLike } from "./nav.ts";
-import { createHeadingIds, createSlugger } from "./nav.ts";
+import { createSlugger, headingIds, idAttrOf } from "./nav.ts";
 import { stripMdx } from "./util.ts";
 
 // Default per-locale keyword tokenizer policy: CJK locales get native word
@@ -28,8 +28,8 @@ export function defaultTokenizer(): TokenizerResolver {
   };
 }
 
-// `headingId` is the anchor processHtml gives the heading (June's own id, else a createHeadingIds
-// slug), so a hit deep-links to the exact rendered anchor (#heading); `heading` is the section's
+// `headingId` is the anchor processHtml gives the heading (June's own id, else its headingIds
+// GitHub slug), so a hit deep-links to the exact rendered anchor (#heading); `heading` is the section's
 // heading text (the page title still travels in `title`). The intro section (text before the first h2–h4) has an empty headingId → page top.
 export type SearchData = { slug: string; title: string; section: string; text: string; locale?: string; headingId?: string; heading?: string };
 export type SearchHit = { slug: string; title: string; section: string; text: string; score: number; locale?: string; headingId?: string; heading?: string; html?: string };
@@ -89,20 +89,17 @@ export function htmlToText(html: string): string {
 }
 
 /** Split rendered HTML into heading-anchored sections (h2–h4), mirroring {@link splitByHeadings} on
- *  markdown. Ids come from the SAME generator as processHtml (createHeadingIds: June's own id, else a
+ *  markdown. Ids come from the SAME pass as processHtml (headingIds: June's own id, else its GitHub
  *  slug), so a section's `headingId` matches the live page's anchor (deep-links land).
  *  Each section keeps its HTML (for a rich preview) and a derived plaintext (index + snippet). */
 function splitHtmlByHeadings(html: string): { headingId: string; heading: string; html: string; text: string }[] {
-  // The SAME id generator processHtml uses: June's own heading ids are reused as-is, so a hit's
-  // headingId is exactly the anchor on the live page (bare headings from an older June are slugged).
-  const idFor = createHeadingIds(html);
+  html = headingIds(html); // the anchors processHtml puts on the live page
   const out: { headingId: string; heading: string; html: string; text: string }[] = [];
   for (const part of html.split(/(?=<h[2-4]\b)/i)) {
     const m = /^<(h[2-4])(\s[^>]*)?>([\s\S]*?)<\/\1>/i.exec(part);
     if (m) {
-      const raw = m[3]!.replace(/<[^>]+>/g, "").trim(); // heading text as processHtml slugs it
       const rest = part.slice(m[0].length).trim();
-      out.push({ headingId: idFor(m[2], raw), heading: htmlToText(m[3]!), html: rest, text: htmlToText(rest) });
+      out.push({ headingId: idAttrOf(m[2])!, heading: htmlToText(m[3]!), html: rest, text: htmlToText(rest) });
     } else {
       // Intro (before the first h2) — drop the leading <h1> (the page title is shown separately).
       const rest = part.replace(/^\s*<h1\b[^>]*>[\s\S]*?<\/h1>/i, "").trim();

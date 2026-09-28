@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { treeOf, flattenTree, createNav, slugify, topFolderOf, activeTabIndex, normalizeBasePath, docPath, ogImageUrl, normalizeOgSlug, resolveOgSlug, canonicalUrl, processHtml, type NavNode, type DocLike } from "../src/nav.ts";
+import { treeOf, flattenTree, createNav, slugify, topFolderOf, activeTabIndex, normalizeBasePath, docPath, ogImageUrl, normalizeOgSlug, resolveOgSlug, canonicalUrl, processHtml, headingIds, type NavNode, type DocLike } from "../src/nav.ts";
 import { doc, DOCS, META } from "./fixtures.ts";
 
 // Tiny readers over the discriminated NavNode union.
@@ -107,6 +107,30 @@ test("slugify: lowercases, dashes spaces, drops punctuation", () => {
   assert.equal(slugify("Getting Started"), "getting-started");
 });
 
+// GitHub's algorithm (github-slugger), as June renders heading ids — see nav.ts.
+test("slugify: GitHub-compatible — keeps _ and every script, one dash per space, 'section' when empty", () => {
+  assert.equal(slugify("snake_case_opt"), "snake_case_opt");
+  assert.equal(slugify("API_KEY vs. api key"), "api_key-vs-api-key");
+  assert.equal(slugify("A & B"), "a--b"); // spaces are not collapsed
+  assert.equal(slugify("Café au lait"), "café-au-lait");
+  assert.equal(slugify("日本語 見出し"), "日本語-見出し");
+  assert.equal(slugify("🎉!"), "section");
+});
+
+test("headingIds: every level, one document-wide de-dup, entities decoded, authored ids kept", () => {
+  assert.equal(
+    headingIds("<h1>Guide</h1><h2>Guide</h2><h2>Setup</h2><h2>Setup</h2><h3>Setup 1</h3><h6>Q&amp;A</h6>"),
+    '<h1 id="guide">Guide</h1><h2 id="guide-1">Guide</h2><h2 id="setup">Setup</h2><h2 id="setup-1">Setup</h2>' +
+      '<h3 id="setup-1-1">Setup 1</h3><h6 id="qa">Q&amp;A</h6>',
+  );
+  // an authored id is kept and never generated again; an empty id="" is dropped for a real one
+  assert.equal(headingIds("<h2 id='setup'>Intro</h2><h2>Setup</h2><h2 id=\"\" class=\"x\">X</h2>"),
+    "<h2 id='setup'>Intro</h2><h2 id=\"setup-1\">Setup</h2><h2 class=\"x\" id=\"x\">X</h2>");
+  // idempotent: html June already anchored passes through unchanged
+  const once = headingIds("<h2>A</h2><h3>B <code>c</code></h3>");
+  assert.equal(headingIds(once), once);
+});
+
 test("topFolderOf: the first slug segment (or '' for a bare slug)", () => {
   assert.equal(topFolderOf("features/search/semantic"), "features");
   assert.equal(topFolderOf("features"), "features");
@@ -150,7 +174,7 @@ test("processHtml: extracts h2–h4, injects ids, and strips inline markup from 
   ]);
   assert.match(html, /<h2 id="intro">Intro<\/h2>/);
   assert.match(html, /<h4 id="edge">Edge<\/h4>/);
-  assert.match(html, /<h5>Skipped<\/h5>/); // h5 untouched (no id, not in toc)
+  assert.match(html, /<h5 id="skipped">Skipped<\/h5>/); // anchored like every heading (as June does), but not in toc
 });
 
 test("processHtml: de-dups repeated heading slugs (-1, -2) so anchors stay unique", () => {

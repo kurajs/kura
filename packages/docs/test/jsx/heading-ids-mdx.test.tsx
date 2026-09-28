@@ -1,7 +1,8 @@
-// A page renders its precompiled MDX (opts.mdxHtml) when there is one, not the entry's own html —
-// and the two can disagree on heading ids: June's html carries June's ids, while the MDX precompile
-// emits bare headings that processHtml slugs. Search must index what the page RENDERS, or a hit's
-// headingId names an anchor that isn't on the page. Every search surface is checked against the
+// A page renders its precompiled MDX (opts.mdxHtml) when there is one, not the entry's own html.
+// June's html carries June's ids, while the MDX precompile emits bare headings that processHtml
+// anchors with the same GitHub algorithm, so both agree. Search must still index what the page
+// RENDERS (an authored id or MDX-only heading exists in only one of them), or a hit's headingId
+// can name an anchor that isn't on the page. Every search surface is checked against the
 // page's own ToC: server keyword, semantic, and the static corpus the browser indexes.
 // Imports app.tsx (JSX) → runs under bun (see package.json).
 import { test, expect } from "bun:test";
@@ -38,8 +39,8 @@ const pageAnchor = (kura: ReturnType<typeof mk>): string => {
   return doc.toc[0]!.id;
 };
 
-test("premise: the page anchors its MDX heading, not June's id", () => {
-  expect(pageAnchor(mk({}))).toBe("snakecaseopt");
+test("the page anchors its bare MDX heading with the same GitHub id June gives it", () => {
+  expect(pageAnchor(mk({}))).toBe("snake_case_opt");
 });
 
 test("keyword search: a hit's headingId is the page's anchor", async () => {
