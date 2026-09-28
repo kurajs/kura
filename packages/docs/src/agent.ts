@@ -1,8 +1,9 @@
 // llms.txt customization for a Kura site, fed to June via june.config.ts `agent.llms`.
-// June owns /llms.txt; this supplies the parts June can't know: Kura's canonical names (so
-// agents are pointed at `npm create kura` / `@kurajs/*`, not June's) and a list of every doc
-// page with its `.md` link (June only sees the `/docs/[[...slug]]` catch-all). No React/June
-// imports — safe to import from build config.
+// June owns /llms.txt; this supplies the part June can't know: Kura's canonical names (so
+// agents are pointed at `npm create kura` / `@kurajs/*`, not June's). The docs list comes from
+// the docs route's `llms` export (kura.docRoute.llms) on June versions that read it; on older
+// June, which only sees the `/docs/[[...slug]]` catch-all, this adds a flat "## Docs" list
+// instead. No React/June imports — safe to import from build config.
 import type { DocLike } from "./nav.ts";
 
 export function kuraLlms(opts: {
@@ -10,6 +11,9 @@ export function kuraLlms(opts: {
   DOCS: readonly DocLike[];
   /** Base path docs are served under. Default "/docs". */
   docsBase?: string;
+  /** June reads the docs route's `llms` export (@junejs/server ≥1.0.0-dev.29), so the docs are
+   *  listed from the route — sectioned and described — and this list would repeat them. */
+  routeLlms?: boolean;
 }): { framework: string[]; sections: string[] } {
   const base = opts.docsBase ?? "/docs";
   return {
@@ -21,10 +25,9 @@ export function kuraLlms(opts: {
       "- Packages live under the `@kurajs` scope: `@kurajs/docs`, `@kurajs/core`, `@kurajs/cli`.",
       "- Built on June (https://june.build); the underlying framework package is `@junejs/core`.",
     ],
-    sections: [
-      "## Docs",
-      ...opts.DOCS.map((d) => `- [${String(d.data.title ?? d.slug)}](${base}/${d.slug}.md)`),
-    ],
+    sections: opts.routeLlms
+      ? []
+      : ["## Docs", ...opts.DOCS.map((d) => `- [${String(d.data.title ?? d.slug)}](${base}/${d.slug}.md)`)],
   };
 }
 

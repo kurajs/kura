@@ -224,6 +224,10 @@ export function fromKuraToml(raw: Record<string, unknown>): KuraConfig {
 export function kuraJuneConfig<T extends DocLike>(
   config: KuraConfig,
   content: { DOCS: readonly T[] },
+  /** `routeLlms`: June lists the docs in /llms.txt from the docs route's `llms` export
+   *  (@junejs/server ≥1.0.0-dev.29), so the hand-built docs list is left out. The Kura CLI sets
+   *  it from the June version it runs; see kuraLlms. */
+  opts: { routeLlms?: boolean } = {},
 ): unknown {
   // Lazy import so @junejs/core is only resolved at runtime (peer dep — always present in a
   // running Kura app, because @kurajs/cli brings in @junejs/cli which brings in @junejs/core).
@@ -245,7 +249,7 @@ export function kuraJuneConfig<T extends DocLike>(
     ...(isStatic && deploy?.basePath ? { basePath: deploy.basePath } : {}),
     ...(i18n ? { i18n } : {}),
     ...(sources.length ? { content: { sources } } : {}),
-    agent: { enabled: true, llms: kuraLlms({ DOCS: content.DOCS }) },
+    agent: { enabled: true, llms: kuraLlms({ DOCS: content.DOCS, routeLlms: opts.routeLlms }) },
     ...june,
   };
 }

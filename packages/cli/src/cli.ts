@@ -7,6 +7,7 @@
 //     A content hash short-circuits re-embedding when nothing changed (cheap to run pre-dev).
 import { buildIndex } from "@kurajs/docs/search";
 import { docsRoute, pruneStaleDocsRoutes } from "./routes.js";
+import { juneServerVersion, supportsRouteLlms } from "./june-version.js";
 import { loadCliConfig, resolveComponentsModule } from "./config-load.js";
 import { collectMeta, collectLastUpdated, discoverLocales } from "./content-walk.js";
 import { repoRootOf, detectRepo, gitOriginUrl, linkRef, sourceMapOf, repoPathMapper, collectSourcePaths, gitTrackedFiles, collectRepoTargets, renderLinksTs } from "./links-freeze.js";
@@ -507,12 +508,14 @@ function generateJuneConfig(cwd: string): void {
 
   const HEADER = `// @kura-generated — do not edit. Configure your site in ${cfgFile} instead.\n`;
 
-  // .june/config.ts
+  // .june/config.ts — on a June that lists the docs route's `llms` export in /llms.txt, drop Kura's
+  // hand-built docs list there so the docs aren't listed twice (see june-version.ts).
+  const routeLlms = supportsRouteLlms(juneServerVersion(findJuneBin(cwd)));
   writeIfChanged(path.join(juneDir, "config.ts"),
     HEADER +
     cfgImports(configRef.config, false) +
     'import { DOCS } from "../app/_content";\n' +
-    "\nexport default kuraJuneConfig(kuraConfig, { DOCS });\n",
+    `\nexport default kuraJuneConfig(kuraConfig, { DOCS }${routeLlms ? ", { routeLlms: true }" : ""});\n`,
   );
 
   // .june/routes/_kura.ts — createDocs() singleton; imported by every route below.
@@ -554,6 +557,7 @@ function generateJuneConfig(cwd: string): void {
     "export const md = kura.home.md;\n" +
     "export const json = kura.home.json;\n" +
     "export const metadata = kura.home.metadata;\n" +
+    "export const llms = kura.home.llms;\n" +
     "export default kura.home.View;\n",
   );
 
@@ -568,6 +572,8 @@ function generateJuneConfig(cwd: string): void {
     // staticPaths enumerates every doc page (× locale) so the static() target prerenders this
     // dynamic catch-all to files. Inert on server targets (June only reads it when building static).
     "export const staticPaths = kura.docRoute.staticPaths;\n" +
+    // The docs' /llms.txt entries — read by June ≥ server 1.0.0-dev.29, ignored by older June.
+    "export const llms = kura.docRoute.llms;\n" +
     "export default kura.docRoute.View;\n",
   );
 
@@ -578,6 +584,7 @@ function generateJuneConfig(cwd: string): void {
     "export const loader = kura.searchRoute.loader;\n" +
     "export const json = kura.searchRoute.json;\n" +
     "export const metadata = kura.searchRoute.metadata;\n" +
+    "export const llms = kura.searchRoute.llms;\n" +
     "export default kura.searchRoute.View;\n",
   );
 

@@ -24,6 +24,9 @@ import { createOgRoute } from "./og.js";
 
 type DocCtx = { params?: { slug?: string }; locale?: string };
 type SearchCtx = { url: URL; locale?: string };
+/** One /llms.txt link — the shape of `LlmsEntry` in @junejs/core/route (≥0.2.0-dev.50), declared
+ *  here so Kura still type-checks against the June releases that predate it. */
+type LlmsEntry = { path: string; title: string; description?: string; section: string };
 
 /** A June content finder: `doc(slug)` single-locale, `doc(slug, locale)` localized. */
 type Finder<T> = (slug: string, locale?: string, opts?: { fallback?: boolean }) => T | null | undefined;
@@ -502,6 +505,37 @@ export function createDocs<T extends DocLike>(opts: {
       }
       return [...seen];
     },
+    // The docs' /llms.txt entries, read by June's route `llms` export (@junejs/server
+    // ≥1.0.0-dev.29; older June ignores the export). One H2 per sidebar group, in sidebar order,
+    // each page with its frontmatter description; pages the sidebar leaves out still get listed,
+    // under "Docs". Default locale only: llms.txt is the canonical index, like /mcp.
+    llms: (): LlmsEntry[] => {
+      const bySlug = new Map(entriesFor(defaultLocale).map((e) => [e.slug, e] as const));
+      const out: LlmsEntry[] = [];
+      const seen = new Set<string>();
+      const add = (slug: string, section: string) => {
+        const e = bySlug.get(slug);
+        if (!e || seen.has(slug)) return;
+        seen.add(slug);
+        const description = e.data.description ? String(e.data.description) : undefined;
+        out.push({
+          path: docPath(basePath, slug),
+          title: navTitle.get(slug) ?? String(e.data.title ?? slug),
+          section,
+          ...(description ? { description } : {}),
+        });
+      };
+      const walk = (nodes: SidebarNode[], section: string) => {
+        for (const n of nodes) {
+          // a doc, or a folder's index page — "" is a real slug (a root index.md), not "none"
+          if (n.slug !== undefined) add(n.slug, section);
+          if ("items" in n) walk(n.items, section);
+        }
+      };
+      for (const g of sidebarFor(defaultLocale)) walk(g.items, g.title || "Docs");
+      for (const slug of bySlug.keys()) add(slug, "Docs");
+      return out;
+    },
   };
 
   const home = {
@@ -511,6 +545,8 @@ export function createDocs<T extends DocLike>(opts: {
       return pageOf(e, ctx.locale);
     },
     View, md, json, metadata,
+    // Not in /llms.txt: home renders the first doc, which docRoute.llms already lists.
+    llms: false as const,
   };
 
   // On a STATIC build there's no server to answer /search.json?q=… per keystroke, so ship the corpus
@@ -579,6 +615,7 @@ export function createDocs<T extends DocLike>(opts: {
       };
     },
     metadata: { title: "Search" },
+    llms: false as const, // a query UI, no content of its own — kept out of /llms.txt
   };
 
   // OG image route — /og/<slug>.png → kura-branded card for each doc page (nested slugs included).
