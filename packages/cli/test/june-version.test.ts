@@ -59,3 +59,28 @@ test("juneServerVersion: null when there is no bin or no resolvable server (→ 
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+// Windows: node_modules/.bin/june.cmd is a batch shim — a plain file realpath can't follow. The
+// version must still come from the server @junejs/cli resolves (here a nested install that
+// differs from the root one), not from whatever resolves next to .bin.
+test("juneServerVersion: a .cmd shim resolves the server from @junejs/cli, not the app root", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "kura-june-version-win-"));
+  const nm = path.join(root, "node_modules");
+  const pkg = (dir: string, name: string, version: string) => {
+    fs.mkdirSync(path.join(dir, "dist"), { recursive: true });
+    fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name, version, exports: { ".": { default: "./dist/index.js" } } }));
+    fs.writeFileSync(path.join(dir, "dist", "index.js"), "export {};\n");
+  };
+  try {
+    pkg(path.join(nm, "@junejs", "server"), "@junejs/server", "0.1.0"); // the app root's copy
+    const cliDir = path.join(nm, "@junejs", "cli");
+    pkg(cliDir, "@junejs/cli", "0.0.52");
+    pkg(path.join(cliDir, "node_modules", "@junejs", "server"), "@junejs/server", "1.0.0-dev.29"); // the one June runs
+    fs.mkdirSync(path.join(nm, ".bin"), { recursive: true });
+    const shim = path.join(nm, ".bin", "june.cmd");
+    fs.writeFileSync(shim, '@"%~dp0\\..\\@junejs\\cli\\bin.mjs" %*\r\n');
+    assert.equal(juneServerVersion(shim), "1.0.0-dev.29");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

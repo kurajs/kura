@@ -39,13 +39,16 @@ function versionOf(file: string, name: string): string | null {
 }
 
 // The version of the @junejs/server that `juneBin` (the resolved `june` bin) runs: the bin belongs
-// to @junejs/cli, and the server is resolved from there — the same module the running June loads.
-// Null when it can't be determined; callers then assume an older June.
+// to @junejs/cli, and the server is resolved from that package — the same module the running June
+// loads. The package is found next to the bin's .bin directory (node_modules/.bin → node_modules/
+// @junejs/cli), not by following the bin: on Windows the bin is a .cmd shim, a plain file that
+// realpath can't follow. Null when it can't be determined; callers then assume an older June.
 export function juneServerVersion(juneBin: string | null): string | null {
   if (!juneBin) return null;
   try {
-    const bin = fs.realpathSync(juneBin);
-    const serverEntry = createRequire(bin).resolve("@junejs/server");
+    const cliPkg = path.join(path.dirname(juneBin), "..", "@junejs", "cli", "package.json");
+    const from = fs.existsSync(cliPkg) ? fs.realpathSync(cliPkg) : fs.realpathSync(juneBin);
+    const serverEntry = createRequire(from).resolve("@junejs/server");
     return versionOf(serverEntry, "@junejs/server");
   } catch {
     return null;
