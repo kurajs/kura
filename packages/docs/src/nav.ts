@@ -210,19 +210,43 @@ export function createSlugger(): (text: string) => string {
   };
 }
 
-/** Inject ids into h2–h4 of rendered HTML and extract the table of contents. */
+/** The `id` a tag's attribute string already carries, if any (`' id="setup" class="x"'` → "setup"). */
+export function idAttrOf(attrs: string | undefined): string | undefined {
+  return attrs ? /\sid="([^"]*)"/.exec(attrs)?.[1] || undefined : undefined;
+}
+
+/** Heading ids for ONE rendered document. June (≥ the heading-ids release) already gives every
+ *  heading a GitHub-compatible id — the single source of truth, which the search index and the
+ *  right-rail ToC must match — so an existing id is always REUSED, never recomputed. Only a bare
+ *  heading (older June) gets one from {@link createSlugger}, skipping ids already on the page so a
+ *  generated id can't collide with a June one. */
+export function createHeadingIds(html: string): (attrs: string | undefined, text: string) => string {
+  const taken = new Set([...html.matchAll(/\sid="([^"]*)"/g)].map((m) => m[1]!));
+  const slugId = createSlugger();
+  return (attrs, text) => {
+    const existing = idAttrOf(attrs);
+    if (existing) return existing;
+    let id = slugId(text);
+    while (taken.has(id)) id = slugId(text); // the slugger suffixes each repeat: -1, -2, …
+    taken.add(id);
+    return id;
+  };
+}
+
+/** Give h2–h4 of rendered HTML an id (reusing June's when present) and extract the table of contents. */
 export function processHtml(html: string): { html: string; toc: Toc } {
   const toc: Toc = [];
-  const slugId = createSlugger();
-  html = collapseInPageToc(html, slugId); // fold a hand-written "Table of Contents" list into a collapsed
+  const idFor = createHeadingIds(html);
+  html = collapseInPageToc(html, idFor); // fold a hand-written "Table of Contents" list into a collapsed
   // <details>; done BEFORE the heading pass, so that heading is no longer an <h*> and thus also drops out
-  // of the right-rail `toc` below. Its id comes from the SAME slugger, so a later real heading with the
+  // of the right-rail `toc` below. Its id comes from the SAME generator, so a later real heading with the
   // same text can't collide with it (and ids stay aligned with the search indexer).
-  const out = html.replace(/<h([2-4])>([\s\S]*?)<\/h\1>/g, (_m, lvl: string, inner: string) => {
+  const out = html.replace(/<h([2-4])(\s[^>]*)?>([\s\S]*?)<\/h\1>/g, (_m, lvl: string, attrs: string | undefined, inner: string) => {
     const text = inner.replace(/<[^>]+>/g, "").trim();
-    const id = slugId(text);
+    const id = idFor(attrs, text);
     toc.push({ level: Number(lvl), text, id });
-    return `<h${lvl} id="${id}">${inner}</h${lvl}>`;
+    // keep any attributes the heading already has; add the id only when it had none
+    return `<h${lvl}${idAttrOf(attrs) ? attrs : `${attrs ?? ""} id="${id}"`}>${inner}</h${lvl}>`;
   });
   return { html: out, toc };
 }
@@ -232,10 +256,10 @@ export function processHtml(html: string): { html: string; toc: Toc } {
 // <details> that is closed by default. Only a list that actually looks like a ToC (mostly in-page anchor
 // links) is wrapped, so an ordinary list that happens to follow such a heading is left untouched.
 // h2–h4 only, matching the scope of the heading-id pass and the search indexer (splitByHeadings scans
-// ##–####), so the folded ToC's slugger id stays aligned with them.
-const TOC_HEADING = /<h([2-4])(?:\s[^>]*)?>\s*(Table of Contents|Contents)\s*<\/h\1>/gi;
+// ##–####), so the folded ToC's id stays aligned with them.
+const TOC_HEADING = /<h([2-4])(\s[^>]*)?>\s*(Table of Contents|Contents)\s*<\/h\1>/gi;
 
-function collapseInPageToc(html: string, slugId: (text: string) => string): string {
+function collapseInPageToc(html: string, idFor: (attrs: string | undefined, text: string) => string): string {
   let result = "";
   let last = 0;
   let m: RegExpExecArray | null;
@@ -257,7 +281,7 @@ function collapseInPageToc(html: string, slugId: (text: string) => string): stri
     const after = /^\s*<hr\b[^>]*>/i.exec(html.slice(end));
     if (after) end += after[0].length;
     result += html.slice(last, start);
-    result += `<details class="kura-toc" id="${slugId(m[2])}"><summary class="chevron">${m[2]}</summary>${html.slice(listStart, listEnd)}</details>`;
+    result += `<details class="kura-toc" id="${idFor(m[2], m[3]!)}"><summary class="chevron">${m[3]}</summary>${html.slice(listStart, listEnd)}</details>`;
     last = end;
     TOC_HEADING.lastIndex = end; // resume scanning after the wrapped list (and consumed hr)
   }

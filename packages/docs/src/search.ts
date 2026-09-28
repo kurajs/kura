@@ -6,7 +6,7 @@ import { Bm25, rrfScored, latinTokenizer } from "@kurajs/search";
 import type { Tokenizer, TokenizerResolver } from "@kurajs/search";
 import { cjkSegmenter } from "@kurajs/tokenizers";
 import type { DocLike } from "./nav.ts";
-import { createSlugger } from "./nav.ts";
+import { createHeadingIds, createSlugger } from "./nav.ts";
 import { stripMdx } from "./util.ts";
 
 // Default per-locale keyword tokenizer policy: CJK locales get native word
@@ -28,9 +28,9 @@ export function defaultTokenizer(): TokenizerResolver {
   };
 }
 
-// `headingId` aligns with nav's createSlugger() (same de-dup), so a hit deep-links to the exact
-// rendered anchor (#heading); `heading` is the section's heading text (the page title still travels
-// in `title`). The intro section (text before the first h2–h4) has an empty headingId → page top.
+// `headingId` is the anchor processHtml gives the heading (June's own id, else a createHeadingIds
+// slug), so a hit deep-links to the exact rendered anchor (#heading); `heading` is the section's
+// heading text (the page title still travels in `title`). The intro section (text before the first h2–h4) has an empty headingId → page top.
 export type SearchData = { slug: string; title: string; section: string; text: string; locale?: string; headingId?: string; heading?: string };
 export type SearchHit = { slug: string; title: string; section: string; text: string; score: number; locale?: string; headingId?: string; heading?: string; html?: string };
 
@@ -89,18 +89,20 @@ export function htmlToText(html: string): string {
 }
 
 /** Split rendered HTML into heading-anchored sections (h2–h4), mirroring {@link splitByHeadings} on
- *  markdown. Ids come from the SAME slugger (createSlugger, top-to-bottom) that processHtml + the
- *  markdown split use, so a section's `headingId` matches the live page's anchor (deep-links land).
+ *  markdown. Ids come from the SAME generator as processHtml (createHeadingIds: June's own id, else a
+ *  slug), so a section's `headingId` matches the live page's anchor (deep-links land).
  *  Each section keeps its HTML (for a rich preview) and a derived plaintext (index + snippet). */
 function splitHtmlByHeadings(html: string): { headingId: string; heading: string; html: string; text: string }[] {
-  const slugId = createSlugger();
+  // The SAME id generator processHtml uses: June's own heading ids are reused as-is, so a hit's
+  // headingId is exactly the anchor on the live page (bare headings from an older June are slugged).
+  const idFor = createHeadingIds(html);
   const out: { headingId: string; heading: string; html: string; text: string }[] = [];
   for (const part of html.split(/(?=<h[2-4]\b)/i)) {
-    const m = /^<(h[2-4])\b[^>]*>([\s\S]*?)<\/\1>/i.exec(part);
+    const m = /^<(h[2-4])(\s[^>]*)?>([\s\S]*?)<\/\1>/i.exec(part);
     if (m) {
-      const raw = m[2]!.replace(/<[^>]+>/g, "").trim(); // heading text as processHtml slugs it
+      const raw = m[3]!.replace(/<[^>]+>/g, "").trim(); // heading text as processHtml slugs it
       const rest = part.slice(m[0].length).trim();
-      out.push({ headingId: slugId(raw), heading: htmlToText(m[2]!), html: rest, text: htmlToText(rest) });
+      out.push({ headingId: idFor(m[2], raw), heading: htmlToText(m[3]!), html: rest, text: htmlToText(rest) });
     } else {
       // Intro (before the first h2) — drop the leading <h1> (the page title is shown separately).
       const rest = part.replace(/^\s*<h1\b[^>]*>[\s\S]*?<\/h1>/i, "").trim();
@@ -137,7 +139,13 @@ async function indexKb(entries: readonly DocLike[], embedder: Embedder): Promise
     // Prefix the heading text into the embedded chunk (so the heading's own words are searchable
     // and a short section still yields a chunk), then strip MDX/JSX so neither embeddings nor
     // snippets carry raw `<Tab …>`-style markup.
-    for (const sec of splitByHeadings(d.body)) {
+    // Sections come from the rendered HTML whenever there is some — the same source (and the same
+    // heading ids) as the keyword index and the live page, so a semantic hit's deep link lands on
+    // June's own anchor. The markdown split is only the fallback for an entry without HTML.
+    const sections = d.html
+      ? splitHtmlByHeadings(d.html).map((s) => ({ headingId: s.headingId, heading: s.heading, text: s.text }))
+      : splitByHeadings(d.body);
+    for (const sec of sections) {
       const secData = sec.headingId ? { headingId: sec.headingId, heading: sec.heading } : {};
       const text = stripMdx(sec.heading ? `${sec.heading}\n${sec.text}` : sec.text);
       for (const c of chunk(text)) await kb.addText([{ id: `${d.locale ?? "_"}:${d.slug}#${sec.headingId}@${n++}`, text: c, data: { ...base, ...secData, text: c } }]);
