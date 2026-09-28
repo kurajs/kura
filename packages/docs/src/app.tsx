@@ -527,7 +527,8 @@ export function createDocs<T extends DocLike>(opts: {
       };
       const walk = (nodes: SidebarNode[], section: string) => {
         for (const n of nodes) {
-          if (n.slug) add(n.slug, section); // a doc, or a folder's index page
+          // a doc, or a folder's index page — "" is a real slug (a root index.md), not "none"
+          if (n.slug !== undefined) add(n.slug, section);
           if ("items" in n) walk(n.items, section);
         }
       };

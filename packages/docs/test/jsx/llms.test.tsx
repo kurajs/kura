@@ -52,6 +52,16 @@ test("docRoute.llms: an i18n site lists the default locale's pages only, unprefi
   expect(paths.some((p) => p.startsWith("/ja"))).toBe(false);
 });
 
+test('docRoute.llms: a root doc (slug "") keeps its sidebar place, like any other doc', () => {
+  const docs = [doc("", "Overview", { section: "Start" }), doc("a", "A", { section: "Start" }), doc("b", "B", { section: "More" })];
+  const kura = createDocs({ content: { DOCS: docs, doc: finder(docs) as never }, config: { basePath: "/docs", sections: ["Start", "More"] } as never });
+  expect(kura.docRoute.llms()).toEqual([
+    { path: "/docs/", title: "Overview", section: "Start" },
+    { path: "/docs/a", title: "A", section: "Start" },
+    { path: "/docs/b", title: "B", section: "More" },
+  ]);
+});
+
 test("home and search opt out of /llms.txt: home repeats the first doc, search has no content", () => {
   const kura = createDocs({ content: { DOCS, doc: finder(DOCS) as never }, meta: META, config: {} as never });
   expect(kura.home.llms).toBe(false);
