@@ -301,7 +301,8 @@ function collapseInPageToc(html: string): string {
     const after = /^\s*<hr\b[^>]*>/i.exec(html.slice(end));
     if (after) end += after[0].length;
     result += html.slice(last, start);
-    result += `<details class="kura-toc" id="${idAttrOf(m[2])}"><summary class="chevron">${m[3]}</summary>${html.slice(listStart, listEnd)}</details>`;
+    // the id is re-quoted with "…": an authored single-quoted id may itself contain a `"`
+    result += `<details class="kura-toc" id="${idAttrOf(m[2])!.replace(/"/g, "&quot;")}"><summary class="chevron">${m[3]}</summary>${html.slice(listStart, listEnd)}</details>`;
     last = end;
     TOC_HEADING.lastIndex = end; // resume scanning after the wrapped list (and consumed hr)
   }

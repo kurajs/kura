@@ -59,6 +59,14 @@ test("a folded in-page 'Table of Contents' keeps June's id for its <details>", (
   assert.deepEqual(toc.map((t) => t.id), ["setup"]); // the folded ToC heading is no longer a heading
 });
 
+test("a folded ToC re-quotes an authored single-quoted id safely (a \" in it can't open an attribute)", () => {
+  const { html } = processHtml(
+    `<h2 id='x" onmouseover="alert(1)'>Table of Contents</h2><ul><li><a href="#setup">Setup</a></li></ul><h2>Setup</h2>`,
+  );
+  assert.ok(html.includes('<details class="kura-toc" id="x&quot; onmouseover=&quot;alert(1)">'));
+  assert.ok(!html.includes(' onmouseover="'));
+});
+
 const entries = [
   { slug: "guide", data: { title: "Guide", section: "Docs" }, html: JUNE_HTML, body: "", original: "" },
 ] as unknown as DocLike[];
