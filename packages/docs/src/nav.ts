@@ -182,71 +182,91 @@ export function activeTabIndex(tabs: readonly { pages: string[] }[], slug: strin
   return i >= 0 ? i : 0;
 }
 
+// Heading slugs: GitHub's algorithm, copied VERBATIM from June (@junejs/core/slug, which renders
+// every content heading with these ids), so a page's anchors are the same whichever path produced
+// its html: June's markdown render, Kura's MDX precompile, or an older June's bare headings. Copied,
+// not imported, because the stable June 0.1.0 the peer range still admits has no ./slug export.
+// Keep in sync with June's slug.ts + content.ts headingIds; switch to importing once the peer
+// floor is a June that ships it.
+//   • lowercase;
+//   • drop every character that is not a letter, combining mark, number, connector punctuation
+//     (`_`), hyphen, or space: punctuation, symbols and emoji go; letters of every script stay;
+//   • each space becomes "-" (not collapsed, not trimmed: "A & B" → "a--b", as GitHub).
+// One deliberate difference from github-slugger: a heading that slugs to "" gets "section".
+const SLUG_DROP = /[^\p{L}\p{M}\p{N}\p{Pc} -]/gu;
+
+/** The GitHub slug of one heading's text (no de-duplication — see {@link createSlugger}). */
 export function slugify(text: string): string {
-  return text.trim().toLowerCase().replace(/[`*_~]/g, "").replace(/\s+/g, "-").replace(/[^\p{L}\p{N}-]/gu, "");
+  return text.toLowerCase().replace(SLUG_DROP, "").replace(/ /g, "-") || "section";
 }
 
-/** A stateful heading-id generator for ONE document. Slugifies the heading text, falls back to
- *  "section" when slugify yields "" (a punctuation/emoji-only heading would otherwise get id=""),
- *  and de-dups repeats github-slugger style: the first use keeps the bare slug, later ones get -1,
- *  -2, …. Use one slugger per document so the renderer (processHtml) and the search indexer
- *  (splitByHeadings) walk the same headings in order and assign IDENTICAL ids — search deep-links
- *  (`#id`) must match the rendered anchors, including for repeated and h4 headings. */
+/** A stateful slugger for ONE document: call it once per heading, in document order. Repeats are
+ *  de-duplicated github-slugger style (the first use keeps the bare slug, later ones get -1, -2, …),
+ *  and a suffixed candidate is re-checked against every id already emitted, so "Setup", "Setup",
+ *  "Setup 1" → setup, setup-1, setup-1-1. */
 export function createSlugger(): (text: string) => string {
-  const taken = new Map<string, number>(); // every emitted id → its next suffix counter
+  const occurrences = new Map<string, number>();
   return (text: string) => {
-    const base = slugify(text) || "section";
+    const base = slugify(text);
     let id = base;
-    // Re-check the candidate against ALL emitted ids, not just the base count: a suffixed id like
-    // "setup-1" can also be the NATURAL slug of a different heading ("Setup 1"), so keep incrementing
-    // until the id is genuinely free (github-slugger's algorithm).
-    while (taken.has(id)) {
-      const n = (taken.get(base) ?? 0) + 1;
-      taken.set(base, n);
+    while (occurrences.has(id)) {
+      const n = occurrences.get(base)! + 1;
+      occurrences.set(base, n);
       id = `${base}-${n}`;
     }
-    taken.set(id, taken.get(id) ?? 0);
+    occurrences.set(id, 0);
     return id;
   };
 }
 
-/** The `id` a tag's attribute string already carries, if any (`' id="setup" class="x"'` → "setup"). */
+// &-entities the renderer emits in heading text, decoded so the text (and so the slug) is what a
+// reader sees: "Q&amp;A" slugs as "Q&A" → "qa", as on GitHub.
+const NAMED_ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
+const decodeEntities = (s: string) =>
+  s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e: string) =>
+    e[0] === "#"
+      ? String.fromCodePoint(e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : Number(e.slice(1)))
+      : (NAMED_ENTITIES[e.toLowerCase()] ?? m),
+  );
+
+const ID_ATTR = /\sid\s*=\s*(?:"([^"]*)"|'([^']*)')/i;
+
+/** The `id` a tag's attribute string carries, if any (`' id="setup" class="x"'` → "setup"). */
 export function idAttrOf(attrs: string | undefined): string | undefined {
-  return attrs ? /\sid="([^"]*)"/.exec(attrs)?.[1] || undefined : undefined;
+  const m = attrs ? ID_ATTR.exec(attrs) : null;
+  return m ? (m[1] ?? m[2]) || undefined : undefined;
 }
 
-/** Heading ids for ONE rendered document. June (≥ the heading-ids release) already gives every
- *  heading a GitHub-compatible id — the single source of truth, which the search index and the
- *  right-rail ToC must match — so an existing id is always REUSED, never recomputed. Only a bare
- *  heading (older June) gets one from {@link createSlugger}, skipping ids already on the page so a
- *  generated id can't collide with a June one. */
-export function createHeadingIds(html: string): (attrs: string | undefined, text: string) => string {
-  const taken = new Set([...html.matchAll(/\sid="([^"]*)"/g)].map((m) => m[1]!));
-  const slugId = createSlugger();
-  return (attrs, text) => {
-    const existing = idAttrOf(attrs);
-    if (existing) return existing;
-    let id = slugId(text);
-    while (taken.has(id)) id = slugId(text); // the slugger suffixes each repeat: -1, -2, …
+/** Give every heading (h1–h6) of ONE rendered document a GitHub-compatible id, exactly as June's
+ *  content pipeline does: one slugger per document, in order, so repeats de-duplicate as GitHub's
+ *  do. A heading that already has an id (June's, or one an author wrote) keeps it; a generated id
+ *  never repeats any id already in the document; an empty id="" is dropped. Idempotent, so html
+ *  June already anchored passes through unchanged. processHtml and the search indexer both run it
+ *  over the same html, which is what keeps a search hit's headingId on the page's anchor. */
+export function headingIds(html: string): string {
+  const slug = createSlugger();
+  const taken = new Set<string>();
+  for (const m of html.matchAll(new RegExp(ID_ATTR.source, "gi"))) taken.add((m[1] ?? m[2])!);
+  return html.replace(/<h([1-6])(\s[^>]*)?>([\s\S]*?)<\/h\1>/gi, (m, depth: string, attrs: string | undefined, inner: string) => {
+    if (idAttrOf(attrs)) return m;
+    const text = decodeEntities(inner.replace(/<[^>]*>/g, "")).trim();
+    let id: string;
+    do id = slug(text);
+    while (taken.has(id)); // the slugger suffixes each repeat: -1, -2, …
     taken.add(id);
-    return id;
-  };
+    return `<h${depth}${(attrs ?? "").replace(ID_ATTR, "")} id="${id}">${inner}</h${depth}>`;
+  });
 }
 
-/** Give h2–h4 of rendered HTML an id (reusing June's when present) and extract the table of contents. */
+/** Anchor every heading of rendered HTML ({@link headingIds}) and extract the h2–h4 table of contents. */
 export function processHtml(html: string): { html: string; toc: Toc } {
   const toc: Toc = [];
-  const idFor = createHeadingIds(html);
-  html = collapseInPageToc(html, idFor); // fold a hand-written "Table of Contents" list into a collapsed
-  // <details>; done BEFORE the heading pass, so that heading is no longer an <h*> and thus also drops out
-  // of the right-rail `toc` below. Its id comes from the SAME generator, so a later real heading with the
-  // same text can't collide with it (and ids stay aligned with the search indexer).
-  const out = html.replace(/<h([2-4])(\s[^>]*)?>([\s\S]*?)<\/h\1>/g, (_m, lvl: string, attrs: string | undefined, inner: string) => {
-    const text = inner.replace(/<[^>]+>/g, "").trim();
-    const id = idFor(attrs, text);
-    toc.push({ level: Number(lvl), text, id });
-    // keep any attributes the heading already has; add the id only when it had none
-    return `<h${lvl}${idAttrOf(attrs) ? attrs : `${attrs ?? ""} id="${id}"`}>${inner}</h${lvl}>`;
+  html = collapseInPageToc(headingIds(html)); // fold a hand-written "Table of Contents" list into a
+  // collapsed <details>; done BEFORE the ToC pass, so that heading is no longer an <h*> and thus also
+  // drops out of the right-rail `toc` below. It keeps the id headingIds gave it.
+  const out = html.replace(/<h([2-4])(\s[^>]*)?>([\s\S]*?)<\/h\1>/g, (m, lvl: string, attrs: string | undefined, inner: string) => {
+    toc.push({ level: Number(lvl), text: inner.replace(/<[^>]+>/g, "").trim(), id: idAttrOf(attrs)! });
+    return m;
   });
   return { html: out, toc };
 }
@@ -255,11 +275,11 @@ export function processHtml(html: string): { html: string; toc: Toc } {
 // eats a screenful of vertical space. Detect that heading + the list right after it and fold both into a
 // <details> that is closed by default. Only a list that actually looks like a ToC (mostly in-page anchor
 // links) is wrapped, so an ordinary list that happens to follow such a heading is left untouched.
-// h2–h4 only, matching the scope of the heading-id pass and the search indexer (splitByHeadings scans
-// ##–####), so the folded ToC's id stays aligned with them.
+// h2–h4 only, matching the scope of the right-rail ToC and the search indexer (splitByHeadings scans
+// ##–####). Runs on anchored html, so the <details> keeps the heading's id.
 const TOC_HEADING = /<h([2-4])(\s[^>]*)?>\s*(Table of Contents|Contents)\s*<\/h\1>/gi;
 
-function collapseInPageToc(html: string, idFor: (attrs: string | undefined, text: string) => string): string {
+function collapseInPageToc(html: string): string {
   let result = "";
   let last = 0;
   let m: RegExpExecArray | null;
@@ -281,7 +301,7 @@ function collapseInPageToc(html: string, idFor: (attrs: string | undefined, text
     const after = /^\s*<hr\b[^>]*>/i.exec(html.slice(end));
     if (after) end += after[0].length;
     result += html.slice(last, start);
-    result += `<details class="kura-toc" id="${idFor(m[2], m[3]!)}"><summary class="chevron">${m[3]}</summary>${html.slice(listStart, listEnd)}</details>`;
+    result += `<details class="kura-toc" id="${idAttrOf(m[2])}"><summary class="chevron">${m[3]}</summary>${html.slice(listStart, listEnd)}</details>`;
     last = end;
     TOC_HEADING.lastIndex = end; // resume scanning after the wrapped list (and consumed hr)
   }

@@ -10,17 +10,23 @@ import type { Embedder } from "@kurajs/core";
 // recompute them: the right-rail ToC, the keyword index, and the semantic index all have to point
 // at the anchor that is actually on the page.
 //
-// The headings below are chosen so Kura's own slugify would get them WRONG — it drops "_", which
-// GitHub keeps — so a test only passes if the June id is reused rather than recomputed.
+// The headings below are ones Kura's former slugify got wrong (it dropped "_", which GitHub keeps);
+// slugify now IS June's algorithm, so a bare copy of this html anchors the same way (see nav.test).
 const JUNE_HTML =
   '<h1 id="guide">Guide</h1><p>intro</p>' +
   '<h2 id="snake_case_opt">snake_case_opt</h2><p>set the snake option to tune caching</p>' +
   '<h2 id="api_key-vs-api-key">API_KEY vs. api key</h2><p>questions and answers about credentials</p>' +
   '<h3 id="setup">Setup</h3><p>run the installer</p>';
 
-test("premise: Kura's own slugify disagrees with June's ids for these headings", () => {
-  assert.notEqual(slugify("snake_case_opt"), "snake_case_opt");
-  assert.notEqual(slugify("API_KEY vs. api key"), "api_key-vs-api-key");
+test("slugify agrees with June's ids for these headings", () => {
+  assert.equal(slugify("snake_case_opt"), "snake_case_opt");
+  assert.equal(slugify("API_KEY vs. api key"), "api_key-vs-api-key");
+});
+
+test("processHtml reuses an existing id even where the slug would differ (an author's own anchor)", () => {
+  const { html, toc } = processHtml('<h2 id="custom-anchor">Setup</h2><h2>Setup</h2>');
+  assert.deepEqual(toc.map((t) => t.id), ["custom-anchor", "setup"]);
+  assert.equal(html, '<h2 id="custom-anchor">Setup</h2><h2 id="setup">Setup</h2>');
 });
 
 test("processHtml reuses June's ids for the ToC and leaves the headings untouched", () => {
