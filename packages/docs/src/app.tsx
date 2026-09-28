@@ -544,6 +544,8 @@ export function createDocs<T extends DocLike>(opts: {
       return pageOf(e, ctx.locale);
     },
     View, md, json, metadata,
+    // Not in /llms.txt: home renders the first doc, which docRoute.llms already lists.
+    llms: false as const,
   };
 
   // On a STATIC build there's no server to answer /search.json?q=… per keystroke, so ship the corpus
@@ -612,6 +614,7 @@ export function createDocs<T extends DocLike>(opts: {
       };
     },
     metadata: { title: "Search" },
+    llms: false as const, // a query UI, no content of its own — kept out of /llms.txt
   };
 
   // OG image route — /og/<slug>.png → kura-branded card for each doc page (nested slugs included).

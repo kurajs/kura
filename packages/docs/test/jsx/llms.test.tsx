@@ -51,3 +51,9 @@ test("docRoute.llms: an i18n site lists the default locale's pages only, unprefi
   expect(paths.length).toBe(DOCS.length);
   expect(paths.some((p) => p.startsWith("/ja"))).toBe(false);
 });
+
+test("home and search opt out of /llms.txt: home repeats the first doc, search has no content", () => {
+  const kura = createDocs({ content: { DOCS, doc: finder(DOCS) as never }, meta: META, config: {} as never });
+  expect(kura.home.llms).toBe(false);
+  expect(kura.searchRoute.llms).toBe(false);
+});

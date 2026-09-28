@@ -557,6 +557,7 @@ function generateJuneConfig(cwd: string): void {
     "export const md = kura.home.md;\n" +
     "export const json = kura.home.json;\n" +
     "export const metadata = kura.home.metadata;\n" +
+    "export const llms = kura.home.llms;\n" +
     "export default kura.home.View;\n",
   );
 
@@ -583,6 +584,7 @@ function generateJuneConfig(cwd: string): void {
     "export const loader = kura.searchRoute.loader;\n" +
     "export const json = kura.searchRoute.json;\n" +
     "export const metadata = kura.searchRoute.metadata;\n" +
+    "export const llms = kura.searchRoute.llms;\n" +
     "export default kura.searchRoute.View;\n",
   );
 
