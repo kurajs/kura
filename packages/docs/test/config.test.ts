@@ -105,3 +105,19 @@ test("fromKuraToml: mdx_components accepts a string only, ignores other types", 
   assert.equal(fromKuraToml({ mdx_components: true } as never).mdxComponents, undefined);
   assert.equal(fromKuraToml({}).mdxComponents, undefined);
 });
+
+// /llms.txt docs list: on a June that reads the docs route's `llms` export (routeLlms), the
+// hand-built "## Docs" list is left out so the docs aren't listed twice; on older June it stays.
+type LlmsShape = { agent: { llms: { framework: string[]; sections: string[] } } };
+const docLike = (slug: string, title: string) => ({ slug, data: { title }, html: "", original: "", body: "" });
+
+test("kuraJuneConfig: older June keeps the hand-built docs list in llms.txt", () => {
+  const june = kuraJuneConfig({}, { DOCS: [docLike("intro", "Intro")] }) as LlmsShape;
+  assert.deepEqual(june.agent.llms.sections, ["## Docs", "- [Intro](/docs/intro.md)"]);
+});
+
+test("kuraJuneConfig: routeLlms drops the docs list and keeps Kura's canonical names", () => {
+  const june = kuraJuneConfig({}, { DOCS: [docLike("intro", "Intro")] }, { routeLlms: true }) as LlmsShape;
+  assert.deepEqual(june.agent.llms.sections, []);
+  assert.match(june.agent.llms.framework.join("\n"), /npm create kura/);
+});
