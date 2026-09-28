@@ -28,9 +28,9 @@ export function defaultTokenizer(): TokenizerResolver {
   };
 }
 
-// `headingId` aligns with nav's createSlugger() (same de-dup), so a hit deep-links to the exact
-// rendered anchor (#heading); `heading` is the section's heading text (the page title still travels
-// in `title`). The intro section (text before the first h2–h4) has an empty headingId → page top.
+// `headingId` is the anchor processHtml gives the heading (June's own id, else a createHeadingIds
+// slug), so a hit deep-links to the exact rendered anchor (#heading); `heading` is the section's
+// heading text (the page title still travels in `title`). The intro section (text before the first h2–h4) has an empty headingId → page top.
 export type SearchData = { slug: string; title: string; section: string; text: string; locale?: string; headingId?: string; heading?: string };
 export type SearchHit = { slug: string; title: string; section: string; text: string; score: number; locale?: string; headingId?: string; heading?: string; html?: string };
 
@@ -89,8 +89,8 @@ export function htmlToText(html: string): string {
 }
 
 /** Split rendered HTML into heading-anchored sections (h2–h4), mirroring {@link splitByHeadings} on
- *  markdown. Ids come from the SAME slugger (createSlugger, top-to-bottom) that processHtml + the
- *  markdown split use, so a section's `headingId` matches the live page's anchor (deep-links land).
+ *  markdown. Ids come from the SAME generator as processHtml (createHeadingIds: June's own id, else a
+ *  slug), so a section's `headingId` matches the live page's anchor (deep-links land).
  *  Each section keeps its HTML (for a rich preview) and a derived plaintext (index + snippet). */
 function splitHtmlByHeadings(html: string): { headingId: string; heading: string; html: string; text: string }[] {
   // The SAME id generator processHtml uses: June's own heading ids are reused as-is, so a hit's
