@@ -320,7 +320,7 @@
 
     "@junejs/og": ["@junejs/og@0.0.6", "", { "peerDependencies": { "react": "^19.2.0" } }, "sha512-bF6w8Rg8SyL0cgNlupdL8EsSplP9OIYi9ISefu+hGikz3TwUpKAN4GvFyCYL8JyVo9CSL3vE4/hCwM0nrbV3WA=="],
 
-    "@junejs/server": ["@junejs/server@0.1.0", "", { "dependencies": { "@junejs/core": ">=0.1.0", "@junejs/db": ">=0.0.33", "@momiji-rs/sparkdown": "^0.0.4", "lightningcss": "^1.27.0", "oxc-parser": "^0.137.0", "rolldown": "^1.1.0" }, "peerDependencies": { "@libsql/client": "^0.14.0 || ^0.15.0 || ^0.16.0 || ^0.17.0", "mysql2": "^3.0.0", "pg": "^8.0.0", "react": "^19.2.0", "react-dom": "^19.2.0", "react-server-dom-webpack": "19.2.7" }, "optionalPeers": ["@libsql/client", "mysql2", "pg", "react-server-dom-webpack"] }, "sha512-5lziZmt88o58ed61FaV+n3aqPCydwcEsnExj8mALhqSZ7Xgk0QG20Z0nS891Mx6mOztR5IacpSn2S7bvdHyJwg=="],
+    "@junejs/server": ["@junejs/server@0.1.2", "", { "dependencies": { "@junejs/core": ">=0.1.0", "@junejs/db": ">=0.0.33", "@momiji-rs/sparkdown": "^0.0.4", "lightningcss": "^1.27.0", "oxc-parser": "^0.137.0", "rolldown": "^1.1.0" }, "peerDependencies": { "@libsql/client": "^0.14.0 || ^0.15.0 || ^0.16.0 || ^0.17.0", "mysql2": "^3.0.0", "pg": "^8.0.0", "react": "^19.2.0", "react-dom": "^19.2.0", "react-server-dom-webpack": "19.2.7" }, "optionalPeers": ["@libsql/client", "mysql2", "pg", "react-server-dom-webpack"] }, "sha512-j6Xo/DUlnuMcFkKzPNPfpILQOF18wqND1zpFOCtJ79i2u7G22Pc4AWtkicz2o/8dOYGLhEtnDTpMAhS0oEJncA=="],
 
     "@kurajs/cli": ["@kurajs/cli@workspace:packages/cli"],
 
