@@ -39,7 +39,7 @@ One source, four surfaces (HTML · Markdown · JSON · MCP), zero drift.
 ## Structure
 
 ```
-content/docs/*.md        frontmatter: title, description, section, order
+content/docs/*.md        frontmatter: title, sidebarTitle, description, section, order
 app/_content.ts          frozen by `june gen`
 app/_nav.ts              sidebar groups, prev/next, ToC extraction
 app/_kb.ts               semantic search index (@kurajs + bge-m3)
