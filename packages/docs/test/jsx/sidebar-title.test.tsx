@@ -51,6 +51,17 @@ test("leaves inside a nested folder use sidebarTitle", () => {
   const [group] = kura.sidebarFor();
   const folderNode = group!.items[0]!;
   expect("items" in folderNode && folderNode.items.map((i) => i.title)).toEqual(["Refunds"]);
+  // the folder header links to the index page, so it carries that page's label, as the pager does
+  expect(folderNode.title).toBe("Payments");
+  const refunds = kura.docRoute.loader({ params: { slug: "guide/payments/refunds" } } as never) as Page;
+  expect(refunds.doc.prev?.title).toBe(folderNode.title);
+});
+
+test("a folder header keeps its meta title when the index page has no sidebarTitle", () => {
+  const docs = [doc("guide/payments", "Payments: everything about getting paid"), doc("guide/payments/refunds", "Refunds")];
+  const meta = { "": { pages: ["guide"] }, guide: { title: "Guide", pages: ["payments"] }, "guide/payments": { title: "Payments group", pages: ["index", "refunds"] } };
+  const kura = createDocs({ content: { DOCS: docs, doc: finder(docs) as never }, meta, config: { basePath: "" } as never });
+  expect(kura.sidebarFor()[0]!.items[0]!.title).toBe("Payments group");
 });
 
 test("section nav (frontmatter `section`): leaves use sidebarTitle", () => {

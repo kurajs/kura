@@ -266,17 +266,22 @@ export function createDocs<T extends DocLike>(opts: {
   // The label in the navigation chrome (sidebar, pager). A config.nav label already sits in
   // data.title (entriesFor) and wins; otherwise frontmatter `sidebarTitle` shortens a long H1
   // without changing the page's own title, search hits or llms.txt.
-  const navLabel = (e: T, fallback: string = e.slug): string => {
+  const shortLabel = (e: T): string | undefined => {
     if (navTitle.has(e.slug)) return navTitle.get(e.slug)!;
     const short = e.data.sidebarTitle;
-    if (typeof short === "string" && short.trim()) return short.trim();
-    return String(e.data.title ?? fallback);
+    return typeof short === "string" && short.trim() ? short.trim() : undefined;
   };
-  // Section = top group; within it, slug folders nest (treeOf) into collapsible sub-groups.
+  const navLabel = (e: T, fallback: string = e.slug): string => shortLabel(e) ?? String(e.data.title ?? fallback);
+  // Section = top group; within it, slug folders nest (treeOf) into collapsible sub-groups. A folder
+  // header that links to its index page takes that page's short label, so it matches the pager.
   const toNode = (n: NavNode<T>): SidebarNode =>
     n.kind === "doc"
       ? { slug: n.entry.slug, title: navLabel(n.entry) }
-      : { title: n.title, items: n.children.map(toNode), ...(n.index ? { slug: n.index.slug } : {}) };
+      : {
+          title: (n.index && shortLabel(n.index)) ?? n.title,
+          items: n.children.map(toNode),
+          ...(n.index ? { slug: n.index.slug } : {}),
+        };
   // Two nav models. With `section` frontmatter → sections are the top groups (folders nest within).
   // Without → folder-driven (Fumadocs/GitBook style): top-level FOLDERS are the sections, ordered by
   // the root meta.json; a folder's index shows as its first item.
