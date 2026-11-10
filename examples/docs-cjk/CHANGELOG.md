@@ -1,5 +1,12 @@
 # @kurajs/example-docs-cjk
 
+## 0.0.33
+
+### Patch Changes
+
+- Updated dependencies [[`53e7197`](https://github.com/kurajs/kura/commit/53e719708644c11fca4d2e16921f705d451eeb39)]:
+  - @kurajs/docs@0.2.5
+
 ## 0.0.32
 
 ### Patch Changes
