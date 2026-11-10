@@ -40,4 +40,21 @@ Features            ← section label (not a link)
 Sections without an `index.md` are simply labels with their pages listed below — that
 is the common case, and perfectly fine.
 
+## Short sidebar labels
+
+A page's `title` is its heading, its `<title>` and what search and `/llms.txt` show. A
+title written as a full question reads well there but wraps across several lines in the
+sidebar. Give the page a `sidebarTitle` and the sidebar and the prev/next pager use it
+instead, while everything else keeps the full title:
+
+```yaml
+---
+title: How do I set up a bundle discount for two courses?
+sidebarTitle: Bundle discount
+---
+```
+
+The same works for a section landing page: keep a descriptive `title` and set
+`sidebarTitle: Overview`.
+
 There is no central config that can drift from the files — the tree *is* the source.
