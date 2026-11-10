@@ -263,10 +263,19 @@ export function createDocs<T extends DocLike>(opts: {
   // Section frontmatter values are stable KEYS; sectionLabels maps them to localized headings.
   const sectionLabel = (locale: string | undefined, key: string): string =>
     (locale ? opts.config.sectionLabels?.[locale]?.[key] : undefined) ?? key;
+  // The label in the navigation chrome (sidebar, pager). A config.nav label already sits in
+  // data.title (entriesFor) and wins; otherwise frontmatter `sidebarTitle` shortens a long H1
+  // without changing the page's own title, search hits or llms.txt.
+  const navLabel = (e: T, fallback: string = e.slug): string => {
+    if (navTitle.has(e.slug)) return navTitle.get(e.slug)!;
+    const short = e.data.sidebarTitle;
+    if (typeof short === "string" && short.trim()) return short.trim();
+    return String(e.data.title ?? fallback);
+  };
   // Section = top group; within it, slug folders nest (treeOf) into collapsible sub-groups.
   const toNode = (n: NavNode<T>): SidebarNode =>
     n.kind === "doc"
-      ? { slug: n.entry.slug, title: String(n.entry.data.title ?? n.entry.slug) }
+      ? { slug: n.entry.slug, title: navLabel(n.entry) }
       : { title: n.title, items: n.children.map(toNode), ...(n.index ? { slug: n.index.slug } : {}) };
   // Two nav models. With `section` frontmatter → sections are the top groups (folders nest within).
   // Without → folder-driven (Fumadocs/GitBook style): top-level FOLDERS are the sections, ordered by
@@ -275,7 +284,7 @@ export function createDocs<T extends DocLike>(opts: {
   // A top-level folder group → a sidebar section: its index page (if any) leads, then its children.
   const groupToSection = (n: Extract<NavNode<T>, { kind: "group" }>): SidebarGroup => {
     const items: SidebarNode[] = [];
-    if (n.index) items.push({ slug: n.index.slug, title: String(n.index.data.title ?? n.title) });
+    if (n.index) items.push({ slug: n.index.slug, title: navLabel(n.index, n.title) });
     items.push(...n.children.map(toNode));
     return { title: n.title, items };
   };
@@ -290,7 +299,7 @@ export function createDocs<T extends DocLike>(opts: {
         items: groupSlugsFor(locale, gid)
           .map((s) => byslug.get(s))
           .filter((e): e is T => !!e)
-          .map((e) => ({ slug: e.slug, title: String(e.data.title ?? e.slug) })),
+          .map((e) => ({ slug: e.slug, title: navLabel(e) })),
       }));
     }
     const meta = metaFor(locale);
@@ -399,8 +408,8 @@ export function createDocs<T extends DocLike>(opts: {
       ...(description ? { description } : {}),
       html,
       toc,
-      prev: prev ? { slug: prev.slug, title: String(prev.data.title ?? prev.slug) } : null,
-      next: next ? { slug: next.slug, title: String(next.data.title ?? next.slug) } : null,
+      prev: prev ? { slug: prev.slug, title: navLabel(prev) } : null,
+      next: next ? { slug: next.slug, title: navLabel(next) } : null,
       notTranslated,
       ...(lastUpdated ? { lastUpdated } : {}),
     };
