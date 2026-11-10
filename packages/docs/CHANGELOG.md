@@ -1,5 +1,13 @@
 # @kurajs/docs
 
+## 0.2.5
+
+### Patch Changes
+
+- [#98](https://github.com/kurajs/kura/pull/98) [`53e7197`](https://github.com/kurajs/kura/commit/53e719708644c11fca4d2e16921f705d451eeb39) Thanks [@linyiru](https://github.com/linyiru)! - Add a frontmatter `sidebarTitle`: a short label for the navigation chrome while the page keeps its full `title`. The sidebar (folder, `section` and `config.nav` models alike, folder index pages included, and a nested folder's header when its index page sets one) and the prev/next pager show `sidebarTitle`; the H1, the page `<title>`, search hits and `/llms.txt` keep `title`. Help centers whose titles are long questions ("How do I set up a bundle discount for two courses?") can now list them as "Bundle discount" without shortening the heading readers and search engines see.
+
+  A `config.nav` page label (`{ slug, title }`) still wins over `sidebarTitle`, and a blank or non-string value falls back to `title`.
+
 ## 0.2.4
 
 ### Patch Changes
